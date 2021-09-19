@@ -9,3 +9,8 @@ edition = "2018"
 
 stopwatch = "0.0.7"
 infer_macro = {path = "./infer_macro"}
+bencher = "0.1.5"
+
+[[bench]]
+name = "benches"
+harness = false

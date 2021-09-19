@@ -193,11 +193,13 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
       pub struct DLProgram {
          #(#relation_fields)*
       }
-
+      #[allow(non_snake_case)]
       impl DLProgram {
+         #[allow(non_snake_case)]
          pub fn run(&mut self) {
             #(#sccs_compiled)*
          }
+         #[allow(non_snake_case)]
          pub fn update_indices(&mut self) {
             #update_indices_body
          }

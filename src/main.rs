@@ -5,35 +5,6 @@ use std::{any::Any, cmp::max, rc::Rc};
 use stopwatch::Stopwatch;
 use infer_macro::dl;
 
-struct Rel<T> where T: Copy + Eq{
-   data: Vec<T>
-}
-
-trait ClauseTrait{
-
-}
-
-struct Clause<T> where T: Copy + Eq{
-   rel: Rel<T>,
-   args: Vec<Arg>,
-}
-
-enum Arg{
-   Var(&'static str),
-   Val(Box<dyn Any>)
-}
-
-// struct Rule{
-//     head: Box<dyn ClauseTrait>,
-//     body: Vec<Box<dyn ClauseTrait>>,
-// }
-
-struct Rule<THead, TBody1, TBody2> where THead: Eq + Copy, TBody1: Eq + Copy, TBody2 : Eq + Copy{
-   head_rel: Rel<THead>,
-   body_rel1: Rel<TBody1>,
-   body_rel2: Rel<TBody2>,
-   selector: dyn FnOnce (TBody1, TBody2) -> THead
-}
 
 fn lambda_calc_example() {
    println!("Hello, world!");

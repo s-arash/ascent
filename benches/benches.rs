@@ -1,0 +1,39 @@
+#[macro_use]
+extern crate bencher;
+use bencher::Bencher;
+use stopwatch::Stopwatch;
+
+mod tc{
+   use infer_macro::dl;
+
+  dl!{
+     relation edge(i32, i32);
+     relation path(i32, i32);
+
+     path(*x, *y) <-- edge(x,y);
+     path(*x, *z) <-- edge(x,y), path(y, z);
+  }
+}
+
+fn bench_tc(nodes_count: i32){
+  let mut tc = tc::DLProgram::default();
+
+  for i in 0..nodes_count {
+     tc.edge.push((i, i + 1));
+  }
+  tc.update_indices();
+
+  let mut stopwatch = Stopwatch::start_new();
+  tc.run();
+  stopwatch.stop();
+
+  println!("tc for {} nodes took {:?}", nodes_count, stopwatch.elapsed());
+  println!("path size: {}", tc.path.len());
+}
+
+fn bench_tc_1000(_b: &mut Bencher){
+   bench_tc(1000);
+}
+
+benchmark_group!(benches, bench_tc_1000);
+benchmark_main!(benches);
