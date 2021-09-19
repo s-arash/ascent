@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate bencher;
-use bencher::Bencher;
 use stopwatch::Stopwatch;
 
 mod tc{
@@ -31,9 +28,6 @@ fn bench_tc(nodes_count: i32){
   println!("path size: {}", tc.path.len());
 }
 
-fn bench_tc_1000(_b: &mut Bencher){
+fn main(){
    bench_tc(1000);
 }
-
-benchmark_group!(benches, bench_tc_1000);
-benchmark_main!(benches);

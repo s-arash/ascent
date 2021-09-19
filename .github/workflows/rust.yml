@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, ci ]
   pull_request:
     branches: [ master ]
 
@@ -16,7 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - run: cargo --version
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test
     - name: Run Benchmarks
       run: cargo bench bench_tc -- --nocapture
