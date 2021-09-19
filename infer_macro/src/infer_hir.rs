@@ -5,7 +5,7 @@ use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{Expr, Type};
 
-use crate::{RelationIdentity, RuleNode, YadlProgram, expr_to_ident, ir_name_for_rel_indices, utils::{tuple, tuple_type}};
+use crate::{RelationIdentity, RuleNode, InferProgram, expr_to_ident, ir_name_for_rel_indices, utils::{into_set, tuple, tuple_type}};
 
 
 pub(crate) struct InferIr {
@@ -51,7 +51,7 @@ impl IrRelation {
    }
 }
 
-pub(crate) fn compile_yadl_program_to_hir(prog: &YadlProgram) -> InferIr{
+pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> InferIr{
    let ir_rules : Vec<IrRule> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).collect();
    let mut relations_ir_relations = HashMap::new();
    let mut relations_full_indices = HashMap::new();
@@ -65,7 +65,7 @@ pub(crate) fn compile_yadl_program_to_hir(prog: &YadlProgram) -> InferIr{
          indices: full_indices,
          ir_name: ir_name
       };
-      relations_ir_relations.insert(rel_identity.clone(), [rel_full_index.clone()].into());
+      relations_ir_relations.insert(rel_identity.clone(), into_set([rel_full_index.clone()]));
 
       relations_full_indices.insert(rel_identity, rel_full_index);
    }
@@ -84,7 +84,7 @@ pub(crate) fn compile_yadl_program_to_hir(prog: &YadlProgram) -> InferIr{
    }
 }
 
-fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &YadlProgram) -> IrRule {
+fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
    let mut body_clauses = vec![];
    let mut grounded_vars = vec![];
    for bcl in rule.body_clauses.iter() {
@@ -208,11 +208,11 @@ pub(crate) fn compile_ir_rule(prog: &InferIr, rule: &IrRule, clause_ind: usize) 
 
 pub(crate) fn dl_impl_hir_to_code(input: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream>{
 
-   let prog: YadlProgram = syn::parse2(input)?;
-   // let prog = YadlProgram::parse(input.into());// parse_macro_input!(input as YadlProgram);
+   let prog: InferProgram = syn::parse2(input)?;
+   // let prog = InferProgram::parse(input.into());// parse_macro_input!(input as InferProgram);
    
    println!("prog relations: {}", prog.relations.len());
-   let ir = compile_yadl_program_to_hir(&prog);
+   let ir = compile_infer_program_to_hir(&prog);
    println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
 
    println!("relations: {}", ir.relations_ir_relations.keys().map(|r| &r.name).join(", "));

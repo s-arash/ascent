@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use syn::{Expr, Type};
 
 
@@ -31,4 +33,12 @@ pub fn exp_cloned(exp: &Expr) -> Expr {
       #exp.clone()
    };
    syn::parse2(res).unwrap()
+}
+
+pub fn collect_set<T: Eq + std::hash::Hash>(iter : impl Iterator<Item = T>) -> HashSet<T> {
+   iter.collect()
+}
+
+pub fn into_set<T: Eq + std::hash::Hash>(iter : impl IntoIterator<Item = T>) -> HashSet<T> {
+   iter.into_iter().collect()
 }

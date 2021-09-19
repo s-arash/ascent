@@ -1,5 +1,4 @@
 #![allow(warnings)]
-#![feature(proc_macro)]
 mod tests;
 mod infer_mir;
 mod utils;
@@ -16,7 +15,7 @@ extern crate quote;
 use quote::{ToTokens, TokenStreamExt};
 use itertools::Itertools;
 
-use crate::{utils::tuple_type, infer_hir::{compile_ir_rule, compile_yadl_program_to_hir}, infer_mir::{compile_hir_to_mir, compile_mir}};
+use crate::{utils::tuple_type, infer_hir::{compile_ir_rule, compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir, compile_mir}};
 
 // resources:
 // https://blog.rust-lang.org/2018/12/21/Procedural-Macros-in-Rust-2018.html
@@ -127,12 +126,12 @@ impl Parse for RuleNode {
 }
 
 // #[derive(Clone)]
-pub(crate) struct YadlProgram {
+pub(crate) struct InferProgram {
    rules : Vec<RuleNode>,
    relations : Vec<RelationNode>
 }
 
-impl Parse for YadlProgram {
+impl Parse for InferProgram {
    fn parse(input: ParseStream) -> Result<Self> {
       let mut rules = vec![];
       let mut relations = vec![];
@@ -145,7 +144,7 @@ impl Parse for YadlProgram {
             return Err(input.error("bad dl syntax!"));
          }
       }
-      Ok(YadlProgram{rules, relations})
+      Ok(InferProgram{rules, relations})
    }
 }
 
@@ -174,7 +173,7 @@ fn ir_name_for_rel_indices(rel: &Ident, indices: &[usize]) -> Ident {
 
 #[proc_macro]
 pub fn dl_old(input: TokenStream) -> TokenStream{
-   let prog = parse_macro_input!(input as YadlProgram);
+   let prog = parse_macro_input!(input as InferProgram);
    println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
 
    let mut relation_fields = vec![];
@@ -241,8 +240,6 @@ pub fn dl_old(input: TokenStream) -> TokenStream{
 
 #[proc_macro]
 pub fn dl(input: TokenStream) -> TokenStream{
-   // let prog = parse_macro_input!(input as YadlProgram);
-   // let res = dl_impl_hir_to_code(input.into());
    let res = dl_impl(input.into());
    
    match res {
@@ -252,12 +249,11 @@ pub fn dl(input: TokenStream) -> TokenStream{
 }
 
 fn dl_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::TokenStream> {
-   let prog: YadlProgram = syn::parse2(input)?;
-   // let prog = YadlProgram::parse(input.into());// parse_macro_input!(input as YadlProgram);
+   let prog: InferProgram = syn::parse2(input)?;
    println!("prog relations: {}", prog.relations.len());
    println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
    
-   let hir = compile_yadl_program_to_hir(&prog);
+   let hir = compile_infer_program_to_hir(&prog);
    println!("hir relations: {}", hir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
 
    let mir = compile_hir_to_mir(&hir);
@@ -277,7 +273,7 @@ fn expr_to_ident(expr: &Expr) -> Option<Ident> {
 }
 
 
-fn compile_rule(prog: &YadlProgram, rule: &RuleNode, clause_ind: usize) -> proc_macro2::TokenStream {
+fn compile_rule(prog: &InferProgram, rule: &RuleNode, clause_ind: usize) -> proc_macro2::TokenStream {
    if clause_ind < rule.body_clauses.len() {
 
       let bclause = &rule.body_clauses[clause_ind];
