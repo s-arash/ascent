@@ -183,7 +183,7 @@ pub(crate) fn compile_ir_rule(prog: &InferIr, rule: &IrRule, clause_ind: usize) 
             #expr
          });
       }
-      println!("rule head cl relation: {}", rule.head_clause.rel.name.to_string());
+      // println!("rule head cl relation: {}", rule.head_clause.rel.name.to_string());
       let head_relation = &rule.head_clause.rel;
       let row_type = tuple_type(&head_relation.field_types);
       let cond = rule.when_clause.as_ref().map(|x| x.to_token_stream()).unwrap_or( quote! {true}).clone();

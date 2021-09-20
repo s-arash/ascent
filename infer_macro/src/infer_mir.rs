@@ -104,7 +104,7 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
    let dep_graph = get_hir_dep_graph(hir);
    let dep_graph = DiGraphMap::<_,()>::from_edges(&dep_graph).into_graph::<usize>();
    // let dep_graph = petgraph::Graph::<(), ()>::from_edges(&dep_graph);
-   println!("{:?}", Dot::with_config(&dep_graph, &[Config::EdgeNoLabel]));
+   // println!("{:?}", Dot::with_config(&dep_graph, &[Config::EdgeNoLabel]));
    let sccs = kosaraju_scc(&dep_graph);
    let mut sccs = condensation(dep_graph, true);
 

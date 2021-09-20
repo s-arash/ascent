@@ -200,7 +200,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
       let head_rel_name = &rule.head_clause.rel.name;
       let new_row_tuple = tuple(&rule.head_clause.args);
       
-      println!("rule head cl relation: {}", rule.head_clause.rel.name.to_string());
+      // println!("rule head cl relation: {}", rule.head_clause.rel.name.to_string());
       let head_relation = &rule.head_clause.rel;
       // let head_relation = prog.relations.keys().filter(|v| v.name.to_string() == rule.head_clause.rel.to_string()).next().unwrap();
       let row_type = tuple_type(&head_relation.field_types);

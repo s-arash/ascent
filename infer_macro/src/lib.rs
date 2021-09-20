@@ -175,7 +175,7 @@ fn ir_name_for_rel_indices(rel: &Ident, indices: &[usize]) -> Ident {
 #[proc_macro]
 pub fn dl_old(input: TokenStream) -> TokenStream{
    let prog = parse_macro_input!(input as InferProgram);
-   println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
+   // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
 
    let mut relation_fields = vec![];
    
@@ -251,15 +251,15 @@ pub fn dl(input: TokenStream) -> TokenStream{
 
 fn dl_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::TokenStream> {
    let prog: InferProgram = syn::parse2(input)?;
-   println!("prog relations: {}", prog.relations.len());
-   println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
+   // println!("prog relations: {}", prog.relations.len());
+   // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
    
    let hir = compile_infer_program_to_hir(&prog);
-   println!("hir relations: {}", hir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
+   // println!("hir relations: {}", hir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
 
    let mir = compile_hir_to_mir(&hir);
 
-   println!("mir relations: {}", mir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
+   // println!("mir relations: {}", mir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
 
    let code = compile_mir(&mir);
 
