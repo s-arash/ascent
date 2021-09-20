@@ -4,6 +4,7 @@ mod infer_mir;
 mod utils;
 mod infer_hir;
 mod scratchpad;
+mod infer_codegen;
 
 extern crate proc_macro;
 use proc_macro::{Delimiter, Group, TokenStream, TokenTree};
@@ -15,7 +16,7 @@ extern crate quote;
 use quote::{ToTokens, TokenStreamExt};
 use itertools::Itertools;
 
-use crate::{utils::tuple_type, infer_hir::{compile_ir_rule, compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir, compile_mir}};
+use crate::{infer_codegen::compile_mir, infer_hir::{compile_ir_rule, compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir}, utils::tuple_type};
 
 // resources:
 // https://blog.rust-lang.org/2018/12/21/Procedural-Macros-in-Rust-2018.html
