@@ -19,9 +19,10 @@ jobs:
     - run: cargo --version
     - name: Run tests
       run: cargo test test
-    - name: Run macro tests
-      working-directory: ./infer_macro
-      run: cargo test test   
     - name: Run Benchmarks
       working-directory: .
       run: cargo bench bench_tc -- --nocapture
+      # macro tests should be last, because they produce scratchpad.rs, which my not compile
+    - name: Run macro tests
+      working-directory: ./infer_macro
+      run: cargo test test  
