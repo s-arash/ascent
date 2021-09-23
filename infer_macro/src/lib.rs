@@ -13,7 +13,7 @@ use std::{clone, collections::{HashMap, HashSet}, fmt::Pointer};
 #[macro_use]
 extern crate quote;
 use quote::{ToTokens, TokenStreamExt};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use derive_syn_parse::Parse;
 
 use crate::{infer_codegen::compile_mir, infer_hir::{compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir}, utils::tuple_type};
@@ -71,7 +71,44 @@ struct GeneratorNode {
 struct BodyClauseNode {
    rel : Ident,
    args : Punctuated<Expr, Token![,]>,
-   if_clause: Option<Expr>
+   cond_clauses: Vec<CondClause>
+}
+
+#[derive(Parse, Clone, PartialEq, Eq, Hash)]
+struct IfLetClause {
+   if_keyword: Token![if],
+   let_keyword: Token![let],
+   pattern: syn::Pat,
+   eq_symbol : Token![=],
+   exp: syn::Expr,
+}
+
+#[derive(Parse, Clone, PartialEq, Eq, Hash)]
+struct IfClause {
+   if_keyword: Token![if],
+   cond: Expr 
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum CondClause {
+   IfLet(IfLetClause),
+   If(IfClause),
+}
+
+impl Parse for CondClause {
+   fn parse(input: ParseStream) -> Result<Self> {
+      if input.peek(Token![if]) {
+         if input.peek(Token![let]) {
+            let cl: IfLetClause = input.parse()?;
+            return Ok(Self::IfLet(cl));
+         } else {
+            let cl: IfClause = input.parse()?;
+            return Ok(Self::If(cl));
+         }
+      } else {
+         Err(input.error("expected either if clause or if let clause"))
+      }
+   }
 }
 
 impl ToTokens for BodyClauseNode {
@@ -87,12 +124,11 @@ impl Parse for BodyClauseNode{
       let args_content;
       parenthesized!(args_content in input);
       let args = args_content.parse_terminated(Expr::parse)?;
-      let mut if_clause = None;
-      if input.peek(Token![if]) {
-         input.parse::<Token![if]>()?;
-         if_clause = Some(input.parse::<Expr>()?);
+      let mut cond_clauses = vec![];
+      while let Ok(cl) = input.parse(){
+         cond_clauses.push(cl);
       }
-      Ok(BodyClauseNode{rel, args, if_clause})
+      Ok(BodyClauseNode{rel, args, cond_clauses})
    }
 }
 

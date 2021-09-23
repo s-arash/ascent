@@ -5,7 +5,7 @@ use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap:
 use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
-use crate::{GeneratorNode, expr_to_ident, infer_hir::IrBodyItem, infer_mir::MirRelationVersion::*, utils::{exp_cloned, tuple, tuple_type}};
+use crate::{CondClause, GeneratorNode, expr_to_ident, infer_hir::IrBodyItem, infer_mir::MirRelationVersion::*, utils::{exp_cloned, tuple, tuple_type}};
 
 use crate::{RelationIdentity, infer_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, InferIr}};
 
@@ -37,7 +37,7 @@ pub(crate) enum MirBodyItem {
 pub(crate) struct MirBodyClause {
    pub rel: MirRelation,
    pub args: Vec<Expr>,
-   pub if_clause : Option<Expr>
+   pub cond_clauses : Vec<CondClause>
 }
 impl MirBodyClause {
    pub fn selected_args(&self) -> Vec<Expr> {
@@ -113,7 +113,7 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
    let mut dep_graph = DiGraphMap::<_,()>::from_edges(&dep_graph);
    for i in 0..hir.rules.len() {dep_graph.add_node(i);}
    let dep_graph = dep_graph.into_graph::<usize>();
-   println!("{:?}", Dot::with_config(&dep_graph, &[Config::EdgeNoLabel]));
+   // println!("{:?}", Dot::with_config(&dep_graph, &[Config::EdgeNoLabel]));
    let sccs = kosaraju_scc(&dep_graph);
    let mut sccs = condensation(dep_graph, true);
 
@@ -207,7 +207,7 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
                let mir_bcl = MirBodyClause{
                   rel: mir_relation,
                   args : hir_bcl.args.clone(),
-                  if_clause: hir_bcl.if_clause.clone()
+                  cond_clauses: hir_bcl.cond_clauses.clone()
                };
                res.push(MirBodyItem::Clause(mir_bcl));
             }

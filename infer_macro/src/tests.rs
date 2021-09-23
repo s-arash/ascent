@@ -72,6 +72,8 @@ fn test_macro_tc() {
 
        path(*x, *y) <-- edge(x,y);
        path(*x, *z) <-- edge(x,y), path(y, z);
+      //  path(*x, *z) <-- path(x,y), edge(y, z);
+
    };
 
    write_to_scratchpad(input);
@@ -107,6 +109,35 @@ fn test_macro_generator() {
    };
 
    write_to_scratchpad(input);
+}
+
+#[test]
+fn test_macro_patterns() {
+   let input = quote! {
+      relation foo(i32, Option<i32>);
+      relation bar(i32, i32);
+      foo(1, None);
+      foo(2, Some(2));
+      foo(3, Some(30));
+      bar(*x, *y) <-- foo(x, y_opt) if let Some(y) = y_opt if y != x;
+   };
+
+   write_to_scratchpad(input);
+}
+
+#[test]
+fn exp_borrowing(){
+   // let mut v: Vec<i32> = vec![];
+   // let mut u: Vec<i32> = vec![];
+   // for i in 0..v.len(){
+   //    let v_row = &v[i];
+
+   //    for j in 0..u.len(){
+   //       let u_row = &u[j];
+   //       let new_row = *u_row + *v_row;
+   //       v.push(new_row);
+   //    }
+   // }
 }
 
 #[test]

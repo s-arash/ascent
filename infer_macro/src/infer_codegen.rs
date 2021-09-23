@@ -202,21 +202,39 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             let selected_args_cloned = selected_args.iter().map(exp_cloned).collect_vec();
             let selected_args_tuple = tuple(&selected_args_cloned);
             let rel_version_var_name = bclause.rel.var_name();
-            let if_code = if let Some(ref if_clause) = bclause.if_clause {
-               quote! {if ! (#if_clause) {continue};} 
-            } else { 
-               quote!{}
-            };
+            
+            let mut conds_then_next_loop = next_loop;
+            for cond in bclause.cond_clauses.iter().rev() {
+               match cond {
+                  crate::CondClause::IfLet(if_let_clause) => {
+                     let pat = &if_let_clause.pattern;
+                     let expr = &if_let_clause.exp;
+                     conds_then_next_loop = quote! {
+                       if #pat = #expr {
+                          #conds_then_next_loop
+                       }
+                     }
+                  }
+                  crate::CondClause::If(if_clause) => {
+                     let cond = &if_clause.cond;
+                     conds_then_next_loop = quote! {
+                        if #cond {
+                           #conds_then_next_loop
+                        }
+                     }
+                  }
+               }
+            }
 
             quote! {
                let matching = #rel_version_var_name.get( &#selected_args_tuple );
                if matching.is_some() {
                   let matching = matching.unwrap();
                   for &ind in matching.iter() {
-                     let row = &self.#bclause_rel_name[ind];
+                     // TODO we may be doing excessive cloning
+                     let row = &self.#bclause_rel_name[ind].clone();
                      #(#new_vars_assignmnets)*
-                     #if_code
-                     #next_loop
+                     #conds_then_next_loop
                   }
                }
             }

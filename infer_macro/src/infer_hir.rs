@@ -5,7 +5,7 @@ use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{Expr, Type};
 
-use crate::{BodyItemNode, GeneratorNode, InferProgram, RelationIdentity, RuleNode, expr_to_ident, ir_name_for_rel_indices, pat_to_ident, utils::{into_set, tuple, tuple_type}};
+use crate::{BodyItemNode, CondClause, GeneratorNode, InferProgram, RelationIdentity, RuleNode, expr_to_ident, ir_name_for_rel_indices, pat_to_ident, utils::{into_set, tuple, tuple_type}};
 
 
 pub(crate) struct InferIr {
@@ -33,7 +33,7 @@ pub(crate) enum IrBodyItem {
 pub(crate) struct IrBodyClause {
    pub rel : IrRelation,
    pub args : Vec<Expr>,
-   pub if_clause : Option<Expr>
+   pub cond_clauses : Vec<CondClause>
 }
 
 impl IrBodyClause {
@@ -121,7 +121,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
             let ir_bcl = IrBodyClause {
                args: bcl.args.iter().cloned().collect(),
                rel: ir_rel,
-               if_clause: bcl.if_clause.clone()
+               cond_clauses: bcl.cond_clauses.clone()
             };
             body_items.push(IrBodyItem::Clause(ir_bcl));
          },
