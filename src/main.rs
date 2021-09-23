@@ -56,9 +56,9 @@ dl!{
 
 
    // bar(x, y + z) <-- foo1(x, y, z), foo2(z) when x < y;
-   bar(*x, y + z + w.unwrap_or(0)) <-- foo1(x, y, z), foo2(x, w) when *z != 4;
+   bar(*x, y + z + w.unwrap_or(0)) <-- foo1(x, y, z), foo2(x, w) if *z != 4;
 
-   baz2(*x, exp.clone(), exp.depth() as i32) <-- baz(x, exp) when *x < 100;
+   baz2(*x, exp.clone(), exp.depth() as i32) <-- baz(x, exp) if *x < 100;
    // bar(1, 2, 3) <--;
 }
 

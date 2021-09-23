@@ -8,15 +8,15 @@ mod infer_codegen;
 
 extern crate proc_macro;
 use proc_macro::{Delimiter, Group, TokenStream, TokenTree};
-use syn::{Expr, Ident, Result, Token, Type, parenthesized, parse::{self, Parse, ParseStream}, parse_macro_input, punctuated::Punctuated, token::Token};
-use infer_hir::dl_impl_hir_to_code;
+use syn::{Expr, Ident, Pat, Result, Token, Type, parenthesized, parse::{self, Parse, ParseStream}, parse_macro_input, punctuated::Punctuated, token::Token};
 use std::{clone, collections::{HashMap, HashSet}, fmt::Pointer};
 #[macro_use]
 extern crate quote;
 use quote::{ToTokens, TokenStreamExt};
 use itertools::Itertools;
+use derive_syn_parse::Parse;
 
-use crate::{infer_codegen::compile_mir, infer_hir::{compile_ir_rule, compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir}, utils::tuple_type};
+use crate::{infer_codegen::compile_mir, infer_hir::{compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir}, utils::tuple_type};
 
 // resources:
 // https://blog.rust-lang.org/2018/12/21/Procedural-Macros-in-Rust-2018.html
@@ -26,7 +26,7 @@ use crate::{infer_codegen::compile_mir, infer_hir::{compile_ir_rule, compile_inf
 
 mod kw {
    syn::custom_keyword!(relation);
-   syn::custom_keyword!(when);
+   // syn::custom_keyword!(when);
 
    // syn::custom_keyword!(<--);
 }
@@ -49,10 +49,29 @@ impl Parse for RelationNode {
    }
 }
 
+#[derive(Parse)]
+enum BodyItemNode {
+   #[peek(Token![for], name = "GeneratorNode")]
+   Generator(GeneratorNode),
+   #[peek(Ident, name = "BodyClauseNode")]
+   Clause(BodyClauseNode),
+}
+
+
+
+#[derive(Parse, Clone)]
+struct GeneratorNode {
+   for_keyword: Token![for],
+   pattern: Pat,
+   in_keyword: Token![in],
+   expr: Expr
+}
+
 // #[derive(Debug)]
 struct BodyClauseNode {
    rel : Ident,
    args : Punctuated<Expr, Token![,]>,
+   if_clause: Option<Expr>
 }
 
 impl ToTokens for BodyClauseNode {
@@ -68,7 +87,12 @@ impl Parse for BodyClauseNode{
       let args_content;
       parenthesized!(args_content in input);
       let args = args_content.parse_terminated(Expr::parse)?;
-      Ok(BodyClauseNode{rel, args})
+      let mut if_clause = None;
+      if input.peek(Token![if]) {
+         input.parse::<Token![if]>()?;
+         if_clause = Some(input.parse::<Expr>()?);
+      }
+      Ok(BodyClauseNode{rel, args, if_clause})
    }
 }
 
@@ -96,33 +120,32 @@ impl Parse for HeadClauseNode{
 
 struct RuleNode {
    head_clause: HeadClauseNode,
-   body_clauses: Punctuated<BodyClauseNode, Token![,]>,
-   when_clause: Option<Expr>,
-
+   body_items: Punctuated<BodyItemNode, Token![,]>,
 }
 
-impl ToTokens for RuleNode {
-   fn to_tokens(&self, tokens: &mut quote::__private::TokenStream) {
-      self.head_clause.to_tokens(tokens);
-      self.body_clauses.to_tokens(tokens);
-   }
-}
+// impl ToTokens for RuleNode {
+//    fn to_tokens(&self, tokens: &mut quote::__private::TokenStream) {
+//       self.head_clause.to_tokens(tokens);
+//       self.body_items.to_tokens(tokens);
+//    }
+// }
 
 impl Parse for RuleNode {
    fn parse(input: ParseStream) -> Result<Self> {
-       let head_clause : HeadClauseNode = input.parse()?;
-       input.parse::<Token![<]>()?;
-       input.parse::<Token![-]>()?;
-       input.parse::<Token![-]>()?;
-       let body_clauses = Punctuated::<BodyClauseNode, Token![,]>::parse_separated_nonempty(input)?;
-       let mut when_clause = None;
-       if input.peek(kw::when) {
-          input.parse::<kw::when>()?;
-          when_clause = Some(input.parse::<Expr>()?);
-          
-       }
-       input.parse::<Token![;]>()?;
-       Ok(RuleNode{ head_clause, body_clauses, when_clause})
+      let head_clause : HeadClauseNode = input.parse()?;
+
+      if input.peek(Token![;]){
+         // println!("fact rule!!!");
+         input.parse::<Token![;]>()?;
+         Ok(RuleNode{head_clause, body_items: Punctuated::default()})
+      } else {
+         input.parse::<Token![<]>()?;
+         input.parse::<Token![-]>()?;
+         input.parse::<Token![-]>()?;
+         let body_items = Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty(input)?;
+         input.parse::<Token![;]>()?;
+         Ok(RuleNode{ head_clause, body_items})
+      }
    }
 }
 
@@ -165,79 +188,10 @@ impl From<&RelationNode> for RelationIdentity{
 } 
 
 
-
-
 fn ir_name_for_rel_indices(rel: &Ident, indices: &[usize]) -> Ident {
    let name = format!("{}_indices_{}", rel, indices.iter().join("_"));
    Ident::new(&name, rel.span())
 }
-
-#[proc_macro]
-pub fn dl_old(input: TokenStream) -> TokenStream{
-   let prog = parse_macro_input!(input as InferProgram);
-   // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
-
-   let mut relation_fields = vec![];
-   
-   for rel in prog.relations.iter(){
-      let name = &rel.name;
-      let field_types = &rel.field_types;
-      relation_fields.push(quote! {
-         pub #name : Vec<(#field_types)>,
-
-      });
-   }
-
-   let mut compiled_rules = vec![];
-   for rule in prog.rules.iter() {
-      compiled_rules.push(compile_rule(&prog, rule, 0));
-   }
-
-   let mut merge_rels = vec![];
-   for rel in prog.relations.iter(){
-      let name = &rel.name;
-      merge_rels.push(quote! {
-         Self::extend_no_dup(&mut self.#name, & other.#name);
-      });
-   }
-   let res = quote! {
-      #[derive(Default)]
-      struct DLProgram {
-         #(#relation_fields)*
-      }
-
-      impl DLProgram {
-         pub fn run(&mut self) {
-            loop {
-               let mut new_db = DLProgram::default();
-               #(#compiled_rules)*
-               if !self.merge(&new_db) {break;}
-            }
-         }
-
-         fn merge(&mut self, other: &Self) -> bool{
-            let changed = false;
-            #(#merge_rels)*
-            changed
-         }
-
-         fn extend_no_dup<T : Clone + Eq>(vec1 : &mut Vec<T>, vec2: & Vec<T>) -> bool {
-            let mut res = false;
-            for item in vec2.iter(){
-               if !vec1.contains(item) {
-                  vec1.push(item.clone());
-                  res = true;
-               }
-            }
-            res
-         }
-      }
-   };
-   println!("res:\n {}", res);
-
-   TokenStream::from(res)
-}
-
 
 #[proc_macro]
 pub fn dl(input: TokenStream) -> TokenStream{
@@ -273,67 +227,9 @@ fn expr_to_ident(expr: &Expr) -> Option<Ident> {
    }
 }
 
-
-fn compile_rule(prog: &InferProgram, rule: &RuleNode, clause_ind: usize) -> proc_macro2::TokenStream {
-   if clause_ind < rule.body_clauses.len() {
-
-      let bclause = &rule.body_clauses[clause_ind];
-      let bclause_rel = &bclause.rel;
-      
-      let pre_clause_vars = rule.body_clauses.iter().take(clause_ind)
-                              .flat_map(|cl| cl.args.iter().filter_map(expr_to_ident))
-                              .collect::<Vec<_>>();
-      
-      let clause_vars = rule.body_clauses[clause_ind].args.iter().enumerate()
-                           .filter_map(|(i,v)| expr_to_ident(v).map(|v| (i, v)))
-                           .collect::<Vec<_>>();
-      
-      let common_vars = clause_vars.iter().filter(|(i,v)| pre_clause_vars.contains(v)).collect::<Vec<_>>();
-      let common_vars_no_indices = common_vars.iter().map(|(i,v)| v.clone()).collect::<Vec<_>>();
-      
-      println!("common_vars: {:?}", common_vars);
-      
-      let mut consistency_check = vec![quote! {true}];
-      for (i, var) in common_vars.iter(){
-         let i_ind = syn::Index::from(*i);
-         consistency_check.push(quote! {&& #var == row.#i_ind})
-      }
-      
-      let mut assignments = vec![];
-      for (i, var) in clause_vars.iter() {
-         if common_vars_no_indices.contains(var) {continue};
-         let i_ind = syn::Index::from(*i);
-         assignments.push(quote! {let #var = row.#i_ind.clone();})
-      }
-      
-      let next_loop = compile_rule(prog, rule, clause_ind + 1);
-      let res = quote! {
-         for row in self.#bclause_rel.iter() {
-            if !(#(#consistency_check)*) { continue };
-            #(#assignments)*
-            #next_loop
-         }
-      };
-      res
-   } else {
-      let head_rel = &rule.head_clause.rel;
-      let mut assignments = vec![];
-      for (i, expr) in rule.head_clause.args.iter().enumerate(){
-         let i_ind = syn::Index::from(i);
-         assignments.push(quote! {
-            #expr
-         });
-      }
-      let head_relation = prog.relations.iter().filter(|v| v.name == rule.head_clause.rel).next().unwrap();
-      let row_type = &head_relation.field_types;
-      let cond = rule.when_clause.as_ref().map(|x| x.to_token_stream()).unwrap_or( quote! {true}).clone();
-      quote! {
-         if #cond {
-            let new_row: (#row_type) = (#(#assignments),*) ;
-            new_db.#head_rel.push(new_row);
-         }
-      }
-
+fn pat_to_ident(pat: &Pat) -> Option<Ident> {
+   match pat {
+      Pat::Ident(ident) => Some(ident.ident.clone()),
+      _ => None
    }
 }
-

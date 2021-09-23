@@ -15,3 +15,4 @@ infer_base = {path= "../infer_base"}
 proc-macro2 = "1.0"
 itertools = "0.10"
 petgraph = "0.6.0"
+derive-syn-parse = "0.1.5"

@@ -6,7 +6,7 @@ mod tc{
   dl!{
      relation edge(i32, i32);
      relation path(i32, i32);
-
+     // edge(x, x + 1) <-- for x in (0..1000);
      path(*x, *y) <-- edge(x,y);
      path(*x, *z) <-- edge(x,y), path(y, z);
   }

@@ -1,7 +1,10 @@
-use itertools::Itertools;
+use std::fmt::Display;
+
+use itertools::{Iterate, Itertools};
+use proc_macro2::Ident;
 use syn::{Expr, Type, parse2};
 
-use crate::{expr_to_ident, infer_mir::{InferMir, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, utils::{exp_cloned, tuple, tuple_type}};
+use crate::{expr_to_ident, infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, pat_to_ident, utils::{exp_cloned, tuple, tuple_type}};
 use crate::infer_mir::MirRelationVersion::*;
 
 pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
@@ -93,10 +96,16 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
    }
    
    let mut evaluate_rules = vec![];
+   fn bitem_to_str(bitem: &MirBodyItem) -> String {
+      match bitem {
+         MirBodyItem::Clause(bcl) => format!("{}_{}", bcl.rel.ir_name, bcl.rel.version.to_string()),
+         MirBodyItem::Generator(gen) => format!("for_{}", pat_to_ident(&gen.pattern).map(|x| x.to_string()).unwrap_or_default()),
+      }
+   }
    for rule in scc.rules.iter() {
       let comment = format!("{} <-- {}",
                              rule.head_clause.rel.name.to_string(),
-                             rule.body_clauses.iter().map(|bcl| format!("{}_{}", bcl.rel.ir_name, bcl.rel.version.to_string())).join(", "));
+                             rule.body_items.iter().map(bitem_to_str).join(", "));
       evaluate_rules.push(quote! {
          comment(#comment);
       });
@@ -156,46 +165,73 @@ fn compile_update_indices_function_body(mir: &InferMir) -> proc_macro2::TokenStr
 
 fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: usize) -> proc_macro2::TokenStream {
 
-   if clause_ind < rule.body_clauses.len(){
-
-      let bclause = &rule.body_clauses[clause_ind];
-      let bclause_rel = &bclause.rel;
-      let bclause_rel_sel = &bclause_rel.ir_name;
-      let bclause_rel_name = &bclause.rel.relation.name;
-      let selected_args = &bclause.selected_args();
-
-      let pre_clause_vars = rule.body_clauses.iter().take(clause_ind)
-                                 .flat_map(|cl| cl.args.iter().filter_map(expr_to_ident))
-                                 .collect::<Vec<_>>();
-
-      let clause_vars = bclause.args.iter().enumerate()
-                           .filter_map(|(i,v)| expr_to_ident(v).map(|v| (i, v)))
-                           .collect::<Vec<_>>();
-      let common_vars = clause_vars.iter().filter(|(i,v)| pre_clause_vars.contains(v)).collect::<Vec<_>>();
-      let common_vars_no_indices = common_vars.iter().map(|(i,v)| v.clone()).collect::<Vec<_>>();
-
-      let mut new_vars_assignmnets = vec![];
-      for (i,var) in clause_vars.iter(){
-         if common_vars_no_indices.contains(var) {continue;}
-         let i_ind = syn::Index::from(*i);
-         new_vars_assignmnets.push(quote! {let #var = &row.#i_ind;});
-      }
-
+   if clause_ind < rule.body_items.len(){
+      let bitem = &rule.body_items[clause_ind];
       let next_loop = compile_mir_rule(rule, scc, mir, clause_ind + 1);
-      let selected_args_cloned = selected_args.iter().map(exp_cloned).collect_vec();
-      let selected_args_tuple = tuple(&selected_args_cloned);
-      let rel_version_var_name = bclause.rel.var_name();
-      quote! {
-         let matching = #rel_version_var_name.get( &#selected_args_tuple );
-         if matching.is_some() {
-            let matching = matching.unwrap();
-            for &ind in matching.iter() {
-               let row = &self.#bclause_rel_name[ind];
-               #(#new_vars_assignmnets)*
-               #next_loop
+
+      match bitem {
+         MirBodyItem::Clause(bclause) => {
+            let bclause_rel = &bclause.rel;
+            let bclause_rel_sel = &bclause_rel.ir_name;
+            let bclause_rel_name = &bclause.rel.relation.name;
+            let selected_args = &bclause.selected_args();
+
+            fn bitem_vars(bitem : &MirBodyItem) -> Vec<Ident> {
+               match bitem {
+                  MirBodyItem::Clause(cl) => cl.args.iter().filter_map(expr_to_ident).collect(),
+                  MirBodyItem::Generator(gen) => pat_to_ident(&gen.pattern).into_iter().collect()
+               }
+            }
+            let pre_clause_vars = rule.body_items.iter().take(clause_ind)
+                                       .flat_map(bitem_vars)
+                                       .collect::<Vec<_>>();
+
+            let clause_vars = bclause.args.iter().enumerate()
+                                 .filter_map(|(i,v)| expr_to_ident(v).map(|v| (i, v)))
+                                 .collect::<Vec<_>>();
+            let common_vars = clause_vars.iter().filter(|(i,v)| pre_clause_vars.contains(v)).collect::<Vec<_>>();
+            let common_vars_no_indices = common_vars.iter().map(|(i,v)| v.clone()).collect::<Vec<_>>();
+
+            let mut new_vars_assignmnets = vec![];
+            for (i,var) in clause_vars.iter(){
+               if common_vars_no_indices.contains(var) {continue;}
+               let i_ind = syn::Index::from(*i);
+               new_vars_assignmnets.push(quote! {let #var = &row.#i_ind;});
+            }
+
+            let selected_args_cloned = selected_args.iter().map(exp_cloned).collect_vec();
+            let selected_args_tuple = tuple(&selected_args_cloned);
+            let rel_version_var_name = bclause.rel.var_name();
+            let if_code = if let Some(ref if_clause) = bclause.if_clause {
+               quote! {if ! (#if_clause) {continue};} 
+            } else { 
+               quote!{}
+            };
+
+            quote! {
+               let matching = #rel_version_var_name.get( &#selected_args_tuple );
+               if matching.is_some() {
+                  let matching = matching.unwrap();
+                  for &ind in matching.iter() {
+                     let row = &self.#bclause_rel_name[ind];
+                     #(#new_vars_assignmnets)*
+                     #if_code
+                     #next_loop
+                  }
+               }
+            }
+         },
+         MirBodyItem::Generator(gen) => {
+            let pat = &gen.pattern;
+            let expr = &gen.expr;
+            quote! {
+               for #pat in #expr {
+                  #next_loop
+               }
             }
          }
       }
+      
    } else {
       let head_rel_name = &rule.head_clause.rel.name;
       let new_row_tuple = tuple(&rule.head_clause.args);
@@ -231,24 +267,17 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
       let add_row = quote! {
          // comment("check if the tuple already exists");
          let new_row: #row_type = #new_row_tuple;
-         if #head_rel_full_index_var_name_new.contains_key(&new_row) ||
+         if !(#head_rel_full_index_var_name_new.contains_key(&new_row) ||
             #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
-            #head_rel_full_index_var_name_total.contains_key(&new_row)
-            {continue;}
-         let new_row_ind = self.#head_rel_name.len();
-         #(#update_indices)*
-         self.#head_rel_name.push(new_row);
-         changed = true;
-      };
-      if let Some(ref when_clause) = rule.when_clause{
-         quote! {
-            if #when_clause {
-               #add_row
-            }
+            #head_rel_full_index_var_name_total.contains_key(&new_row))
+         {
+            let new_row_ind = self.#head_rel_name.len();
+            #(#update_indices)*
+            self.#head_rel_name.push(new_row);
+            changed = true;
          }
-      } else {
-         add_row
-      }
+      };
+      add_row
    }
 }
 

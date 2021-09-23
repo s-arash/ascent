@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use petgraph::dot::{Config, Dot};
 use proc_macro2::TokenStream;
 
-use crate::{dl_impl, dl_impl_hir_to_code};
+use crate::{dl_impl};
 
 #[test]
-fn test_macro() {
+fn test_macro1() {
    // let inp = quote!{
    //     relation foo(i32);
    //     relation bar(i32, i32);
@@ -14,29 +14,39 @@ fn test_macro() {
    //     foo(x) <-- bar(x,y);
    // };
 
-   let inp = quote! {
-       relation foo(i32);
-       relation bar(i32, i32);
-       relation baz(i32, i32);
+   // let inp = quote! {
+   //     relation foo(i32);
+   //     relation bar(i32, i32);
+   //     relation baz(i32, i32);
 
 
-       foo(x) <-- bar(x,y), baz(y, z) when x < z;
-       baz(x - 1, x + 1) <-- foo(x) when x > 42;
-   };
+   //     foo(*x) <-- bar(x,y) if *x > 42, baz(y, z) if *x < *z;
+   //     baz(*x - 1, *x + 1) <-- foo(x) if *x > 42;
+   // };
 
-   let inp = quote! {
-       relation bar(i32, i32);
-       relation foo1(i32, i32, i32);
-       relation foo2(i32, Option<i32>);
+   // let inp = quote! {
+   //     relation bar(i32, i32);
+   //     relation foo1(i32, i32, i32);
+   //     relation foo2(i32, Option<i32>);
 
-       relation baz(i32, Vec<i32>);
-       relation baz2(i32, Vec<i32>, i32);
+   //     relation baz(i32, Vec<i32>);
+   //     relation baz2(i32, Vec<i32>, i32);
 
 
-       // bar(x, y + z) <-- foo1(x, y, z), foo2(z) when x < y;
-       bar(*x, y + z + w.unwrap_or(0)) <-- foo1(x, y, z), foo2(x, w) when *z != 4;
+   //     // bar(x, y + z) <-- foo1(x, y, z), foo2(z) when x < y;
+   //     bar(*x, y + z + w.unwrap_or(0)) <-- foo1(x, y, z), foo2(x, w) if *z != 4;
 
-       baz2(*x, exp.clone(), exp.len() as i32) <-- baz(x, exp) when *x < 100;
+   //     baz2(*x, exp.clone(), exp.len() as i32) <-- baz(x, exp) if *x < 100;
+   // };
+
+   let inp = quote!{
+      relation bar(i32, i32);
+      relation foo1(i32, i32);
+      relation foo2(i32, i32);
+      foo1(1,2);
+      foo1(10,20);
+
+      bar(*x, y + z) <-- foo1(x, y), foo2(y, z) if *z > *y;
    };
 
    write_to_scratchpad(inp);
@@ -62,6 +72,38 @@ fn test_macro_tc() {
 
        path(*x, *y) <-- edge(x,y);
        path(*x, *z) <-- edge(x,y), path(y, z);
+   };
+
+   write_to_scratchpad(input);
+}
+
+
+#[test]
+fn test_macro_lambda(){
+   let input = quote!{
+      relation output(LambdaCalcExpr);
+      relation input(LambdaCalcExpr);
+      relation eval(LambdaCalcExpr, LambdaCalcExpr);
+      relation do_eval(LambdaCalcExpr);
+
+      eval(exp.clone(), exp.clone()) <-- do_eval(exp) if exp.is_ref();
+      eval(exp.clone(), exp.clone()) <-- do_eval(exp) if exp.is_lam();
+      do_eval(get_app(exp).0.clone()) <-- do_eval(exp) if exp.is_app();
+      eval(exp, sub(get_lam(f_res).1, get_lam(f_res).0, get_app(exp).1)) <-- 
+         do_eval(exp) if exp.is_app(), 
+         eval(f, f_res) if f_res.is_lam() && f == get_app(exp).0 ;
+   };
+   write_to_scratchpad(input);
+}
+
+#[test]
+fn test_macro_generator() {
+   let input = quote! {
+      relation edge(i32, i32);
+      relation path(i32, i32);
+      edge(x, x + 1) <-- for x in (0..100);
+      path(*x, *y) <-- edge(x,y);
+      path(*x, *z) <-- edge(x,y), path(y, z);
    };
 
    write_to_scratchpad(input);
