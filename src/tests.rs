@@ -1,11 +1,12 @@
 use std::{cmp::max, collections::HashMap, hash, rc::Rc};
 
 
-use std::collections;
+use std::collections::{self, HashSet};
 use infer_macro::dl;
 
 use derive_more::*;
 use LambdaCalcExpr::*;
+use crate::utils::*;
 
 #[derive(Clone, PartialEq, Eq, Debug, IsVariant, Hash)]
 enum LambdaCalcExpr{
@@ -112,7 +113,7 @@ fn test_dl2(){
    let mut prog = DLProgram::default();
    
    let foo2 = vec![
-      (2,4),
+      (2, 4),
       (2, 1),
       (20, 40),
       (20, 0),
@@ -122,8 +123,44 @@ fn test_dl2(){
 
    prog.run();
 
-   assert!(prog.bar.contains(&(1, 6)));
-   assert!(prog.bar.contains(&(10, 60)));
-   assert!(!prog.bar.contains(&(0, 6)));
+   println!("bar: {:?}", prog.bar);
+   assert!(rels_equal([(1, 3), (1, 6), (10, 60), (10, 20)], prog.bar));
 }
 
+#[test]
+fn test_dl_expressions(){
+   dl!{
+      relation foo(i32, i32);
+      relation bar(i32, i32);
+      relation baz(i32, i32, i32);
+      foo(1, 2);
+      foo(2, 3);
+      foo(3, 5);
+
+      bar(3, 6);
+      bar(5, 10);
+
+      baz(*x, *y, *z) <-- foo(x, y), bar(x + y , z);
+   };
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("baz: {:?}", prog.baz);
+   assert!(rels_equal([(1,2,6), (2,3,10)], prog.baz));
+}
+
+#[test]
+fn test_dl_generators(){
+   dl!{
+      relation foo(i32, i32);
+      relation bar(i32);
+
+      foo(x, y) <-- for x in 0..10, for y in (x+1)..10;
+
+      bar(*x) <-- foo(x, y);
+      bar(*y) <-- foo(x, y);
+   };
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("foo: {:?}", prog.foo);
+   assert_eq!(prog.foo.len(), 45);
+}

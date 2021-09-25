@@ -227,9 +227,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             }
 
             quote! {
-               let matching = #rel_version_var_name.get( &#selected_args_tuple );
-               if matching.is_some() {
-                  let matching = matching.unwrap();
+               if let Some(matching) = #rel_version_var_name.get( &#selected_args_tuple) {
                   for &ind in matching.iter() {
                      // TODO we may be doing excessive cloning
                      let row = &self.#bclause_rel_name[ind].clone();

@@ -7,46 +7,18 @@ use crate::{dl_impl};
 
 #[test]
 fn test_macro1() {
-   // let inp = quote!{
-   //     relation foo(i32);
-   //     relation bar(i32, i32);
-
-   //     foo(x) <-- bar(x,y);
-   // };
-
-   // let inp = quote! {
-   //     relation foo(i32);
-   //     relation bar(i32, i32);
-   //     relation baz(i32, i32);
-
-
-   //     foo(*x) <-- bar(x,y) if *x > 42, baz(y, z) if *x < *z;
-   //     baz(*x - 1, *x + 1) <-- foo(x) if *x > 42;
-   // };
-
-   // let inp = quote! {
-   //     relation bar(i32, i32);
-   //     relation foo1(i32, i32, i32);
-   //     relation foo2(i32, Option<i32>);
-
-   //     relation baz(i32, Vec<i32>);
-   //     relation baz2(i32, Vec<i32>, i32);
-
-
-   //     // bar(x, y + z) <-- foo1(x, y, z), foo2(z) when x < y;
-   //     bar(*x, y + z + w.unwrap_or(0)) <-- foo1(x, y, z), foo2(x, w) if *z != 4;
-
-   //     baz2(*x, exp.clone(), exp.len() as i32) <-- baz(x, exp) if *x < 100;
-   // };
-
    let inp = quote!{
+      relation foo(i32, i32);
       relation bar(i32, i32);
-      relation foo1(i32, i32);
-      relation foo2(i32, i32);
-      foo1(1,2);
-      foo1(10,20);
+      relation baz(i32, i32, i32);
+      foo(1, 2);
+      foo(2, 3);
+      foo(3, 5);
 
-      bar(*x, y + z) <-- foo1(x, y), foo2(y, z) if *z > *y;
+      bar(3, 6);
+      bar(5, 10);
+
+      baz(*x, *y, *z) <-- foo(x, y), bar(x + y , z);
    };
 
    write_to_scratchpad(inp);
@@ -79,24 +51,6 @@ fn test_macro_tc() {
    write_to_scratchpad(input);
 }
 
-
-#[test]
-fn test_macro_lambda(){
-   let input = quote!{
-      relation output(LambdaCalcExpr);
-      relation input(LambdaCalcExpr);
-      relation eval(LambdaCalcExpr, LambdaCalcExpr);
-      relation do_eval(LambdaCalcExpr);
-
-      eval(exp.clone(), exp.clone()) <-- do_eval(exp) if exp.is_ref();
-      eval(exp.clone(), exp.clone()) <-- do_eval(exp) if exp.is_lam();
-      do_eval(get_app(exp).0.clone()) <-- do_eval(exp) if exp.is_app();
-      eval(exp, sub(get_lam(f_res).1, get_lam(f_res).0, get_app(exp).1)) <-- 
-         do_eval(exp) if exp.is_app(), 
-         eval(f, f_res) if f_res.is_lam() && f == get_app(exp).0 ;
-   };
-   write_to_scratchpad(input);
-}
 
 #[test]
 fn test_macro_generator() {

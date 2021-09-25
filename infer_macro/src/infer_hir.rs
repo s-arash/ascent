@@ -106,6 +106,8 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
                   } else {
                      grounded_vars.push(var);
                   }
+               } else {
+                  indices.push(i);
                }
             }
             let ir_name = ir_name_for_rel_indices(&bcl.rel, &indices);

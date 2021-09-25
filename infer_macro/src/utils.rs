@@ -29,8 +29,12 @@ pub fn tuple(exprs: &[Expr]) -> Expr {
 }
 
 pub fn exp_cloned(exp: &Expr) -> Expr {
-   let res = quote! {
-      #exp.clone()
+   let res = match exp {
+      Expr::Path(_) |
+      Expr::Field(_) |
+      Expr::Paren(_) =>
+         quote! {#exp.clone()},
+      _ => quote! {(#exp).clone()}
    };
    syn::parse2(res).unwrap()
 }

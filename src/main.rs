@@ -1,5 +1,6 @@
 #![allow(warnings)]
 mod tests;
+mod utils;
 
 use std::{any::Any, cmp::max, rc::Rc};
 use stopwatch::Stopwatch;
