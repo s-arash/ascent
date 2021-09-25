@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use syn::{Expr, Type};
+use syn::{Expr, Type, punctuated::Punctuated};
 
 
 
@@ -45,4 +45,14 @@ pub fn collect_set<T: Eq + std::hash::Hash>(iter : impl Iterator<Item = T>) -> H
 
 pub fn into_set<T: Eq + std::hash::Hash>(iter : impl IntoIterator<Item = T>) -> HashSet<T> {
    iter.into_iter().collect()
+}
+
+pub fn map_punctuated<T, P, U>(punc: Punctuated<T,P>, mut f: impl FnMut (T) -> U) -> Punctuated<U,P> {
+   let mut res = Punctuated::new();
+   for pair in punc.into_pairs() {
+      let (t, p) = pair.into_tuple();
+      res.push_value(f(t));
+      if let Some(p) = p {res.push_punct(p)}
+   };
+   res
 }

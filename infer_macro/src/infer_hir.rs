@@ -5,7 +5,7 @@ use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{Expr, Type};
 
-use crate::{BodyItemNode, CondClause, GeneratorNode, InferProgram, RelationIdentity, RuleNode, expr_to_ident, ir_name_for_rel_indices, pat_to_ident, utils::{into_set, tuple, tuple_type}};
+use crate::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, InferProgram, RelationIdentity, RuleNode, expr_to_ident, ir_name_for_rel_indices, pat_to_ident, utils::{into_set, tuple, tuple_type}};
 
 
 pub(crate) struct InferIr {
@@ -99,9 +99,8 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
          BodyItemNode::Clause(ref bcl) => {
             let mut indices = vec![];
             for (i,arg) in bcl.args.iter().enumerate() {
-               if let Some(var) = expr_to_ident(arg) {
+               if let Some(var) = expr_to_ident(arg.unwrap_expr_ref()) {
                   if grounded_vars.contains(&var){
-                     // TODO how is this not a bug?
                      indices.push(i);
                   } else {
                      grounded_vars.push(var);
@@ -121,7 +120,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
                ir_name
             };
             let ir_bcl = IrBodyClause {
-               args: bcl.args.iter().cloned().collect(),
+               args: bcl.args.iter().cloned().map(BodyClauseArg::unwrap_expr).collect(),
                rel: ir_rel,
                cond_clauses: bcl.cond_clauses.clone()
             };

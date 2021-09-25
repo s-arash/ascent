@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use itertools::Either;
 use petgraph::dot::{Config, Dot};
 use proc_macro2::TokenStream;
 
@@ -73,6 +74,7 @@ fn test_macro_patterns() {
       foo(1, None);
       foo(2, Some(2));
       foo(3, Some(30));
+      bar(*x, *y) <-- foo(x, ?Some(y)) if y != x;
       bar(*x, *y) <-- foo(x, y_opt) if let Some(y) = y_opt if y != x;
    };
 

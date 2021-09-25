@@ -97,6 +97,23 @@ fn test_dl_patterns(){
 }
 
 #[test]
+fn test_dl_pattern_args(){
+   dl!{
+      relation foo(i32, Option<i32>);
+      relation bar(i32, i32);
+      foo(1, None);
+      foo(2, Some(2));
+      foo(3, Some(30));
+      bar(*x, *y) <-- foo(x, ?Some(y)) if y != x;
+   };
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("bar: {:?}", prog.bar);
+   assert!(prog.bar.contains(&(3,30)));
+   assert!(prog.bar.len() == 1);
+}
+
+#[test]
 fn test_dl2(){
    dl!{
       relation bar(i32, i32);

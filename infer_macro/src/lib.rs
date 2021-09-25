@@ -8,15 +8,16 @@ mod infer_codegen;
 
 extern crate proc_macro;
 use proc_macro::{Delimiter, Group, TokenStream, TokenTree};
-use syn::{Expr, Ident, Pat, Result, Token, Type, parenthesized, parse::{self, Parse, ParseStream}, parse_macro_input, punctuated::Punctuated, token::Token};
-use std::{clone, collections::{HashMap, HashSet}, fmt::Pointer};
+use proc_macro2::Span;
+use syn::{Expr, Ident, Pat, Result, Token, Type, parenthesized, parse::{self, Parse, ParseStream}, parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Token};
+use std::{clone, collections::{HashMap, HashSet}, fmt::Pointer, sync::Mutex};
 #[macro_use]
 extern crate quote;
 use quote::{ToTokens, TokenStreamExt};
 use itertools::{Either, Itertools};
 use derive_syn_parse::Parse;
 
-use crate::{infer_codegen::compile_mir, infer_hir::{compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir}, utils::tuple_type};
+use crate::{infer_codegen::compile_mir, infer_hir::{compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir}, utils::{map_punctuated, tuple_type}};
 
 // resources:
 // https://blog.rust-lang.org/2018/12/21/Procedural-Macros-in-Rust-2018.html
@@ -70,11 +71,41 @@ struct GeneratorNode {
 // #[derive(Debug)]
 struct BodyClauseNode {
    rel : Ident,
-   args : Punctuated<Expr, Token![,]>,
+   args : Punctuated<BodyClauseArg, Token![,]>,
    cond_clauses: Vec<CondClause>
 }
 
-#[derive(Parse, Clone, PartialEq, Eq, Hash)]
+#[derive(Parse, Clone, PartialEq, Eq)]
+enum BodyClauseArg {
+   #[peek(Token![?], name = "Pattern arg")]
+   Pat(ClauseArgPattern),
+   #[peek_with(|x| true, name = "Expression arg")]
+   Expr(Expr),
+}
+
+impl BodyClauseArg {
+   fn unwrap_expr(self) -> Expr {
+      match self {
+         Self::Expr(exp) => exp,
+         Self::Pat(_) => panic!("unwrap_expr(): BodyClauseArg is not an expr")
+      }
+   }
+
+   fn unwrap_expr_ref(&self) -> &Expr {
+      match self {
+         Self::Expr(exp) => exp,
+         Self::Pat(_) => panic!("unwrap_expr(): BodyClauseArg is not an expr")
+      }
+   }
+}
+
+#[derive(Parse, Clone, PartialEq, Eq)]
+struct ClauseArgPattern {
+   huh_token: Token![?],
+   pattern : Pat,
+}
+
+#[derive(Parse, Clone, PartialEq, Eq, Hash, Debug)]
 struct IfLetClause {
    if_keyword: Token![if],
    let_keyword: Token![let],
@@ -83,13 +114,13 @@ struct IfLetClause {
    exp: syn::Expr,
 }
 
-#[derive(Parse, Clone, PartialEq, Eq, Hash)]
+#[derive(Parse, Clone, PartialEq, Eq, Hash, Debug)]
 struct IfClause {
    if_keyword: Token![if],
    cond: Expr 
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum CondClause {
    IfLet(IfLetClause),
    If(IfClause),
@@ -111,19 +142,19 @@ impl Parse for CondClause {
    }
 }
 
-impl ToTokens for BodyClauseNode {
-   fn to_tokens(&self, tokens: &mut quote::__private::TokenStream) {
-      self.rel.to_tokens(tokens);
-      self.args.to_tokens(tokens);
-   }
-}
+// impl ToTokens for BodyClauseNode {
+//    fn to_tokens(&self, tokens: &mut quote::__private::TokenStream) {
+//       self.rel.to_tokens(tokens);
+//       self.args.to_tokens(tokens);
+//    }
+// }
 
 impl Parse for BodyClauseNode{
    fn parse(input: ParseStream) -> Result<Self> {
       let rel : Ident = input.parse()?;
       let args_content;
       parenthesized!(args_content in input);
-      let args = args_content.parse_terminated(Expr::parse)?;
+      let args = args_content.parse_terminated(BodyClauseArg::parse)?;
       let mut cond_clauses = vec![];
       while let Ok(cl) = input.parse(){
          cond_clauses.push(cl);
@@ -243,6 +274,8 @@ fn dl_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::TokenStream> 
    let prog: InferProgram = syn::parse2(input)?;
    // println!("prog relations: {}", prog.relations.len());
    // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
+
+   let prog = desugar_pattern_args(prog);
    
    let hir = compile_infer_program_to_hir(&prog);
    // println!("hir relations: {}", hir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
@@ -268,4 +301,65 @@ fn pat_to_ident(pat: &Pat) -> Option<Ident> {
       Pat::Ident(ident) => Some(ident.ident.clone()),
       _ => None
    }
+}
+
+fn desugar_pattern_args(prog: InferProgram) -> InferProgram {
+
+   fn clause_desugar_pattern_args(body_clause: BodyClauseNode) -> BodyClauseNode {
+      let mut new_args = Punctuated::new();
+      let mut new_cond_clauses = vec![];
+      for arg in body_clause.args.into_pairs() {
+         let (arg, punc) = arg.into_tuple();
+         let new_arg = match arg {
+            BodyClauseArg::Expr(_) => arg,
+            BodyClauseArg::Pat(pat) => {
+               let pattern = pat.pattern;
+               let ident = fresh_ident("_arg_pattern", pattern.span());
+               let new_cond_clause = quote!{ if let #pattern = #ident};
+               let new_cond_clause = CondClause::IfLet(syn::parse2(new_cond_clause).unwrap());
+               new_cond_clauses.push(new_cond_clause);
+               BodyClauseArg::Expr(syn::parse2(quote!{#ident}).unwrap())
+            }
+         };
+         new_args.push_value(new_arg);
+         if let Some(punc) = punc {new_args.push_punct(punc)}
+      }
+      new_cond_clauses.extend(body_clause.cond_clauses.into_iter());
+      BodyClauseNode{
+         args: new_args,
+         cond_clauses: new_cond_clauses,
+         rel: body_clause.rel
+      }
+   }
+   fn rule_desugar_pattern_args(rule: RuleNode) -> RuleNode {
+      RuleNode {
+         body_items: map_punctuated(rule.body_items, 
+                                    |bi| match bi {BodyItemNode::Clause(cl) => BodyItemNode::Clause(clause_desugar_pattern_args(cl)),
+                                                   _ => bi}),
+         head_clause: rule.head_clause
+      }
+   }
+
+   InferProgram{
+      relations: prog.relations,
+      rules: prog.rules.into_iter().map(rule_desugar_pattern_args).collect()
+   }
+}
+
+
+lazy_static::lazy_static! {
+   static ref ident_counters: Mutex<HashMap<String, u32>> = Mutex::new(HashMap::default());
+}
+fn fresh_ident(prefix: &str, span: Span) -> Ident {
+   let mut ident_counters_lock = ident_counters.lock().unwrap();
+   let counter = if let Some(entry) = ident_counters_lock.get_mut(prefix) {
+      let counter = *entry;
+      *entry = counter + 1;
+      format!("{}", counter)
+   } else {
+      ident_counters_lock.insert(prefix.to_string(), 1);
+      "".to_string()
+   };
+   
+   Ident::new(&format!("{}_{}", prefix, counter), span)
 }

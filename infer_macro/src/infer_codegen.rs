@@ -210,7 +210,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                      let pat = &if_let_clause.pattern;
                      let expr = &if_let_clause.exp;
                      conds_then_next_loop = quote! {
-                       if #pat = #expr {
+                       if let #pat = #expr {
                           #conds_then_next_loop
                        }
                      }
