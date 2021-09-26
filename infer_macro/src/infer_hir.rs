@@ -5,7 +5,7 @@ use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{Expr, Type};
 
-use crate::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, InferProgram, RelationIdentity, RuleNode, expr_to_ident, ir_name_for_rel_indices, pat_to_ident, utils::{into_set, tuple, tuple_type}};
+use crate::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, InferProgram, RelationIdentity, RuleNode, expr_to_ident, ir_name_for_rel_indices, pat_to_ident, utils::{into_set, pattern_get_vars, tuple, tuple_type}};
 
 
 pub(crate) struct InferIr {
@@ -113,6 +113,12 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
             // TODO compile error if the relation does not exist
             let relation = prog.relations.iter().filter(|r| r.name.to_string() == bcl.rel.to_string()).next().unwrap();
 
+            for cond_clause in bcl.cond_clauses.iter() {
+               if let CondClause::IfLet(if_let_cl) = &cond_clause {
+                  let pat_vars = pattern_get_vars(&if_let_cl.pattern);
+                  grounded_vars.extend(pat_vars);
+               }
+            }
             
             let ir_rel = IrRelation{
                relation: relation.into(),

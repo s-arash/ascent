@@ -129,7 +129,7 @@ enum CondClause {
 impl Parse for CondClause {
    fn parse(input: ParseStream) -> Result<Self> {
       if input.peek(Token![if]) {
-         if input.peek(Token![let]) {
+         if input.peek2(Token![let]) {
             let cl: IfLetClause = input.parse()?;
             return Ok(Self::IfLet(cl));
          } else {

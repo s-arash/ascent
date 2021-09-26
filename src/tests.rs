@@ -1,3 +1,5 @@
+#![feature(bindings_after_at)]
+use std::ops::Deref;
 use std::{cmp::max, collections::HashMap, hash, rc::Rc};
 
 
@@ -8,7 +10,7 @@ use derive_more::*;
 use LambdaCalcExpr::*;
 use crate::utils::*;
 
-#[derive(Clone, PartialEq, Eq, Debug, IsVariant, Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 enum LambdaCalcExpr{
    Ref(&'static str),
    Lam(&'static str, Rc<LambdaCalcExpr>),
@@ -60,17 +62,18 @@ fn test_dl_lambda(){
 
       eval(exp.clone(), exp.clone()) <-- do_eval(exp) if let Lam(_,_) = exp;
 
-      do_eval(ef.as_ref().clone()) <-- do_eval(exp) if let App(ef,ea) = exp;
+      do_eval(ef.as_ref().clone()) <-- do_eval(?App(ef,ea));
 
       do_eval(sub(fb, fx, ea)) <-- 
-         do_eval(exp) if let App(ef, ea) = exp, 
-         eval(ef2, f_res) if let Lam(fx, fb) = f_res if ef.as_ref() == ef2;
+         do_eval(?App(ef, ea)), 
+         eval(ef.deref(), ?Lam(fx, fb));
       
       eval(exp.clone(), final_res.clone()) <-- 
+         // do_eval(?exp @ App(ef, ea)), // this requires nightly
          do_eval(exp) if let App(ef, ea) = exp, 
-         eval(ef2, f_res) if let Lam(fx, fb) = f_res if ef.as_ref() == ef2
+         eval(ef.deref(), f_res) if let Lam(fx, fb) = f_res
          if let sub_res = sub(fb, fx, ea),
-         eval(sub_res2, final_res) if sub_res2 == &sub_res;
+         eval(sub_res, final_res);
    };
    let mut prog = DLProgram::default();
    prog.run();   
@@ -163,6 +166,30 @@ fn test_dl_expressions(){
    prog.run();
    println!("baz: {:?}", prog.baz);
    assert!(rels_equal([(1,2,6), (2,3,10)], prog.baz));
+}
+
+#[test]
+fn test_dl_vars_bound_in_patterns(){
+   dl!{
+      relation foo(i32, Option<i32>);
+      relation bar(i32, i32);
+      relation baz(i32, i32, i32);
+      foo(1, Some(2));
+      foo(2, None);
+      foo(3, Some(5));
+      foo(4, Some(10));
+
+
+      bar(3, 6);
+      bar(5, 10);
+      bar(10, 20);
+
+      baz(*x, *y, *z) <-- foo(x, ?Some(y)), bar(y , z);
+   };
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("baz: {:?}", prog.baz);
+   assert!(rels_equal([(3, 5, 10), (4, 10, 20)], prog.baz));
 }
 
 #[test]
