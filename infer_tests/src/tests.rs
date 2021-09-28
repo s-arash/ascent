@@ -1,14 +1,14 @@
-#![feature(bindings_after_at)]
 use std::ops::Deref;
 use std::{cmp::max, collections::HashMap, hash, rc::Rc};
 
 
 use std::collections::{self, HashSet};
-use infer_macro::dl;
+use infer::dl;
 
 use derive_more::*;
 use LambdaCalcExpr::*;
 use crate::utils::*;
+use itertools::Itertools;
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
 enum LambdaCalcExpr{
@@ -207,4 +207,22 @@ fn test_dl_generators(){
    prog.run();
    println!("foo: {:?}", prog.foo);
    assert_eq!(prog.foo.len(), 45);
+}
+
+#[test]
+fn test_dl_generators2(){
+   dl!{
+      relation foo(i32, i32);
+      relation bar(i32);
+
+      foo(3, 4);
+      foo(4, 6);
+      foo(20, 21);
+      bar(*x) <-- for (x, y) in (0..10).map(|x| (x, x+1)), foo(x, y);
+
+   };
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("bar: {:?}", prog.bar);
+   assert!(rels_equal([(3,)], prog.bar));
 }

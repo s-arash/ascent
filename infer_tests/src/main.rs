@@ -1,10 +1,12 @@
 #![allow(warnings)]
+// #![feature(bindings_after_at)]
+
 mod tests;
 mod utils;
 
 use std::{any::Any, cmp::max, rc::Rc};
 use stopwatch::Stopwatch;
-use infer_macro::dl;
+use infer::dl;
 
 
 fn lambda_calc_example() {
@@ -64,7 +66,7 @@ dl!{
 }
 
 mod tc{
-    use infer_macro::dl;
+    use infer::dl;
 
    dl!{
       relation edge(i32, i32);

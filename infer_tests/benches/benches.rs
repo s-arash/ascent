@@ -1,7 +1,7 @@
 use stopwatch::Stopwatch;
 
 mod tc {
-   use infer_macro::dl;
+   use infer::dl;
 
    dl! {
       relation edge(i32, i32);

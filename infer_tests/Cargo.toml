@@ -1,5 +1,5 @@
 [package]
-name = "infer"
+name = "infer_tests"
 version = "0.1.0"
 edition = "2018"
 
@@ -8,9 +8,10 @@ edition = "2018"
 [dependencies]
 
 stopwatch = "0.0.7"
-infer_macro = {path = "./infer_macro"}
+infer = {path = "../infer"}
 bencher = "0.1.5"
 derive_more = "0.99.16"
+itertools = "0.10"
 
 [[bench]]
 name = "benches"

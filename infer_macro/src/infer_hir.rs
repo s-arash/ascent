@@ -133,7 +133,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
             body_items.push(IrBodyItem::Clause(ir_bcl));
          },
          BodyItemNode::Generator(ref gen) => {
-            if let Some(ident) = pat_to_ident(&gen.pattern) {
+            for ident in pattern_get_vars(&gen.pattern) {
                grounded_vars.push(ident);
             }
             body_items.push(IrBodyItem::Generator(gen.clone()));
