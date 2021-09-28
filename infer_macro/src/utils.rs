@@ -124,3 +124,18 @@ fn test_pattern_get_vars(){
    assert_eq!(collect_set(["x", "y", "z"].into_iter().map(ToString::to_string)), 
               pattern_get_vars(&pat).into_iter().map(|id| id.to_string()).collect());
 }
+
+
+pub fn expr_to_ident(expr: &Expr) -> Option<Ident> {
+   match expr {
+      Expr::Path(p) if p.path.get_ident().is_some() => p.path.get_ident().cloned(),
+      _ => None
+   }
+}
+
+pub fn pat_to_ident(pat: &Pat) -> Option<Ident> {
+   match pat {
+      Pat::Ident(ident) => Some(ident.ident.clone()),
+      _ => None
+   }
+}

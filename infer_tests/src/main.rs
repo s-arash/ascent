@@ -1,5 +1,5 @@
 #![allow(warnings)]
-// #![feature(bindings_after_at)]
+#![feature(bindings_after_at)]
 
 mod tests;
 mod utils;

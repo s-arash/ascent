@@ -69,12 +69,12 @@ fn test_dl_lambda(){
          eval(ef.deref(), ?Lam(fx, fb));
       
       eval(exp.clone(), final_res.clone()) <-- 
-         // do_eval(?exp @ App(ef, ea)), // this requires nightly
-         do_eval(exp) if let App(ef, ea) = exp, 
-         eval(ef.deref(), f_res) if let Lam(fx, fb) = f_res
-         if let sub_res = sub(fb, fx, ea),
-         eval(sub_res, final_res);
+         // do_eval(exp) if let App(ef, ea) = exp, 
+         do_eval(?exp @ App(ef, ea)), // this requires nightly
+         eval(ef.deref(), ?Lam(fx, fb)),
+         eval(sub(fb, fx, ea), final_res);
    };
+   
    let mut prog = DLProgram::default();
    prog.run();   
    println!("output: {:?}", prog.output);
@@ -107,6 +107,7 @@ fn test_dl_pattern_args(){
       foo(1, None);
       foo(2, Some(2));
       foo(3, Some(30));
+      foo(3, None);
       bar(*x, *y) <-- foo(x, ?Some(y)) if y != x;
    };
    let mut prog = DLProgram::default();

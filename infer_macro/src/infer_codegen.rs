@@ -4,7 +4,7 @@ use itertools::{Iterate, Itertools};
 use proc_macro2::Ident;
 use syn::{Expr, Type, parse2};
 
-use crate::{expr_to_ident, infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, pat_to_ident, utils::{exp_cloned, tuple, tuple_type}};
+use crate::{infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
 use crate::infer_mir::MirRelationVersion::*;
 
 pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
@@ -206,7 +206,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             let mut conds_then_next_loop = next_loop;
             for cond in bclause.cond_clauses.iter().rev() {
                match cond {
-                  crate::CondClause::IfLet(if_let_clause) => {
+                  CondClause::IfLet(if_let_clause) => {
                      let pat = &if_let_clause.pattern;
                      let expr = &if_let_clause.exp;
                      conds_then_next_loop = quote! {
@@ -215,7 +215,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                        }
                      }
                   }
-                  crate::CondClause::If(if_clause) => {
+                  CondClause::If(if_clause) => {
                      let cond = &if_clause.cond;
                      conds_then_next_loop = quote! {
                         if #cond {

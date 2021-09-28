@@ -3,10 +3,10 @@ use std::{collections::{HashMap, HashSet}, ops::Index};
 use itertools::Itertools;
 use proc_macro2::Ident;
 use quote::ToTokens;
-use syn::{Expr, Type};
+use syn::{Error, Expr, Type};
 
-use crate::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, InferProgram, RelationIdentity, RuleNode, expr_to_ident, ir_name_for_rel_indices, pat_to_ident, utils::{into_set, pattern_get_vars, tuple, tuple_type}};
-
+use crate::{InferProgram, utils::{expr_to_ident, into_set, pattern_get_vars, tuple, tuple_type}};
+use crate::infer_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
 
 pub(crate) struct InferIr {
    pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
@@ -56,8 +56,8 @@ impl IrRelation {
    }
 }
 
-pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> InferIr{
-   let ir_rules : Vec<IrRule> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).collect();
+pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<InferIr>{
+   let ir_rules : Vec<IrRule> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
    let mut relations_ir_relations = HashMap::new();
    let mut relations_full_indices = HashMap::new();
    for rel in prog.relations.iter(){
@@ -84,14 +84,14 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> InferIr{
          }
       }
    }
-   InferIr{
+   Ok(InferIr{
       rules: ir_rules,
       relations_ir_relations,
       relations_full_indices
-   }
+   })
 }
 
-fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
+fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<IrRule> {
    let mut body_items = vec![];
    let mut grounded_vars = vec![];
    for bitem in rule.body_items.iter() {
@@ -110,8 +110,12 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
                }
             }
             let ir_name = ir_name_for_rel_indices(&bcl.rel, &indices);
-            // TODO compile error if the relation does not exist
-            let relation = prog.relations.iter().filter(|r| r.name.to_string() == bcl.rel.to_string()).next().unwrap();
+            let relation = prog.relations.iter().filter(|r| r.name.to_string() == bcl.rel.to_string()).next();
+
+            let relation = match relation {
+                Some(rel) => rel,
+                None => return Err(Error::new(bcl.rel.span(), format!("relation {} not defined", bcl.rel))),
+            };
 
             for cond_clause in bcl.cond_clauses.iter() {
                if let CondClause::IfLet(if_let_cl) = &cond_clause {
@@ -142,16 +146,22 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> IrRule {
       
    }
    let rel = prog.relations.iter().filter(|r| r.name.to_string() == rule.head_clause.rel.to_string()).next();
-   if rel.is_none() {
-      // TODO do better error handling
-      panic!("relation {} not defined!", rule.head_clause.rel);
-   }
-   let rel = RelationIdentity::from(rel.unwrap());
+   let rel = match rel {
+      Some(rel) => rel,
+      None => return Err(Error::new(rule.head_clause.rel.span(), format!("relation {} not defined", rule.head_clause.rel))),
+   };
+   
+   let rel = RelationIdentity::from(rel);
    let head_clause = IrHeadClause {
       rel,
       args : rule.head_clause.args.iter().cloned().collect()
    };
-   IrRule {
+   Ok(IrRule {
       head_clause, body_items
-   }
+   })
+}
+
+fn ir_name_for_rel_indices(rel: &Ident, indices: &[usize]) -> Ident {
+   let name = format!("{}_indices_{}", rel, indices.iter().join("_"));
+   Ident::new(&name, rel.span())
 }

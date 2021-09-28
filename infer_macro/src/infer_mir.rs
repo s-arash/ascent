@@ -5,9 +5,9 @@ use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap:
 use proc_macro2::Ident;
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
-use crate::{CondClause, GeneratorNode, expr_to_ident, infer_hir::IrBodyItem, infer_mir::MirRelationVersion::*, utils::{exp_cloned, tuple, tuple_type}};
-
-use crate::{RelationIdentity, infer_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, InferIr}};
+use crate::{infer_hir::IrBodyItem, infer_mir::MirRelationVersion::*, utils::{exp_cloned, tuple, tuple_type}};
+use crate::infer_syntax::{CondClause, GeneratorNode, RelationIdentity};
+use crate::{infer_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, InferIr}};
 
 pub(crate) struct InferMir {
    pub sccs: Vec<MirScc>,
