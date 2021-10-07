@@ -58,7 +58,7 @@ fn test_dl_lambda(){
       do_eval(exp.clone()) <-- input(exp);
       output(res.clone()) <-- input(exp), eval(exp, res);
 
-      eval(exp.clone(), exp.clone()) <-- do_eval(exp) if let Ref(_) = exp;
+      eval(exp.clone(), exp.clone()) <-- do_eval(?exp @Ref(_));
 
       eval(exp.clone(), exp.clone()) <-- do_eval(exp) if let Lam(_,_) = exp;
 
@@ -69,12 +69,11 @@ fn test_dl_lambda(){
          eval(ef.deref(), ?Lam(fx, fb));
       
       eval(exp.clone(), final_res.clone()) <-- 
-         // do_eval(exp) if let App(ef, ea) = exp, 
          do_eval(?exp @ App(ef, ea)), // this requires nightly
          eval(ef.deref(), ?Lam(fx, fb)),
          eval(sub(fb, fx, ea), final_res);
    };
-   
+
    let mut prog = DLProgram::default();
    prog.run();   
    println!("output: {:?}", prog.output);
@@ -226,4 +225,51 @@ fn test_dl_generators2(){
    prog.run();
    println!("bar: {:?}", prog.bar);
    assert!(rels_equal([(3,)], prog.bar));
+}
+
+
+#[test]
+fn test_dl_multiple_head_clauses(){
+   dl!{
+      relation foo(Vec<i32>, Vec<i32>);
+      relation foo2(Vec<i32>);
+      relation foo1(Vec<i32>);
+
+      relation bar(i32);
+
+      foo(vec![3], vec![4]);
+      foo(vec![1, 2], vec![4, 5]);
+      foo(vec![10, 11], vec![20]);
+
+      foo1(x.clone()), foo2(y.clone()) <-- foo(x, y) if x.len() > 1;
+   };
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("foo1: {:?}", prog.foo1);
+   println!("foo2: {:?}", prog.foo2);
+
+   assert!(rels_equal([(vec![1, 2],), (vec![10,11],)], prog.foo1));
+   assert!(rels_equal([(vec![4, 5],), (vec![20],)], prog.foo2));
+}
+
+#[test]
+fn test_dl_multiple_head_clauses2(){
+   dl!{
+      relation foo(Vec<i32>);
+      relation foo_left(Vec<i32>);
+      relation foo_right(Vec<i32>);
+
+      foo(vec![1,2,3,4]);
+
+      foo_left(xs[..i].into()), foo_right(xs[i..].into()) <-- foo(xs), for i in 0..xs.len();
+      foo(xs.clone()) <-- foo_left(xs);
+      foo(xs.clone()) <-- foo_right(xs);
+   };
+
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("foo: {:?}", prog.foo);
+
+   assert!(rels_equal([(vec![],), (vec![1],), (vec![1, 2],), (vec![1, 2, 3],), (vec![1, 2, 3, 4],), (vec![2],), (vec![2, 3],), (vec![2, 3, 4],), (vec![3],), (vec![3, 4],), (vec![4],)], 
+                      prog.foo));
 }

@@ -104,7 +104,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
    }
    for rule in scc.rules.iter() {
       let comment = format!("{} <-- {}",
-                             rule.head_clause.rel.name.to_string(),
+                             rule.head_clause.iter().map(|hcl| hcl.rel.name.to_string()).join(", "),
                              rule.body_items.iter().map(bitem_to_str).join(", "));
       evaluate_rules.push(quote! {
          comment(#comment);
@@ -249,51 +249,59 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
       }
       
    } else {
-      let head_rel_name = &rule.head_clause.rel.name;
-      let new_row_tuple = tuple(&rule.head_clause.args);
-      
-      // println!("rule head cl relation: {}", rule.head_clause.rel.name.to_string());
-      let head_relation = &rule.head_clause.rel;
-      // let head_relation = prog.relations.keys().filter(|v| v.name.to_string() == rule.head_clause.rel.to_string()).next().unwrap();
-      let row_type = tuple_type(&head_relation.field_types);
+      let mut add_rows = vec![];
 
-      let mut update_indices = vec![];
-      let rel_indices = scc.dynamic_relations.get(head_relation);
-      if let Some(rel_indices) = rel_indices {
-         for rel_ind in rel_indices.iter(){
-            let var_name = ir_relation_version_var_name(&rel_ind.ir_name, New);
-            // TODO args must be cloned here
-            let args_tuple : Vec<Expr> = rel_ind.indices.iter().map(|&i| {
-               let i_ind = syn::Index::from(i);
-               syn::parse2(quote!{ new_row.#i_ind.clone()}).unwrap()
-            }).collect();
-            // let args_tuple : Vec<_> = rel_ind.indices.iter().map(|&i| rule.head_clause.args[i].clone()).collect();
-            let args_tuple = tuple(&args_tuple);
-            update_indices.push(quote! {
-               #var_name.entry(#args_tuple).or_default().insert(new_row_ind);
-            });
+      for hcl in rule.head_clause.iter() {
+
+         let head_rel_name = &hcl.rel.name;
+         let new_row_tuple = tuple(&hcl.args);
+         
+         // println!("rule head cl relation: {}", rule.head_clause.rel.name.to_string());
+         let head_relation = &hcl.rel;
+         // let head_relation = prog.relations.keys().filter(|v| v.name.to_string() == rule.head_clause.rel.to_string()).next().unwrap();
+         let row_type = tuple_type(&head_relation.field_types);
+
+         let mut update_indices = vec![];
+         let rel_indices = scc.dynamic_relations.get(head_relation);
+         if let Some(rel_indices) = rel_indices {
+            for rel_ind in rel_indices.iter(){
+               let var_name = ir_relation_version_var_name(&rel_ind.ir_name, New);
+               // TODO args must be cloned here
+               let args_tuple : Vec<Expr> = rel_ind.indices.iter().map(|&i| {
+                  let i_ind = syn::Index::from(i);
+                  syn::parse2(quote!{ new_row.#i_ind.clone()}).unwrap()
+               }).collect();
+               // let args_tuple : Vec<_> = rel_ind.indices.iter().map(|&i| rule.head_clause.args[i].clone()).collect();
+               let args_tuple = tuple(&args_tuple);
+               update_indices.push(quote! {
+                  #var_name.entry(#args_tuple).or_default().insert(new_row_ind);
+               });
+            }
          }
+
+         let head_rel_full_index = &mir.relations_full_indices[head_relation];
+         let head_rel_full_index_var_name_new = ir_relation_version_var_name(&head_rel_full_index.ir_name, New);
+         let head_rel_full_index_var_name_delta = ir_relation_version_var_name(&head_rel_full_index.ir_name, Delta);
+         let head_rel_full_index_var_name_total = ir_relation_version_var_name(&head_rel_full_index.ir_name, Total);
+
+         let add_row = quote! {
+            // comment("check if the tuple already exists");
+            let new_row: #row_type = #new_row_tuple;
+            if !(#head_rel_full_index_var_name_new.contains_key(&new_row) ||
+               #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
+               #head_rel_full_index_var_name_total.contains_key(&new_row))
+            {
+               let new_row_ind = self.#head_rel_name.len();
+               #(#update_indices)*
+               self.#head_rel_name.push(new_row);
+               changed = true;
+            }
+         };
+         add_rows.push(add_row);
       }
-
-      let head_rel_full_index = &mir.relations_full_indices[head_relation];
-      let head_rel_full_index_var_name_new = ir_relation_version_var_name(&head_rel_full_index.ir_name, New);
-      let head_rel_full_index_var_name_delta = ir_relation_version_var_name(&head_rel_full_index.ir_name, Delta);
-      let head_rel_full_index_var_name_total = ir_relation_version_var_name(&head_rel_full_index.ir_name, Total);
-
-      let add_row = quote! {
-         // comment("check if the tuple already exists");
-         let new_row: #row_type = #new_row_tuple;
-         if !(#head_rel_full_index_var_name_new.contains_key(&new_row) ||
-            #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
-            #head_rel_full_index_var_name_total.contains_key(&new_row))
-         {
-            let new_row_ind = self.#head_rel_name.len();
-            #(#update_indices)*
-            self.#head_rel_name.push(new_row);
-            changed = true;
-         }
-      };
-      add_row
+      quote!{
+         #(#add_rows)*
+      }
    }
 }
 

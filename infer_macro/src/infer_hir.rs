@@ -15,7 +15,7 @@ pub(crate) struct InferIr {
 }
 
 pub(crate) struct IrRule {
-   pub head_clause: IrHeadClause,
+   pub head_clauses: Vec<IrHeadClause>,
    pub body_items: Vec<IrBodyItem>,
 }
 
@@ -145,19 +145,24 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
       }
       
    }
-   let rel = prog.relations.iter().filter(|r| r.name.to_string() == rule.head_clause.rel.to_string()).next();
-   let rel = match rel {
-      Some(rel) => rel,
-      None => return Err(Error::new(rule.head_clause.rel.span(), format!("relation {} not defined", rule.head_clause.rel))),
-   };
-   
-   let rel = RelationIdentity::from(rel);
-   let head_clause = IrHeadClause {
-      rel,
-      args : rule.head_clause.args.iter().cloned().collect()
-   };
+   let mut head_clauses = vec![];
+   for hcl_node in rule.head_clauses.iter(){
+      let rel = prog.relations.iter().filter(|r| r.name.to_string() == hcl_node.rel.to_string()).next();
+      let rel = match rel {
+         Some(rel) => rel,
+         None => return Err(Error::new(hcl_node.rel.span(), format!("relation {} not defined", hcl_node.rel))),
+      };
+      
+      let rel = RelationIdentity::from(rel);
+      let head_clause = IrHeadClause {
+         rel,
+         args : hcl_node.args.iter().cloned().collect()
+      };
+      head_clauses.push(head_clause);
+   }
+
    Ok(IrRule {
-      head_clause, body_items
+      head_clauses: head_clauses, body_items
    })
 }
 

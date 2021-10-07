@@ -1,7 +1,7 @@
 extern crate proc_macro;
 use proc_macro::{Delimiter, Group, TokenStream, TokenTree};
 use proc_macro2::Span;
-use syn::{Expr, Ident, Pat, Result, Token, Type, parenthesized, parse::{self, Parse, ParseStream}, parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Token};
+use syn::{Expr, Ident, Pat, Result, Token, Type, braced, parenthesized, parse::{self, Parse, ParseStream}, parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Token};
 use std::{clone, collections::{HashMap, HashSet}, fmt::Pointer, sync::Mutex};
 
 use quote::{ToTokens, TokenStreamExt};
@@ -177,7 +177,7 @@ impl Parse for HeadClauseNode{
 }
 
 pub struct RuleNode {
-   pub head_clause: HeadClauseNode,
+   pub head_clauses: Punctuated<HeadClauseNode, Token![,]>,
    pub body_items: Punctuated<BodyItemNode, Token![,]>,
 }
 
@@ -190,19 +190,29 @@ pub struct RuleNode {
 
 impl Parse for RuleNode {
    fn parse(input: ParseStream) -> Result<Self> {
-      let head_clause : HeadClauseNode = input.parse()?;
+      let head_clauses = if input.peek(syn::token::Brace) {
+         let content;
+         braced!(content in input);
+         Punctuated::<HeadClauseNode, Token![,]>::parse_terminated(&content)?
+      } else {
+         // let mut res = Punctuated::<HeadClauseNode, Token![,]>::new();
+         // res.push(HeadClauseNode::parse(&input)?);
+         // res
+         // TODO this seems to work fine for parsing multiple head clauses...
+         Punctuated::<HeadClauseNode, Token![,]>::parse_separated_nonempty(&input)?
+      };
 
       if input.peek(Token![;]){
          // println!("fact rule!!!");
          input.parse::<Token![;]>()?;
-         Ok(RuleNode{head_clause, body_items: Punctuated::default()})
+         Ok(RuleNode{head_clauses, body_items: Punctuated::default()})
       } else {
          input.parse::<Token![<]>()?;
          input.parse::<Token![-]>()?;
          input.parse::<Token![-]>()?;
          let body_items = Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty(input)?;
          input.parse::<Token![;]>()?;
-         Ok(RuleNode{ head_clause, body_items})
+         Ok(RuleNode{ head_clauses, body_items})
       }
    }
 }
@@ -218,12 +228,10 @@ impl Parse for InferProgram {
       let mut rules = vec![];
       let mut relations = vec![];
       while !input.is_empty() {
-         if let Ok(rel) = RelationNode::parse(input) {
-            relations.push(rel);
-         } else if let Ok(rule) = RuleNode::parse(input) {
-            rules.push(rule);
+         if input.peek(kw::relation){
+            relations.push(RelationNode::parse(input)?);
          } else {
-            return Err(input.error("bad dl syntax!"));
+            rules.push(RuleNode::parse(input)?);
          }
       }
       Ok(InferProgram{rules, relations})
@@ -278,7 +286,7 @@ pub(crate) fn desugar_pattern_args(prog: InferProgram) -> InferProgram {
          body_items: map_punctuated(rule.body_items, 
                                     |bi| match bi {BodyItemNode::Clause(cl) => BodyItemNode::Clause(clause_desugar_pattern_args(cl)),
                                                    _ => bi}),
-         head_clause: rule.head_clause
+         head_clauses: rule.head_clauses
       }
    }
 

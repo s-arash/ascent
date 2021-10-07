@@ -23,7 +23,7 @@ pub(crate) struct MirScc {
 }
 
 pub(crate) struct MirRule {
-   pub head_clause: IrHeadClause,
+   pub head_clause: Vec<IrHeadClause>,
    pub body_items: Vec<MirBodyItem>,
 }
 
@@ -87,8 +87,9 @@ fn get_hir_dep_graph(hir: &InferIr) -> Vec<(usize,usize)> {
    let mut relations_to_rules_in_head : HashMap<&RelationIdentity, HashSet<usize>> = HashMap::new();
    for (i, rule) in hir.rules.iter().enumerate(){
       let rule = &hir.rules[i];
-      let head_rel = &rule.head_clause.rel;
-      relations_to_rules_in_head.entry(head_rel).or_default().insert(i);
+      for head_rel in rule.head_clauses.iter().map(|hcl| &hcl.rel){
+         relations_to_rules_in_head.entry(head_rel).or_default().insert(i);
+      }
    }
    
    let mut edges = vec![];
@@ -133,13 +134,14 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
             }
          }
 
-         let hcl = &hir.rules[rule_ind].head_clause;
+         for hcl in hir.rules[rule_ind].head_clauses.iter() {
          
-         dynamic_relations_set.insert(hcl.rel.clone());
-         dynamic_relations.entry(hcl.rel.clone()).or_default();
-         for rel_ind in &hir.relations_ir_relations[&hcl.rel]{
-            dynamic_relation_indices.insert(rel_ind.clone());
-            dynamic_relations.get_mut(&hcl.rel).unwrap().insert(rel_ind.clone());
+            dynamic_relations_set.insert(hcl.rel.clone());
+            dynamic_relations.entry(hcl.rel.clone()).or_default();
+            for rel_ind in &hir.relations_ir_relations[&hcl.rel]{
+               dynamic_relation_indices.insert(rel_ind.clone());
+               dynamic_relations.get_mut(&hcl.rel).unwrap().insert(rel_ind.clone());
+            }
          }
 
       }
@@ -235,6 +237,6 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
    mir_body_items.into_iter()
       .map(|bcls| MirRule {
          body_items: bcls,
-         head_clause: rule.head_clause.clone(),
+         head_clause: rule.head_clauses.clone(),
       }).collect()
 }
