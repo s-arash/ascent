@@ -11,7 +11,7 @@ mod infer_syntax;
 extern crate quote;
 
 extern crate proc_macro;
-use infer_syntax::{InferProgram, desugar_pattern_args};
+use infer_syntax::{InferProgram, desugar_infer_program};
 use proc_macro::{Delimiter, Group, TokenStream, TokenTree};
 use proc_macro2::Span;
 use syn::{Expr, Ident, Pat, Result, Token, Type, parenthesized, parse::{self, Parse, ParseStream}, parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Token};
@@ -38,7 +38,7 @@ fn dl_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::TokenStream> 
    // println!("prog relations: {}", prog.relations.len());
    // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
 
-   let prog = desugar_pattern_args(prog);
+   let prog = desugar_infer_program(prog);
    
    let hir = compile_infer_program_to_hir(&prog)?;
    // println!("hir relations: {}", hir.relations_ir_relations.keys().map(|r| &r.name).join(", "));

@@ -273,3 +273,30 @@ fn test_dl_multiple_head_clauses2(){
    assert!(rels_equal([(vec![],), (vec![1],), (vec![1, 2],), (vec![1, 2, 3],), (vec![1, 2, 3, 4],), (vec![2],), (vec![2, 3],), (vec![2, 3, 4],), (vec![3],), (vec![3, 4],), (vec![4],)], 
                       prog.foo));
 }
+
+#[test]
+fn test_dl_disjunctions(){
+   dl!{
+      relation foo1(i32, i32);
+      relation foo2(i32, i32);
+      relation small(i32);
+      relation bar(i32, i32);
+
+      small(x) <-- for x in 0..5;
+      foo1(0, 4);
+      foo1(1, 4);
+      foo1(2, 6);
+
+      foo2(3, 30);
+      foo2(2, 20);
+      foo2(8, 21);
+      foo2(9, 21);
+
+      bar(x.clone(), y.clone()) <-- ((for x in 3..10), small(x) || foo1(x,_y)), (foo2(x,y));
+
+   };
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("bar: {:?}", prog.bar);
+   assert!(rels_equal([(3,30), (2, 20)], prog.bar));
+}

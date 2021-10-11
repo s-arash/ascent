@@ -142,6 +142,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
             }
             body_items.push(IrBodyItem::Generator(gen.clone()));
          }
+         _ => panic!("unrecognized body item")
       }
       
    }

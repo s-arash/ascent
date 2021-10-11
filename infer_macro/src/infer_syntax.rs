@@ -18,9 +18,6 @@ use crate::{infer_codegen::compile_mir, infer_hir::{compile_infer_program_to_hir
 
 mod kw {
    syn::custom_keyword!(relation);
-   // syn::custom_keyword!(when);
-
-   // syn::custom_keyword!(<--);
 }
 
 // #[derive(Clone)]
@@ -41,13 +38,32 @@ impl Parse for RelationNode {
    }
 }
 
-#[derive(Parse)]
+#[derive(Parse, Clone)]
 pub enum BodyItemNode {
    #[peek(Token![for], name = "GeneratorNode")]
    Generator(GeneratorNode),
    #[peek(Ident, name = "BodyClauseNode")]
    Clause(BodyClauseNode),
+   #[peek(syn::token::Paren, name = "Dsjunction node")]
+   Disjunction(DisjunctionNode)
 }
+
+#[derive(Clone)]
+pub struct DisjunctionNode {
+   paren: syn::token::Paren,
+   disjuncts: Punctuated<Punctuated<BodyItemNode, Token![,]>, Token![||]>,
+}
+
+impl Parse for DisjunctionNode {
+   fn parse(input: ParseStream) -> Result<Self> {
+      let content;
+      let paren = parenthesized!(content in input);
+      let res: Punctuated<Punctuated<BodyItemNode, Token![,]>, Token![||]>;
+      res = Punctuated::<Punctuated<BodyItemNode, Token![,]>, Token![||]>::parse_separated_nonempty_with(&content, Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty)?;
+      Ok(DisjunctionNode{paren, disjuncts: res})
+   }
+}
+
 
 
 
@@ -59,7 +75,7 @@ pub struct GeneratorNode {
    pub expr: Expr
 }
 
-// #[derive(Debug)]
+#[derive(Clone)]
 pub struct BodyClauseNode {
    pub rel : Ident,
    pub args : Punctuated<BodyClauseArg, Token![,]>,
@@ -154,7 +170,7 @@ impl Parse for BodyClauseNode{
    }
 }
 
-// #[derive(Debug)]
+#[derive(Clone)]
 pub struct HeadClauseNode {
    pub rel : Ident,
    pub args : Punctuated<Expr, Token![,]>,
@@ -178,7 +194,7 @@ impl Parse for HeadClauseNode{
 
 pub struct RuleNode {
    pub head_clauses: Punctuated<HeadClauseNode, Token![,]>,
-   pub body_items: Punctuated<BodyItemNode, Token![,]>,
+   pub body_items: Vec<BodyItemNode>// Punctuated<BodyItemNode, Token![,]>,
 }
 
 // impl ToTokens for RuleNode {
@@ -205,14 +221,14 @@ impl Parse for RuleNode {
       if input.peek(Token![;]){
          // println!("fact rule!!!");
          input.parse::<Token![;]>()?;
-         Ok(RuleNode{head_clauses, body_items: Punctuated::default()})
+         Ok(RuleNode{head_clauses, body_items: vec![] /*Punctuated::default()*/})
       } else {
          input.parse::<Token![<]>()?;
          input.parse::<Token![-]>()?;
          input.parse::<Token![-]>()?;
          let body_items = Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty(input)?;
          input.parse::<Token![;]>()?;
-         Ok(RuleNode{ head_clauses, body_items})
+         Ok(RuleNode{ head_clauses, body_items: body_items.into_iter().collect()})
       }
    }
 }
@@ -253,7 +269,63 @@ impl From<&RelationNode> for RelationIdentity{
    }
 } 
 
-pub(crate) fn desugar_pattern_args(prog: InferProgram) -> InferProgram {
+fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
+   fn bitem_desugar(bitem: &BodyItemNode) -> Vec<Vec<BodyItemNode>> {
+      match bitem {
+         BodyItemNode::Generator(g) => vec![vec![bitem.clone()]],
+         BodyItemNode::Clause(c) => vec![vec![bitem.clone()]],
+         BodyItemNode::Disjunction(d) => {
+            let mut res = vec![];
+            for disjunt in d.disjuncts.iter() {
+               for conjunction in bitems_desugar(&disjunt.iter().cloned().collect_vec()){
+                  res.push(conjunction);
+               }
+            } 
+           res
+         },
+      }
+   }
+   fn bitems_desugar(bitems: &[BodyItemNode]) -> Vec<Vec<BodyItemNode>> {
+      let mut res = vec![];
+      if bitems.len() > 0 {
+         let sub_res = bitems_desugar(&bitems[0 .. bitems.len() - 1]);
+         let last_desugared = bitem_desugar(&bitems[bitems.len() - 1]);
+         for sub_res_item in sub_res.into_iter() {
+            for last_item in last_desugared.iter() {
+               let mut res_item = sub_res_item.clone();
+               res_item.extend(last_item.clone());
+               res.push(res_item);
+            }
+         }
+      } else {
+         res.push(vec![]);
+      }
+
+      res
+   }
+
+   let mut res = vec![];
+   for conjunction in bitems_desugar(&rule.body_items){
+      res.push(RuleNode {
+         body_items: conjunction,
+         head_clauses: rule.head_clauses.clone()
+      })
+   }
+   res
+}
+
+fn desugar_disjunction_nodes(prog: InferProgram) -> InferProgram {
+   let mut new_rules = vec![];
+   for rule in prog.rules.into_iter() {
+      new_rules.extend(rule_desugar_disjunction_nodes(rule));
+   }
+   InferProgram {
+      relations : prog.relations,
+      rules: new_rules
+   }
+}
+
+fn desugar_pattern_args(prog: InferProgram) -> InferProgram {
 
    fn clause_desugar_pattern_args(body_clause: BodyClauseNode) -> BodyClauseNode {
       let mut new_args = Punctuated::new();
@@ -283,9 +355,9 @@ pub(crate) fn desugar_pattern_args(prog: InferProgram) -> InferProgram {
    }
    fn rule_desugar_pattern_args(rule: RuleNode) -> RuleNode {
       RuleNode {
-         body_items: map_punctuated(rule.body_items, 
-                                    |bi| match bi {BodyItemNode::Clause(cl) => BodyItemNode::Clause(clause_desugar_pattern_args(cl)),
-                                                   _ => bi}),
+         body_items: rule.body_items.into_iter().map(
+                           |bi| match bi {BodyItemNode::Clause(cl) => BodyItemNode::Clause(clause_desugar_pattern_args(cl)),
+                                          _ => bi}).collect(),
          head_clauses: rule.head_clauses
       }
    }
@@ -296,6 +368,9 @@ pub(crate) fn desugar_pattern_args(prog: InferProgram) -> InferProgram {
    }
 }
 
+pub(crate) fn desugar_infer_program(prog: InferProgram) -> InferProgram {
+   desugar_pattern_args(desugar_disjunction_nodes(prog))
+}
 
 lazy_static::lazy_static! {
    static ref ident_counters: Mutex<HashMap<String, u32>> = Mutex::new(HashMap::default());
