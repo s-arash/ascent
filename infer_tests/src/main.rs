@@ -1,12 +1,15 @@
 #![allow(warnings)]
 #![feature(bindings_after_at)]
+#![feature(decl_macro)]
 
 mod tests;
 mod utils;
+mod lattice_exps;
+mod se;
 
 use std::{any::Any, cmp::max, rc::Rc};
 use stopwatch::Stopwatch;
-use infer::dl;
+use infer::infer;
 
 
 fn lambda_calc_example() {
@@ -49,7 +52,7 @@ impl LambdaCalcExpr {
    }
 }
 
-dl!{
+infer!{
    relation bar(i32, i32);
    relation foo1(i32, i32, i32);
    relation foo2(i32, Option<i32>);
@@ -66,9 +69,9 @@ dl!{
 }
 
 mod tc{
-    use infer::dl;
+    use infer::infer;
 
-   dl!{
+   infer!{
       relation edge(i32, i32);
       relation path(i32, i32);
 

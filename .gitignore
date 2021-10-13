@@ -2,3 +2,8 @@ target
 cargo.lock
 .vscode
 **/scratchpad.rs
+
+ez3/
+ez3_base/
+ez3_tests/
+.z3-trace

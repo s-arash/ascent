@@ -3,7 +3,8 @@ use std::{cmp::max, collections::HashMap, hash, rc::Rc};
 
 
 use std::collections::{self, HashSet};
-use infer::dl;
+use infer::infer;
+// use ::infer::dl;
 
 use derive_more::*;
 use LambdaCalcExpr::*;
@@ -48,7 +49,7 @@ fn I() -> LambdaCalcExpr {lam("x", Ref("x"))}
 
 #[test]
 fn test_dl_lambda(){
-   dl!{
+   infer!{
       relation output(LambdaCalcExpr);
       relation input(LambdaCalcExpr);
       relation eval(LambdaCalcExpr, LambdaCalcExpr);
@@ -83,7 +84,7 @@ fn test_dl_lambda(){
 
 #[test]
 fn test_dl_patterns(){
-   dl!{
+   infer!{
       relation foo(i32, Option<i32>);
       relation bar(i32, i32);
       foo(1, None);
@@ -100,7 +101,7 @@ fn test_dl_patterns(){
 
 #[test]
 fn test_dl_pattern_args(){
-   dl!{
+   infer!{
       relation foo(i32, Option<i32>);
       relation bar(i32, i32);
       foo(1, None);
@@ -118,7 +119,7 @@ fn test_dl_pattern_args(){
 
 #[test]
 fn test_dl2(){
-   dl!{
+   infer!{
       relation bar(i32, i32);
       relation foo1(i32, i32);
       relation foo2(i32, i32);
@@ -149,7 +150,7 @@ fn test_dl2(){
 
 #[test]
 fn test_dl_expressions(){
-   dl!{
+   infer!{
       relation foo(i32, i32);
       relation bar(i32, i32);
       relation baz(i32, i32, i32);
@@ -170,7 +171,7 @@ fn test_dl_expressions(){
 
 #[test]
 fn test_dl_vars_bound_in_patterns(){
-   dl!{
+   infer!{
       relation foo(i32, Option<i32>);
       relation bar(i32, i32);
       relation baz(i32, i32, i32);
@@ -194,7 +195,7 @@ fn test_dl_vars_bound_in_patterns(){
 
 #[test]
 fn test_dl_generators(){
-   dl!{
+   infer!{
       relation foo(i32, i32);
       relation bar(i32);
 
@@ -211,7 +212,7 @@ fn test_dl_generators(){
 
 #[test]
 fn test_dl_generators2(){
-   dl!{
+   infer!{
       relation foo(i32, i32);
       relation bar(i32);
 
@@ -230,7 +231,7 @@ fn test_dl_generators2(){
 
 #[test]
 fn test_dl_multiple_head_clauses(){
-   dl!{
+   infer!{
       relation foo(Vec<i32>, Vec<i32>);
       relation foo2(Vec<i32>);
       relation foo1(Vec<i32>);
@@ -254,7 +255,7 @@ fn test_dl_multiple_head_clauses(){
 
 #[test]
 fn test_dl_multiple_head_clauses2(){
-   dl!{
+   infer!{
       relation foo(Vec<i32>);
       relation foo_left(Vec<i32>);
       relation foo_right(Vec<i32>);
@@ -276,7 +277,7 @@ fn test_dl_multiple_head_clauses2(){
 
 #[test]
 fn test_dl_disjunctions(){
-   dl!{
+   infer!{
       relation foo1(i32, i32);
       relation foo2(i32, i32);
       relation small(i32);

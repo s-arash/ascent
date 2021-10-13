@@ -86,7 +86,6 @@ impl MirRelationVersion {
 fn get_hir_dep_graph(hir: &InferIr) -> Vec<(usize,usize)> {
    let mut relations_to_rules_in_head : HashMap<&RelationIdentity, HashSet<usize>> = HashMap::new();
    for (i, rule) in hir.rules.iter().enumerate(){
-      let rule = &hir.rules[i];
       for head_rel in rule.head_clauses.iter().map(|hcl| &hcl.rel){
          relations_to_rules_in_head.entry(head_rel).or_default().insert(i);
       }
@@ -115,7 +114,6 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
    for i in 0..hir.rules.len() {dep_graph.add_node(i);}
    let dep_graph = dep_graph.into_graph::<usize>();
    // println!("{:?}", Dot::with_config(&dep_graph, &[Config::EdgeNoLabel]));
-   let sccs = kosaraju_scc(&dep_graph);
    let mut sccs = condensation(dep_graph, true);
 
    let mut mir_sccs = vec![];

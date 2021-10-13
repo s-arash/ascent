@@ -1,14 +1,12 @@
 extern crate proc_macro;
-use proc_macro::{Delimiter, Group, TokenStream, TokenTree};
 use proc_macro2::Span;
-use syn::{Expr, Ident, Pat, Result, Token, Type, braced, parenthesized, parse::{self, Parse, ParseStream}, parse_macro_input, punctuated::Punctuated, spanned::Spanned, token::Token};
-use std::{clone, collections::{HashMap, HashSet}, fmt::Pointer, sync::Mutex};
+use syn::{Expr, Ident, Pat, Result, Token, Type, braced, parenthesized, parse::{Parse, ParseStream}, punctuated::Punctuated, spanned::Spanned};
+use std::{collections::{HashMap}, sync::Mutex};
 
-use quote::{ToTokens, TokenStreamExt};
-use itertools::{Either, Itertools};
+use quote::{ToTokens};
+use itertools::{Itertools};
 use derive_syn_parse::Parse;
 
-use crate::{infer_codegen::compile_mir, infer_hir::{compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir}, utils::{map_punctuated, tuple_type}};
 
 // resources:
 // https://blog.rust-lang.org/2018/12/21/Procedural-Macros-in-Rust-2018.html
@@ -86,7 +84,7 @@ pub struct BodyClauseNode {
 pub enum BodyClauseArg {
    #[peek(Token![?], name = "Pattern arg")]
    Pat(ClauseArgPattern),
-   #[peek_with(|x| true, name = "Expression arg")]
+   #[peek_with(|_| true, name = "Expression arg")]
    Expr(Expr),
 }
 
@@ -272,8 +270,8 @@ impl From<&RelationNode> for RelationIdentity{
 fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
    fn bitem_desugar(bitem: &BodyItemNode) -> Vec<Vec<BodyItemNode>> {
       match bitem {
-         BodyItemNode::Generator(g) => vec![vec![bitem.clone()]],
-         BodyItemNode::Clause(c) => vec![vec![bitem.clone()]],
+         BodyItemNode::Generator(_) => vec![vec![bitem.clone()]],
+         BodyItemNode::Clause(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Disjunction(d) => {
             let mut res = vec![];
             for disjunt in d.disjuncts.iter() {
@@ -373,10 +371,10 @@ pub(crate) fn desugar_infer_program(prog: InferProgram) -> InferProgram {
 }
 
 lazy_static::lazy_static! {
-   static ref ident_counters: Mutex<HashMap<String, u32>> = Mutex::new(HashMap::default());
+   static ref IDENT_COUNTERS: Mutex<HashMap<String, u32>> = Mutex::new(HashMap::default());
 }
 fn fresh_ident(prefix: &str, span: Span) -> Ident {
-   let mut ident_counters_lock = ident_counters.lock().unwrap();
+   let mut ident_counters_lock = IDENT_COUNTERS.lock().unwrap();
    let counter = if let Some(entry) = ident_counters_lock.get_mut(prefix) {
       let counter = *entry;
       *entry = counter + 1;

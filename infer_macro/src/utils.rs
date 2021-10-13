@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 use proc_macro2::Ident;
-use quote::ToTokens;
-use syn::{Expr, Pat, PatBox, Type, parse2, punctuated::Punctuated, spanned::Spanned};
+
+use syn::{Expr, Pat, Type, parse2, punctuated::Punctuated, spanned::Spanned};
 
 
 
@@ -64,17 +64,17 @@ pub fn map_punctuated<T, P, U>(punc: Punctuated<T,P>, mut f: impl FnMut (T) -> U
 pub fn pattern_get_vars(pat: &Pat) -> Vec<Ident> {
    let mut res = vec![];
    match pat {
-      Pat::Box(patBox) => res.extend(pattern_get_vars(&patBox.pat)),
-      Pat::Ident(patIdent) => {
-         res.push(patIdent.ident.clone()); 
-         if let Some(subpat) = &patIdent.subpat {
+      Pat::Box(pat_box) => res.extend(pattern_get_vars(&pat_box.pat)),
+      Pat::Ident(pat_ident) => {
+         res.push(pat_ident.ident.clone()); 
+         if let Some(subpat) = &pat_ident.subpat {
             res.extend(pattern_get_vars(&subpat.1))
          }
       },
       Pat::Lit(_) => {},
       Pat::Macro(_) => {},
-      Pat::Or(orPat) => {
-         let cases_vars = orPat.cases.iter().map(pattern_get_vars).map(into_set);
+      Pat::Or(or_pat) => {
+         let cases_vars = or_pat.cases.iter().map(pattern_get_vars).map(into_set);
          let intersection = cases_vars.fold1(|case_vars, accu| collect_set(case_vars.intersection(&accu).cloned()));
          if let Some(intersection) = intersection {
             res.extend(intersection);
@@ -82,11 +82,11 @@ pub fn pattern_get_vars(pat: &Pat) -> Vec<Ident> {
       },
       Pat::Path(_) => {},
       Pat::Range(_) => {},
-      Pat::Reference(refPat) => res.extend(pattern_get_vars(&refPat.pat)),
+      Pat::Reference(ref_pat) => res.extend(pattern_get_vars(&ref_pat.pat)),
       Pat::Rest(_) => {},
-      Pat::Slice(slicePat) => {
-         for subPat in slicePat.elems.iter(){
-            res.extend(pattern_get_vars(subPat));
+      Pat::Slice(slice_pat) => {
+         for sub_pat in slice_pat.elems.iter(){
+            res.extend(pattern_get_vars(sub_pat));
          }
       },
       Pat::Struct(struct_pat) => {
@@ -121,7 +121,7 @@ fn test_pattern_get_vars(){
       SomePair(x, (y, z))
    };
    let pat : syn::Pat = parse2(pattern).unwrap();
-   assert_eq!(collect_set(["x", "y", "z"].into_iter().map(ToString::to_string)), 
+   assert_eq!(collect_set(["x", "y", "z"].iter().map(ToString::to_string)), 
               pattern_get_vars(&pat).into_iter().map(|id| id.to_string()).collect());
 }
 

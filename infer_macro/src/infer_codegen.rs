@@ -171,8 +171,6 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
 
       match bitem {
          MirBodyItem::Clause(bclause) => {
-            let bclause_rel = &bclause.rel;
-            let bclause_rel_sel = &bclause_rel.ir_name;
             let bclause_rel_name = &bclause.rel.relation.name;
             let selected_args = &bclause.selected_args();
 
@@ -189,8 +187,8 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             let clause_vars = bclause.args.iter().enumerate()
                                  .filter_map(|(i,v)| expr_to_ident(v).map(|v| (i, v)))
                                  .collect::<Vec<_>>();
-            let common_vars = clause_vars.iter().filter(|(i,v)| pre_clause_vars.contains(v)).collect::<Vec<_>>();
-            let common_vars_no_indices = common_vars.iter().map(|(i,v)| v.clone()).collect::<Vec<_>>();
+            let common_vars = clause_vars.iter().filter(|(_i,v)| pre_clause_vars.contains(v)).collect::<Vec<_>>();
+            let common_vars_no_indices = common_vars.iter().map(|(_i,v)| v.clone()).collect::<Vec<_>>();
 
             let mut new_vars_assignmnets = vec![];
             for (i,var) in clause_vars.iter(){

@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-
-use itertools::Either;
+#![cfg(test)]
 use petgraph::dot::{Config, Dot};
 use proc_macro2::TokenStream;
 
-use crate::{dl_impl};
+use crate::{infer_impl};
 
 #[test]
 fn test_macro1() {
@@ -26,13 +24,13 @@ fn test_macro1() {
 }
 
 fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   let code = dl_impl(tokens);
+   let code = infer_impl(tokens);
    assert!(code.is_ok());
 
    let code = code.unwrap();
 
-   std::fs::write("src/scratchpad.rs", code.to_string());
-   std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait();
+   std::fs::write("src/scratchpad.rs", code.to_string()).unwrap();
+   std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
    code
 }
 
@@ -103,14 +101,14 @@ fn exp_condensation() {
    use petgraph::Graph;
 
    let mut graph: Graph<&'static str, (), Directed> = Graph::new();
-   let a = graph.add_node(("a")); // node with no weight
-   let b = graph.add_node(("b"));
-   let c = graph.add_node(("c"));
-   let d = graph.add_node(("d"));
-   let e = graph.add_node(("e"));
-   let f = graph.add_node(("f"));
-   let g = graph.add_node(("g"));
-   let h = graph.add_node(("h"));
+   let a = graph.add_node("a"); // node with no weight
+   let b = graph.add_node("b");
+   let c = graph.add_node("c");
+   let d = graph.add_node("d");
+   let e = graph.add_node("e");
+   let f = graph.add_node("f");
+   let g = graph.add_node("g");
+   let h = graph.add_node("h");
 
    // a ----> b ----> e ----> f
    // ^       |       ^       |
@@ -118,8 +116,8 @@ fn exp_condensation() {
    // d <---- c       h <---- g
    graph.extend_with_edges(&[(a, b), (b, c), (c, d), (d, a), (b, e), (e, f), (f, g), (g, h), (h, e)]);
    let acyclic_condensed_graph = condensation(graph.clone(), true);
-   let A = NodeIndex::new(0);
-   let B = NodeIndex::new(1);
+   #[allow(non_snake_case)]
+   let (A, B) = (NodeIndex::new(0), NodeIndex::new(1));
    assert_eq!(acyclic_condensed_graph.node_count(), 2);
    assert_eq!(acyclic_condensed_graph.edge_count(), 1);
    assert_eq!(acyclic_condensed_graph.neighbors(B).collect::<Vec<_>>(), vec![A]);
