@@ -1,4 +1,6 @@
 #![cfg(test)]
+use std::clone;
+
 use petgraph::dot::{Config, Dot};
 use proc_macro2::TokenStream;
 
@@ -92,7 +94,26 @@ fn exp_borrowing(){
    //       v.push(new_row);
    //    }
    // }
+
+   let x: i32 = 42;
+   let y: i32 = <i32 as Convert<_>>::convert(&x);
 }
+
+trait Convert<TSource> {
+   #[inline]
+   fn convert(source: TSource) -> Self;
+}
+
+impl<T> Convert<T> for T {
+   #[inline(always)]
+   fn convert(source: T) -> T {source}
+}
+
+impl<T> Convert<&T> for T where T: Clone {
+   #[inline(always)]
+   fn convert(source: &T) -> T {source.clone()}
+}
+
 
 #[test]
 fn exp_condensation() {

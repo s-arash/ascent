@@ -1,8 +1,8 @@
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 use itertools::{Iterate, Itertools};
 use proc_macro2::Ident;
-use syn::{Expr, Type, parse2};
+use syn::{Expr, Type, parse2, spanned::Spanned};
 
 use crate::{infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
 use crate::infer_mir::MirRelationVersion::*;
@@ -38,6 +38,28 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
    }
 
    let update_indices_body = compile_update_indices_function_body(mir);
+
+   let mut type_constaints = vec![];
+   let mut field_type_names = HashSet::<String>::new();
+   
+   /// for reference: 
+   struct TypeConstraints where i32: ::core::clone::Clone + ::core::cmp::Eq + ::core::hash::Hash {}
+   for relation in mir.relations_ir_relations.keys() {
+      use crate::quote::ToTokens;
+      for field_type in relation.field_types.iter() {
+         let add =
+         if let Type::Path(path) = field_type {
+            field_type_names.insert(path.path.clone().into_token_stream().to_string())
+         } else {true}; 
+         if add {
+            type_constaints.push(quote_spanned!{field_type.span()=>
+               let _type_constraints : TypeConstraints<#field_type>;
+            });
+         }
+      }
+      //for reference:
+   }
+
    quote! {
       use std::collections::{HashMap, HashSet};
       fn move_index_contents<K, V>(hm1: &mut HashMap<K, HashSet<V>>, hm2: &mut HashMap<K, HashSet<V>>) 
@@ -61,6 +83,13 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
          #[allow(non_snake_case)]
          pub fn update_indices(&mut self) {
             #update_indices_body
+         }
+
+         fn type_constaints() {
+            use ::core::clone::Clone; use ::core::cmp::Eq; use ::core::hash::Hash;
+            // struct TypeConstraints where #(#type_constaints),* {}
+            struct TypeConstraints<T> where T : Clone + Eq + Hash{_t: ::core::marker::PhantomData<T>}
+            #(#type_constaints)*
          }
       }
    }

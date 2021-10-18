@@ -57,7 +57,7 @@ impl Parse for DisjunctionNode {
       let content;
       let paren = parenthesized!(content in input);
       let res: Punctuated<Punctuated<BodyItemNode, Token![,]>, Token![||]>;
-      res = Punctuated::<Punctuated<BodyItemNode, Token![,]>, Token![||]>::parse_separated_nonempty_with(&content, Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty)?;
+      res = Punctuated::<Punctuated<BodyItemNode, Token![,]>, Token![||]>::parse_terminated_with(&content, Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty)?;
       Ok(DisjunctionNode{paren, disjuncts: res})
    }
 }

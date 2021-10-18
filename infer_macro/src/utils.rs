@@ -1,9 +1,11 @@
-use std::collections::HashSet;
+use std::{collections::HashSet};
 
 use itertools::Itertools;
 use proc_macro2::Ident;
 
-use syn::{Expr, Pat, Type, parse2, punctuated::Punctuated, spanned::Spanned};
+use quote::ToTokens;
+use syn::parse::{Parse, ParseBuffer};
+use syn::{Expr, Pat, Path, Type, parse::ParseStream, parse2, punctuated::Punctuated, spanned::Spanned};
 
 
 
