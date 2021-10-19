@@ -82,6 +82,23 @@ fn test_macro_patterns() {
 }
 
 #[test]
+fn test_macro_lattices(){
+   let input = quote!{
+      lattice shortest_path(i32, i32, MyU32);
+      relation edge(i32, i32, u32);
+
+      shortest_path(*x,*y, MyU32(*w)) <-- edge(x,y,w);
+
+      // edge(1,2, 3);
+      // edge(2,3, 5);
+      // edge(1,3, 4);
+      // edge(2,4, 10);
+
+   };
+   write_to_scratchpad(input);
+}
+
+#[test]
 fn exp_borrowing(){
    // let mut v: Vec<i32> = vec![];
    // let mut u: Vec<i32> = vec![];

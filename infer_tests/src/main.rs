@@ -4,7 +4,6 @@
 
 mod tests;
 mod utils;
-mod lattice_exps;
 mod se;
 
 use std::{any::Any, cmp::max, rc::Rc};

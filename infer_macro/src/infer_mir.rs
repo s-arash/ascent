@@ -13,7 +13,8 @@ pub(crate) struct InferMir {
    pub sccs: Vec<MirScc>,
    pub deps: HashMap<usize, HashSet<usize>>,
    pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
-   pub relations_full_indices: HashMap<RelationIdentity, IrRelation>
+   pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
+   pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
 }
 
 pub(crate) struct MirScc {
@@ -169,6 +170,7 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
       deps: sccs_dep_graph,// HashMap::from_iter([(0, HashSet::new())]),
       relations_ir_relations: hir.relations_ir_relations.clone(),
       relations_full_indices: hir.relations_full_indices.clone(),
+      lattices_full_indices: hir.lattices_full_indices.clone(),
    }
 }
 

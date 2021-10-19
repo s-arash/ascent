@@ -293,7 +293,6 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
          if let Some(rel_indices) = rel_indices {
             for rel_ind in rel_indices.iter(){
                let var_name = ir_relation_version_var_name(&rel_ind.ir_name, New);
-               // TODO args must be cloned here
                let args_tuple : Vec<Expr> = rel_ind.indices.iter().map(|&i| {
                   let i_ind = syn::Index::from(i);
                   syn::parse2(quote!{ new_row.#i_ind.clone()}).unwrap()
@@ -311,20 +310,56 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
          let head_rel_full_index_var_name_delta = ir_relation_version_var_name(&head_rel_full_index.ir_name, Delta);
          let head_rel_full_index_var_name_total = ir_relation_version_var_name(&head_rel_full_index.ir_name, Total);
 
-         let add_row = quote! {
-            // comment("check if the tuple already exists");
-            let new_row: #row_type = #new_row_tuple;
-            if !(#head_rel_full_index_var_name_new.contains_key(&new_row) ||
-               #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
-               #head_rel_full_index_var_name_total.contains_key(&new_row))
-            {
-               let new_row_ind = self.#head_rel_name.len();
-               #(#update_indices)*
-               self.#head_rel_name.push(new_row);
-               changed = true;
-            }
-         };
-         add_rows.push(add_row);
+         if !hcl.rel.is_lattice { 
+            let add_row = quote! {
+               // comment("check if the tuple already exists");
+               let new_row: #row_type = #new_row_tuple;
+               if !(#head_rel_full_index_var_name_new.contains_key(&new_row) ||
+                  #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
+                  #head_rel_full_index_var_name_total.contains_key(&new_row))
+               {
+                  let new_row_ind = self.#head_rel_name.len();
+                  #(#update_indices)*
+                  self.#head_rel_name.push(new_row);
+                  changed = true;
+               }
+            };
+            add_rows.push(add_row);
+         } else { 
+            let head_lat_full_index = &mir.lattices_full_indices[head_relation];
+            let head_lat_full_index_var_name_new = ir_relation_version_var_name(&head_lat_full_index.ir_name, New);
+            let head_lat_full_index_var_name_delta = ir_relation_version_var_name(&head_lat_full_index.ir_name, Delta);
+            let head_lat_full_index_var_name_full = ir_relation_version_var_name(&head_lat_full_index.ir_name, Total);
+            let tuple_lat_index = syn::Index::from(hcl.rel.field_types.len() - 1);
+            let lattice_key_args = hcl.args.iter().take(hcl.args.len() - 1).map(exp_cloned).collect_vec();
+            let lattice_key_tuple = tuple(&lattice_key_args);
+
+            let add_row = quote! {
+               let new_row: #row_type = #new_row_tuple;
+               let lattice_key = #lattice_key_tuple;
+               if let Some(existing_ind) = #head_lat_full_index_var_name_new.get(&lattice_key)
+                  .or_else(|| #head_lat_full_index_var_name_delta.get(&lattice_key))
+                  .or_else(|| #head_lat_full_index_var_name_full.get(&lattice_key)) 
+               {
+                  // let existing_row = &self.#head_rel_name[existing_ind];
+                  let existing_ind = *existing_ind.iter().next().unwrap();
+                  // TODO clone before joining?
+                  let new_lat = self.#head_rel_name[existing_ind].#tuple_lat_index.join(&new_row.#tuple_lat_index);
+                  if new_lat != self.#head_rel_name[existing_ind].#tuple_lat_index {
+                     self.#head_rel_name[ind].#tuple_lat_index = new_lat;
+                     let new_row_ind = existing_ind;
+                     #(#update_indices)*
+                     changed = true;
+                  }
+               } else {
+                  let new_row_ind = self.#head_rel_name.len();
+                  #(#update_indices)*
+                  self.#head_rel_name.push(new_row);
+                  changed = true;
+               }
+            };
+            add_rows.push(add_row);
+         }
       }
       quote!{
          #(#add_rows)*

@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::{cmp::max, collections::HashMap, hash, rc::Rc};
@@ -301,4 +302,39 @@ fn test_dl_disjunctions(){
    prog.run();
    println!("bar: {:?}", prog.bar);
    assert!(rels_equal([(3,30), (2, 20)], prog.bar));
+}
+
+
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Default)]
+pub struct MyU32(pub u32);
+impl MyU32 {
+   pub fn join(self, other: &MyU32) -> MyU32 {
+      MyU32(self.0.min(other.0))
+   }
+}
+impl Debug for MyU32 {
+   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+      write!(f, "{}", self.0)
+   }
+}
+
+#[test]
+fn test_dl_lattice(){
+   infer!{
+      lattice shortest_path(i32, i32, MyU32);
+      relation edge(i32, i32, u32);
+
+      shortest_path(*x,*y, MyU32(*w)) <-- edge(x,y,w);
+      shortest_path(*x, *z, MyU32(w + l.0)) <-- edge(x, y, w), shortest_path(y, z, l);
+
+      edge(1, 2, 30);
+      edge(2, 3, 50);
+      edge(1, 3, 40);
+      edge(2, 4, 100);
+      edge(4, 1, 1000);
+
+   };
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("shortest_path: {:?}", prog.shortest_path);
 }

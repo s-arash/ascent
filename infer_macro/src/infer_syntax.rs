@@ -16,6 +16,7 @@ use derive_syn_parse::Parse;
 
 mod kw {
    syn::custom_keyword!(relation);
+   syn::custom_keyword!(lattice);
 }
 
 // #[derive(Clone)]
@@ -23,16 +24,21 @@ pub struct RelationNode{
    pub name: Ident,
    pub field_types : Punctuated<Type, Token![,]>,
    pub semi_colon: Token![;],
+   pub is_lattice: bool,
 }
 impl Parse for RelationNode {
    fn parse(input: ParseStream) -> Result<Self> {
-      input.parse::<kw::relation>()?;
+      let is_lattice = input.peek(kw::lattice);
+      if is_lattice {input.parse::<kw::lattice>()?;} else {input.parse::<kw::relation>()?;}
       let name : Ident = input.parse()?;
       let content;
       parenthesized!(content in input);
       let field_types = content.parse_terminated(Type::parse)?;
       let semi_colon = input.parse::<Token![;]>()?;
-      Ok(RelationNode{name, field_types, semi_colon})
+      if is_lattice && field_types.empty_or_trailing() {
+         return Err(input.error(format!("empty lattice is not allowed")));
+      }
+      Ok(RelationNode{name, field_types, semi_colon, is_lattice})
    }
 }
 
@@ -242,7 +248,7 @@ impl Parse for InferProgram {
       let mut rules = vec![];
       let mut relations = vec![];
       while !input.is_empty() {
-         if input.peek(kw::relation){
+         if input.peek(kw::relation) || input.peek(kw::lattice){
             relations.push(RelationNode::parse(input)?);
          } else {
             rules.push(RuleNode::parse(input)?);
@@ -255,14 +261,16 @@ impl Parse for InferProgram {
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub(crate) struct RelationIdentity {
    pub name: Ident,
-   pub field_types: Vec<Type>
+   pub field_types: Vec<Type>,
+   pub is_lattice: bool,
 }
 
 impl From<&RelationNode> for RelationIdentity{
    fn from(relation_node: &RelationNode) -> Self {
       RelationIdentity {
          name: relation_node.name.clone(),
-         field_types: relation_node.field_types.iter().cloned().collect()
+         field_types: relation_node.field_types.iter().cloned().collect(),
+         is_lattice: relation_node.is_lattice
       }
    }
 } 

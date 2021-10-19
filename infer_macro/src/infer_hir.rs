@@ -11,6 +11,7 @@ use crate::infer_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode
 pub(crate) struct InferIr {
    pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
    pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
+   pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub rules: Vec<IrRule>
 }
 
@@ -58,10 +59,23 @@ impl IrRelation {
 
 pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<InferIr>{
    let ir_rules : Vec<IrRule> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
-   let mut relations_ir_relations = HashMap::new();
+   let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
    let mut relations_full_indices = HashMap::new();
+   let mut lattices_full_indices = HashMap::new();
    for rel in prog.relations.iter(){
       let rel_identity = RelationIdentity::from(rel);
+
+      if rel.is_lattice {
+         let indices = (0 .. rel_identity.field_types.len() - 1).collect_vec();
+         let ir_name = ir_name_for_rel_indices(&rel_identity.name, &indices);
+         let lat_full_index = IrRelation{
+            relation: rel_identity.clone(),
+            indices: indices,
+            ir_name: ir_name,
+         };
+         relations_ir_relations.entry(rel_identity.clone()).or_default().insert(lat_full_index.clone());
+         lattices_full_indices.insert(rel_identity.clone(), lat_full_index);
+      }
 
       let full_indices = (0 .. rel_identity.field_types.len()).collect_vec();
       let ir_name = ir_name_for_rel_indices(&rel_identity.name, &full_indices);
@@ -70,24 +84,22 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<I
          indices: full_indices,
          ir_name: ir_name
       };
-      relations_ir_relations.insert(rel_identity.clone(), into_set([rel_full_index.clone()]));
-
+      relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_full_index.clone());
       relations_full_indices.insert(rel_identity, rel_full_index);
    }
    for ir_rule in ir_rules.iter(){
       for bcl in ir_rule.body_items.iter(){
          if let IrBodyItem::Clause(ref bcl) = bcl {
             let relation = &bcl.rel.relation;
-            
-            let entry = relations_ir_relations.entry(relation.clone()).or_insert_with(||HashSet::new());
-            entry.insert(bcl.rel.clone());
+            relations_ir_relations.entry(relation.clone()).or_default().insert(bcl.rel.clone());
          }
       }
    }
    Ok(InferIr{
       rules: ir_rules,
       relations_ir_relations,
-      relations_full_indices
+      relations_full_indices,
+      lattices_full_indices
    })
 }
 
