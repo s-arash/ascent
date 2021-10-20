@@ -5,6 +5,7 @@
 mod tests;
 mod utils;
 mod se;
+mod exps;
 
 use std::{any::Any, cmp::max, rc::Rc};
 use stopwatch::Stopwatch;

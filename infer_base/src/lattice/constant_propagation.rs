@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
-use super::{BoundedLattice, Lattice};
+use super::{BoundedLattice, Lattice, ProtoLattice};
 
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
+#[allow(dead_code)]
 pub enum ConstPropagation<T> {
    Bottom,
    Constant(T),
@@ -24,7 +25,7 @@ impl<T: PartialEq> PartialOrd for ConstPropagation<T> {
    }
 }
 
-impl<T: PartialEq> Lattice for ConstPropagation<T> {
+impl<T: PartialEq> ProtoLattice for ConstPropagation<T> {
    fn meet(self, other: Self) -> Self {
       use ConstPropagation::*;
       match (self, other) {
@@ -48,7 +49,15 @@ impl<T: PartialEq> Lattice for ConstPropagation<T> {
    }
 }
 
-impl<T: Lattice> BoundedLattice for ConstPropagation<T> {
+impl<T: Lattice> BoundedLattice for ConstPropagation<T> where ConstPropagation<T>: Lattice {
    fn top() -> Self { Self::Top }
    fn bottom() -> Self { Self::Bottom }
+}
+
+#[test]
+fn test_constant_propagation(){
+   let const_1 = ConstPropagation::Constant(1);
+   assert!(const_1 > ConstPropagation::Bottom);
+   assert!(const_1 < ConstPropagation::Top);
+   assert!(const_1 > ConstPropagation::bottom());
 }
