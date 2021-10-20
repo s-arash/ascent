@@ -84,10 +84,10 @@ fn test_macro_patterns() {
 #[test]
 fn test_macro_lattices(){
    let input = quote!{
-      lattice shortest_path(i32, i32, MyU32);
+      lattice shortest_path(i32, i32, Dual<u32>);
       relation edge(i32, i32, u32);
 
-      shortest_path(*x,*y, MyU32(*w)) <-- edge(x,y,w);
+      shortest_path(*x,*y, Dual(*w)) <-- edge(x,y,w);
 
       // edge(1,2, 3);
       // edge(2,3, 5);

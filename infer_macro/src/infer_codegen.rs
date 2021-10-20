@@ -32,7 +32,7 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
    for (i, scc) in sccs_ordered.iter().enumerate() {
       let msg = format!("scc {}", i);
       sccs_compiled.push(quote!{
-         comment(#msg);
+         Self::comment(#msg);
       });
       sccs_compiled.push(compile_mir_scc(scc, mir));
    }
@@ -41,35 +41,32 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
 
    let mut type_constaints = vec![];
    let mut field_type_names = HashSet::<String>::new();
+   let mut lat_field_type_names = HashSet::<String>::new();
+
    
    /// for reference: 
    struct TypeConstraints where i32: ::core::clone::Clone + ::core::cmp::Eq + ::core::hash::Hash {}
    for relation in mir.relations_ir_relations.keys() {
       use crate::quote::ToTokens;
-      for field_type in relation.field_types.iter() {
-         let add =
-         if let Type::Path(path) = field_type {
-            field_type_names.insert(path.path.clone().into_token_stream().to_string())
+      for (i,field_type) in relation.field_types.iter().enumerate() {
+         let is_lat = relation.is_lattice && i == relation.field_types.len() - 1;
+         let add = if let Type::Path(path) = field_type {
+            let container = if is_lat {&mut lat_field_type_names} else {&mut field_type_names};
+            container.insert(path.path.clone().into_token_stream().to_string())
          } else {true}; 
          if add {
+            let type_constaints_type = 
+               if is_lat {quote_spanned!(field_type.span()=>LatTypeConstraints)} 
+               else {quote_spanned!(field_type.span()=>TypeConstraints)}; 
             type_constaints.push(quote_spanned!{field_type.span()=>
-               let _type_constraints : TypeConstraints<#field_type>;
+               let _type_constraints : #type_constaints_type<#field_type>;
             });
          }
       }
-      //for reference:
    }
 
    quote! {
       use std::collections::{HashMap, HashSet};
-      fn move_index_contents<K, V>(hm1: &mut HashMap<K, HashSet<V>>, hm2: &mut HashMap<K, HashSet<V>>) 
-         where K : Eq + std::hash::Hash, V: Eq + std::hash::Hash {
-         for (k,v) in hm1.drain(){
-            let set = hm2.entry(k).or_default();
-            set.extend(v);
-         }
-      }
-      fn comment(_: &str){}
       #[derive(Default)]
       pub struct DLProgram {
          #(#relation_fields)*
@@ -87,10 +84,21 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
 
          fn type_constaints() {
             use ::core::clone::Clone; use ::core::cmp::Eq; use ::core::hash::Hash;
+            use ::infer::Lattice;
             // struct TypeConstraints where #(#type_constaints),* {}
             struct TypeConstraints<T> where T : Clone + Eq + Hash{_t: ::core::marker::PhantomData<T>}
+            struct LatTypeConstraints<T> where T : Clone + Eq + Hash + Lattice{_t: ::core::marker::PhantomData<T>}
             #(#type_constaints)*
          }
+
+         fn move_index_contents<K, V>(hm1: &mut HashMap<K, HashSet<V>>, hm2: &mut HashMap<K, HashSet<V>>) 
+            where K : ::core::cmp::Eq + ::core::hash::Hash, V: ::core::cmp::Eq + ::core::hash::Hash {
+            for (k,v) in hm1.drain(){
+               let set = hm2.entry(k).or_default();
+               set.extend(v);
+            }
+         }
+         fn comment(_: &str){}
       }
    }
 }
@@ -114,7 +122,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
       });
 
       shift_delta_to_total_new_to_delta.push(quote!{
-         move_index_contents(#delta_var_name, &mut #total_var_name);
+         Self::move_index_contents(#delta_var_name, &mut #total_var_name);
          #delta_var_name.clear();
          std::mem::swap(&mut #new_var_name, #delta_var_name);
       });
@@ -132,11 +140,11 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
       }
    }
    for rule in scc.rules.iter() {
-      let comment = format!("{} <-- {}",
+      let msg = format!("{} <-- {}",
                              rule.head_clause.iter().map(|hcl| hcl.rel.name.to_string()).join(", "),
                              rule.body_items.iter().map(bitem_to_str).join(", "));
       evaluate_rules.push(quote! {
-         comment(#comment);
+         Self::comment(#msg);
       });
       evaluate_rules.push(compile_mir_rule(rule, scc, mir, 0));
    }
@@ -341,12 +349,9 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                   .or_else(|| #head_lat_full_index_var_name_delta.get(&lattice_key))
                   .or_else(|| #head_lat_full_index_var_name_full.get(&lattice_key)) 
                {
-                  // let existing_row = &self.#head_rel_name[existing_ind];
                   let existing_ind = *existing_ind.iter().next().unwrap();
-                  // TODO clone before joining?
-                  let new_lat = self.#head_rel_name[existing_ind].#tuple_lat_index.join(&new_row.#tuple_lat_index);
-                  if new_lat != self.#head_rel_name[existing_ind].#tuple_lat_index {
-                     self.#head_rel_name[ind].#tuple_lat_index = new_lat;
+                  let lat_changed = ::infer::Lattice::join_mut(&mut self.#head_rel_name[existing_ind].#tuple_lat_index, new_row.#tuple_lat_index);
+                  if lat_changed {
                      let new_row_ind = existing_ind;
                      #(#update_indices)*
                      changed = true;

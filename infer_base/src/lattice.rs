@@ -1,6 +1,8 @@
 pub mod constant_propagation;
 mod set;
-use std::{cmp::Ordering, ops::Deref, rc::Rc};
+mod dual;
+use std::{ops::Deref, rc::Rc};
+pub use dual::Dual;
 
 use paste::paste;
 
@@ -17,11 +19,13 @@ pub trait Lattice: PartialOrd + Sized{
 
    fn join_mut(&mut self, other: Self) -> bool;
 
+   #[inline]
    fn meet(mut self, other: Self) -> Self{
       self.meet_mut(other);
       self
    }
 
+   #[inline]
    fn join(mut self, other: Self) -> Self{
       self.join_mut(other);
       self
@@ -29,6 +33,7 @@ pub trait Lattice: PartialOrd + Sized{
 }
 
 impl<T: ProtoLattice + Clone> Lattice for T {
+   #[inline]
    fn meet_mut(&mut self, other: Self) -> bool {
       let new_self = ProtoLattice::meet(self.clone(), other);
       let res = self != &new_self;
@@ -36,11 +41,22 @@ impl<T: ProtoLattice + Clone> Lattice for T {
       res
    }
 
+   #[inline]
    fn join_mut(&mut self, other: Self) -> bool {
       let new_self = ProtoLattice::join(self.clone(), other);
       let res = self != &new_self;
       *self = new_self;
       res
+   }
+
+   #[inline]
+   fn meet(self, other: Self) -> Self{
+      ProtoLattice::join(self, other)     
+   }
+
+   #[inline]
+   fn join(self, other: Self) -> Self{
+      ProtoLattice::meet(self, other)
    }
 }
 
@@ -48,43 +64,6 @@ impl<T: ProtoLattice + Clone> Lattice for T {
 pub trait BoundedLattice: Lattice {
    fn bottom() -> Self;   
    fn top() -> Self;
-}
-
-
-#[derive(PartialEq, Eq, Clone, Copy, Hash)]
-/// A wrapper that inverts `<=` and `>=` (or `partial_cmp` for `PartialOrd` types), `meet` and `join` for `ProtoLattice`s, 
-/// and `top` and `bottom` for `BoundedLattice`s.
-/// 
-/// # Example 
-/// ```
-/// assert!(Dual(2) < Dual(1));
-/// ```
-struct Dual<T>(pub T);
-
-impl<T> PartialOrd for Dual<T> where T: PartialOrd {
-   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-      other.0.partial_cmp(&self.0)
-   }
-}
-
-impl<T> Ord for Dual<T> where T: Ord {
-   fn cmp(&self, other: &Self) -> Ordering { other.0.cmp(&self.0) }
-}
-
-impl<T> ProtoLattice for Dual<T> where T: ProtoLattice {
-   fn meet(self, other: Self) -> Self { Dual(self.0.join(other.0)) }
-   fn join(self, other: Self) -> Self { Dual(self.0.meet(other.0)) }
-}
-
-// impl<T> Lattice for Dual<T> where T: Lattice{
-//    fn meet(self, other: Self) -> Self { Dual(self.0.join(other.0)) }
-//    fn join(self, other: Self) -> Self { Dual(self.0.meet(other.0)) }
-// }
-
-
-impl<T> BoundedLattice for Dual<T> where T: BoundedLattice, Dual<T>: Lattice{
-   fn top() -> Self { Dual(T::bottom()) }
-   fn bottom() -> Self { Dual(T::top()) }
 }
 
 

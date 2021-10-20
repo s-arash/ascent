@@ -11,7 +11,7 @@ proc-macro = true
 [dependencies]
 syn = { version = "1.0", features= ["derive", "full", "extra-traits"]} 
 quote = "1.0"
-# infer_base = {path= "../infer_base"}
+infer_base = {path= "../infer_base"}
 proc-macro2 = "1.0"
 itertools = "0.10"
 petgraph = "0.6.0"
