@@ -1,7 +1,7 @@
 use std::{collections::HashSet};
 
 use itertools::Itertools;
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 
 use quote::ToTokens;
 use syn::parse::{Parse, ParseBuffer};
@@ -22,13 +22,17 @@ pub fn tuple_type(types: &[Type]) -> Type {
 }
 
 pub fn tuple(exprs: &[Expr]) -> Expr {
+   let span = if exprs.len() > 0 {exprs[0].span()} else {Span::call_site()};
+   tuple_spanned(exprs, span)
+}
+pub fn tuple_spanned(exprs: &[Expr], span: Span) -> Expr {
    let res = if exprs.len() == 0 {
-      quote! {()}
+      quote_spanned! {span=>()}
    } else if exprs.len() == 1 {
-      let ty = &exprs[0];
-      quote! { ( #ty, ) }
+      let exp = &exprs[0];
+      quote_spanned! {span=> ( #exp, ) }
    } else {
-      quote! { ( #(#exprs),* ) }
+      quote_spanned! {span=> ( #(#exprs),* ) }
    };
    syn::parse2(res).unwrap()
 }
@@ -38,8 +42,7 @@ pub fn exp_cloned(exp: &Expr) -> Expr {
    let res = match exp {
       Expr::Path(_) |
       Expr::Field(_) |
-      Expr::Paren(_) =>
-         quote_spanned! {exp_span=> #exp.clone()},
+      Expr::Paren(_) => quote_spanned! {exp_span=> #exp.clone()},
       _ => quote_spanned! {exp_span=> (#exp).clone()}
    };
    syn::parse2(res).unwrap()

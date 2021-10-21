@@ -1,11 +1,13 @@
 extern crate proc_macro;
 use proc_macro2::Span;
-use syn::{Expr, Ident, Pat, Result, Token, Type, braced, parenthesized, parse::{Parse, ParseStream}, punctuated::Punctuated, spanned::Spanned};
+use syn::{Expr, Ident, Pat, Result, Token, Type, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned};
 use std::{collections::{HashMap}, sync::Mutex};
 
 use quote::{ToTokens};
 use itertools::{Itertools};
 use derive_syn_parse::Parse;
+
+use crate::utils::{expr_to_ident, pattern_get_vars};
 
 
 // resources:
@@ -106,6 +108,17 @@ impl BodyClauseArg {
       match self {
          Self::Expr(exp) => exp,
          Self::Pat(_) => panic!("unwrap_expr(): BodyClauseArg is not an expr")
+      }
+   }
+}
+impl ToTokens for BodyClauseArg {
+   fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+      match self{
+         BodyClauseArg::Pat(pat) => {
+            pat.huh_token.to_tokens(tokens);
+            pat.pattern.to_tokens(tokens);
+         },
+         BodyClauseArg::Expr(exp) => exp.to_tokens(tokens),
       }
    }
 }
@@ -320,19 +333,7 @@ fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
    res
 }
 
-fn desugar_disjunction_nodes(prog: InferProgram) -> InferProgram {
-   let mut new_rules = vec![];
-   for rule in prog.rules.into_iter() {
-      new_rules.extend(rule_desugar_disjunction_nodes(rule));
-   }
-   InferProgram {
-      relations : prog.relations,
-      rules: new_rules
-   }
-}
-
-fn desugar_pattern_args(prog: InferProgram) -> InferProgram {
-
+fn rule_desugar_pattern_args(rule: RuleNode) -> RuleNode {
    fn clause_desugar_pattern_args(body_clause: BodyClauseNode) -> BodyClauseNode {
       let mut new_args = Punctuated::new();
       let mut new_cond_clauses = vec![];
@@ -359,23 +360,62 @@ fn desugar_pattern_args(prog: InferProgram) -> InferProgram {
          rel: body_clause.rel
       }
    }
-   fn rule_desugar_pattern_args(rule: RuleNode) -> RuleNode {
-      RuleNode {
-         body_items: rule.body_items.into_iter().map(
-                           |bi| match bi {BodyItemNode::Clause(cl) => BodyItemNode::Clause(clause_desugar_pattern_args(cl)),
-                                          _ => bi}).collect(),
-         head_clauses: rule.head_clauses
-      }
-   }
-
-   InferProgram{
-      relations: prog.relations,
-      rules: prog.rules.into_iter().map(rule_desugar_pattern_args).collect()
+   use BodyItemNode::*;
+   RuleNode {
+      body_items: rule.body_items.into_iter().map(|bi| match bi {
+         Clause(cl) => Clause(clause_desugar_pattern_args(cl)),
+         _ => bi}).collect(),
+      head_clauses: rule.head_clauses
    }
 }
 
-pub(crate) fn desugar_infer_program(prog: InferProgram) -> InferProgram {
-   desugar_pattern_args(desugar_disjunction_nodes(prog))
+fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
+   
+   let mut grounded_vars = HashMap::<Ident, usize>::new();
+   for i in 0..rule.body_items.len(){
+      let bitem = &mut rule.body_items[i];
+      match bitem {
+         BodyItemNode::Clause(cl) => {
+            let mut new_cond_clauses = vec![];
+            for arg_ind in 0..cl.args.len() {
+               let expr = cl.args[arg_ind].unwrap_expr_ref();
+               if let Some(ident) = expr_to_ident(expr) {
+                  if let Some(cl_ind) = grounded_vars.get(&ident){
+                     if *cl_ind == i {
+                        let new_ident = fresh_ident(&ident.to_string(), ident.span());
+                        cl.args[arg_ind] = BodyClauseArg::Expr(parse2(new_ident.to_token_stream()).unwrap());
+                        new_cond_clauses.push(CondClause::If(
+                           parse2(quote_spanned! {ident.span()=> if #new_ident == #ident}).unwrap()
+                        ));
+                     }
+                  } else {
+                     grounded_vars.insert(ident, i);
+                  }
+               };
+            }
+            for new_cond_cl in new_cond_clauses.into_iter().rev() {
+               cl.cond_clauses.insert(0, new_cond_cl);
+            }
+         },
+         BodyItemNode::Generator(gen) => {
+            for ident in pattern_get_vars(&gen.pattern) {
+               grounded_vars.entry(ident).or_insert(i);
+            }
+         },
+         _ => panic!("unrecognized BodyItemNode variant")
+      }
+   }
+   rule
+}
+
+pub(crate) fn desugar_infer_program(mut prog: InferProgram) -> InferProgram {
+   prog.rules = 
+      prog.rules.into_iter()
+      .flat_map(rule_desugar_disjunction_nodes)
+      .map(rule_desugar_pattern_args)
+      .map(rule_desugar_repeated_vars)
+      .collect_vec();
+   prog
 }
 
 lazy_static::lazy_static! {

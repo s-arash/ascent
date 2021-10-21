@@ -1,9 +1,10 @@
 pub mod constant_propagation;
 mod set;
-mod dual;
 pub mod product;
+pub use product::Product;
 pub mod tuple;
 use std::{ops::Deref, rc::Rc};
+mod dual;
 pub use dual::Dual;
 
 /// an easy-to-implement trait that provides an implementation of the `Lattice` trait

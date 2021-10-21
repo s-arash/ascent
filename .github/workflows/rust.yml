@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build-test:
 
     runs-on: ubuntu-latest
 
@@ -22,7 +22,7 @@ jobs:
       run: cargo test test
     - name: Run infer_base tests
       working-directory: ./infer_base
-      run: cargo test test
+      run: cargo test
     - name: Run Benchmarks
       working-directory: ./infer_tests
       run: cargo bench bench_tc -- --nocapture

@@ -2,7 +2,7 @@ use std::{collections::{HashMap, HashSet}, fmt::Display, iter::FromIterator};
 
 use itertools::Itertools;
 use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap::DiGraphMap};
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
 use crate::{infer_hir::IrBodyItem, infer_mir::MirRelationVersion::*, utils::{exp_cloned, tuple, tuple_type}};
@@ -34,10 +34,12 @@ pub(crate) enum MirBodyItem {
    Generator(GeneratorNode)
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub(crate) struct MirBodyClause {
    pub rel: MirRelation,
    pub args: Vec<Expr>,
+   pub rel_args_span: Span,
+   pub args_span: Span,
    pub cond_clauses : Vec<CondClause>
 }
 impl MirBodyClause {
@@ -209,6 +211,8 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
                let mir_bcl = MirBodyClause{
                   rel: mir_relation,
                   args : hir_bcl.args.clone(),
+                  rel_args_span: hir_bcl.rel_args_span,
+                  args_span: hir_bcl.args_span,
                   cond_clauses: hir_bcl.cond_clauses.clone()
                };
                res.push(MirBodyItem::Clause(mir_bcl));

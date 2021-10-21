@@ -10,6 +10,7 @@ use super::{BoundedLattice};
 /// 
 /// # Example 
 /// ```
+/// # use infer_base::lattice::Dual;
 /// assert!(Dual(2) < Dual(1));
 /// ```
 pub struct Dual<T>(pub T);

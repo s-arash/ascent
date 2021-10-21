@@ -6,6 +6,22 @@ use proc_macro2::TokenStream;
 
 use crate::{infer_impl};
 
+
+#[test]
+fn test_macro() {
+   let inp = quote!{
+      relation foo(i32);
+      relation bar(i32, i32);
+      relation res(i32, i32);
+
+      foo(1);
+      bar(2, 1);
+      bar(1, 1);
+
+      res(*x, *x) <-- bar(x, x);
+   };
+   write_to_scratchpad(inp);
+}
 #[test]
 fn test_macro1() {
    let inp = quote!{

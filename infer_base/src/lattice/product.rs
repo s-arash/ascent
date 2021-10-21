@@ -10,11 +10,12 @@ use std::cmp::Ordering;
 /// 
 /// Difference from lexicographical ordering (the `PartialOrd` implementation for tuple types):
 /// ```
+/// # use infer_base::lattice::Product;
 /// assert!(!{Product((1,4)) < Product((2,3))});
 /// assert!((1,4) < (2,3));
 /// 
 /// ```
-struct Product<T>(pub T);
+pub struct Product<T>(pub T);
 
 #[inline]
 fn combine_orderings(ord1: Ordering, ord2: Ordering) -> Option<Ordering>{
