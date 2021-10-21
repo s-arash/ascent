@@ -1,9 +1,9 @@
 use std::{collections::{HashMap, HashSet}, ops::Index};
 
 use itertools::Itertools;
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 use quote::ToTokens;
-use syn::{Error, Expr, Type};
+use syn::{Error, Expr, Type, spanned::Spanned};
 
 use crate::{InferProgram, utils::{expr_to_ident, into_set, pattern_get_vars, tuple, tuple_type}};
 use crate::infer_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
@@ -19,10 +19,12 @@ pub(crate) struct IrRule {
    pub body_items: Vec<IrBodyItem>,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub(crate) struct IrHeadClause{
    pub rel : RelationIdentity,
    pub args : Vec<Expr>,
+   pub span: Span,
+   pub args_span: Span,
 }
 
 pub(crate) enum IrBodyItem {
@@ -33,6 +35,8 @@ pub(crate) enum IrBodyItem {
 pub(crate) struct IrBodyClause {
    pub rel : IrRelation,
    pub args : Vec<Expr>,
+   pub rel_args_span: Span,
+   pub args_span: Span,
    pub cond_clauses : Vec<CondClause>
 }
 
@@ -130,8 +134,10 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
                ir_name
             };
             let ir_bcl = IrBodyClause {
-               args: bcl.args.iter().cloned().map(BodyClauseArg::unwrap_expr).collect(),
                rel: ir_rel,
+               args: bcl.args.iter().cloned().map(BodyClauseArg::unwrap_expr).collect(),
+               rel_args_span: bcl.rel.span().join(bcl.args.span()).unwrap_or(bcl.rel.span()),
+               args_span: bcl.args.span(),
                cond_clauses: bcl.cond_clauses.clone()
             };
             body_items.push(IrBodyItem::Clause(ir_bcl));
@@ -157,7 +163,9 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
       let rel = RelationIdentity::from(rel);
       let head_clause = IrHeadClause {
          rel,
-         args : hcl_node.args.iter().cloned().collect()
+         args : hcl_node.args.iter().cloned().collect(),
+         span: hcl_node.span(),
+         args_span: hcl_node.args.span()
       };
       head_clauses.push(head_clause);
    }

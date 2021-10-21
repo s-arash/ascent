@@ -302,3 +302,30 @@ fn test_dl_disjunctions(){
    println!("bar: {:?}", prog.bar);
    assert!(rels_equal([(3,30), (2, 20)], prog.bar));
 }
+
+struct MyStruct{}
+#[test]
+fn test_dl_repeated_vars(){
+   infer!{
+      relation foo(i32);
+      relation bar(i32, i32);
+      relation res(i32);
+      relation bar_refl(i32);
+
+      foo(3);
+      bar(2, 1);
+      bar(1, 1);
+      bar(3, 3);
+
+      bar_refl(*x) <-- bar(x, x);
+
+      res(*x) <-- foo(x), bar(x, x);
+
+      res(*x) <-- foo(x);
+   };
+   let mut prog = DLProgram::default();
+   prog.run();
+   println!("res: {:?}", prog.res);
+   assert!(rels_equal([(3,)], prog.res));
+   assert!(rels_equal([(1,), (3,)], prog.bar_refl));
+}

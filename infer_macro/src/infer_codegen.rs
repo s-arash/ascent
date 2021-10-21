@@ -4,7 +4,7 @@ use itertools::{Iterate, Itertools};
 use proc_macro2::Ident;
 use syn::{Expr, Type, parse2, spanned::Spanned};
 
-use crate::{infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
+use crate::{infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_spanned, tuple_type}};
 use crate::infer_mir::MirRelationVersion::*;
 
 pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
@@ -113,13 +113,13 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
          let mut #new_var_name : #ty = HashMap::default();
       });
 
-      shift_delta_to_total_new_to_delta.push(quote!{
+      shift_delta_to_total_new_to_delta.push(quote_spanned!{rel.relation.name.span()=>
          move_index_contents(#delta_var_name, &mut #total_var_name);
          #delta_var_name.clear();
          std::mem::swap(&mut #new_var_name, #delta_var_name);
       });
 
-      move_total_to_field.push(quote!{
+      move_total_to_field.push(quote_spanned!{rel.relation.name.span()=>
          self.#total_field = #total_var_name;
       });
    }
@@ -172,10 +172,10 @@ fn compile_update_indices_function_body(mir: &InferMir) -> proc_macro2::TokenStr
          let ind_name = &ind.ir_name;
          let selection_tuple : Vec<Expr> = ind.indices.iter().map(|&i| {
             let ind = syn::Index::from(i); 
-            parse2(quote! { tuple.#ind.clone()}).unwrap()
+            parse2(quote_spanned! {r.name.span()=> tuple.#ind.clone()}).unwrap()
          }).collect_vec();
-         let selection_tuple = tuple(&selection_tuple);
-         update_indices.push(quote! {
+         let selection_tuple = tuple_spanned(&selection_tuple, r.name.span());
+         update_indices.push(quote_spanned! {r.name.span()=>
             let selection_tuple = #selection_tuple;
             self.#ind_name.entry(selection_tuple).or_default().insert(i);
          });
@@ -223,11 +223,11 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             for (i,var) in clause_vars.iter(){
                if common_vars_no_indices.contains(var) {continue;}
                let i_ind = syn::Index::from(*i);
-               new_vars_assignmnets.push(quote! {let #var = &row.#i_ind;});
+               new_vars_assignmnets.push(quote_spanned! {var.span()=> let #var = &row.#i_ind;});
             }
 
             let selected_args_cloned = selected_args.iter().map(exp_cloned).collect_vec();
-            let selected_args_tuple = tuple(&selected_args_cloned);
+            let selected_args_tuple = tuple_spanned(&selected_args_cloned, bclause.args_span);
             let rel_version_var_name = bclause.rel.var_name();
             
             let mut conds_then_next_loop = next_loop;
@@ -236,15 +236,15 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                   CondClause::IfLet(if_let_clause) => {
                      let pat = &if_let_clause.pattern;
                      let expr = &if_let_clause.exp;
-                     conds_then_next_loop = quote! {
-                       if let #pat = #expr {
-                          #conds_then_next_loop
-                       }
+                     conds_then_next_loop = quote_spanned! {if_let_clause.if_keyword.span()=>
+                        if let #pat = #expr {
+                           #conds_then_next_loop
+                        }
                      }
                   }
                   CondClause::If(if_clause) => {
                      let cond = &if_clause.cond;
-                     conds_then_next_loop = quote! {
+                     conds_then_next_loop = quote_spanned! {if_clause.if_keyword.span()=>
                         if #cond {
                            #conds_then_next_loop
                         }
@@ -253,7 +253,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                }
             }
 
-            quote! {
+            quote_spanned! {bclause.rel_args_span=>
                if let Some(matching) = #rel_version_var_name.get( &#selected_args_tuple) {
                   for &ind in matching.iter() {
                      // TODO we may be doing excessive cloning
@@ -267,7 +267,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
          MirBodyItem::Generator(gen) => {
             let pat = &gen.pattern;
             let expr = &gen.expr;
-            quote! {
+            quote_spanned! {gen.for_keyword.span()=>
                for #pat in #expr {
                   #next_loop
                }
@@ -281,7 +281,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
       for hcl in rule.head_clause.iter() {
 
          let head_rel_name = &hcl.rel.name;
-         let new_row_tuple = tuple(&hcl.args);
+         let new_row_tuple = tuple_spanned(&hcl.args, hcl.args_span);
          
          // println!("rule head cl relation: {}", rule.head_clause.rel.name.to_string());
          let head_relation = &hcl.rel;
@@ -296,11 +296,11 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                // TODO args must be cloned here
                let args_tuple : Vec<Expr> = rel_ind.indices.iter().map(|&i| {
                   let i_ind = syn::Index::from(i);
-                  syn::parse2(quote!{ new_row.#i_ind.clone()}).unwrap()
+                  syn::parse2(quote_spanned!{head_rel_name.span()=> new_row.#i_ind.clone()}).unwrap()
                }).collect();
                // let args_tuple : Vec<_> = rel_ind.indices.iter().map(|&i| rule.head_clause.args[i].clone()).collect();
                let args_tuple = tuple(&args_tuple);
-               update_indices.push(quote! {
+               update_indices.push(quote_spanned! {hcl.span=>
                   #var_name.entry(#args_tuple).or_default().insert(new_row_ind);
                });
             }
@@ -311,7 +311,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
          let head_rel_full_index_var_name_delta = ir_relation_version_var_name(&head_rel_full_index.ir_name, Delta);
          let head_rel_full_index_var_name_total = ir_relation_version_var_name(&head_rel_full_index.ir_name, Total);
 
-         let add_row = quote! {
+         let add_row = quote_spanned!{hcl.span=>
             // comment("check if the tuple already exists");
             let new_row: #row_type = #new_row_tuple;
             if !(#head_rel_full_index_var_name_new.contains_key(&new_row) ||
