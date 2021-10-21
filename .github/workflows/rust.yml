@@ -20,6 +20,9 @@ jobs:
     - name: Run tests
       working-directory: ./infer_tests
       run: cargo test test
+    - name: Run infer_base tests
+      working-directory: ./infer_base
+      run: cargo test test
     - name: Run Benchmarks
       working-directory: ./infer_tests
       run: cargo bench bench_tc -- --nocapture

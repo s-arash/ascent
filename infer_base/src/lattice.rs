@@ -1,10 +1,10 @@
 pub mod constant_propagation;
 mod set;
 mod dual;
+pub mod product;
+pub mod tuple;
 use std::{ops::Deref, rc::Rc};
 pub use dual::Dual;
-
-use paste::paste;
 
 /// an easy-to-implement trait that provides an implementation of the `Lattice` trait
 /// through a blanket implementation (`impl<T: ProtoLattice + Clone> Lattice for T`)
@@ -51,12 +51,12 @@ impl<T: ProtoLattice + Clone> Lattice for T {
 
    #[inline]
    fn meet(self, other: Self) -> Self{
-      ProtoLattice::join(self, other)     
+      ProtoLattice::meet(self, other)     
    }
 
    #[inline]
    fn join(self, other: Self) -> Self{
-      ProtoLattice::meet(self, other)
+      ProtoLattice::join(self, other)
    }
 }
 
@@ -103,53 +103,6 @@ num_lattice_impl!(f32);
 num_lattice_impl!(f64);
 
 
-macro_rules! tuple_lattice_impl{
-   ($($i:tt),*) => {
-      paste!(
-      impl< $([<T $i>]: ProtoLattice),* > ProtoLattice for ($([<T $i>]),*,) {
-         fn meet(self, other: Self) -> Self {
-            ($(self.$i.meet(other.$i)),*,)
-         }
-      
-         fn join(self, other: Self) -> Self {
-            ($(self.$i.join(other.$i)),*,)
-         }
-      }
-      
-      impl< $([<T $i>]: BoundedLattice),* > BoundedLattice for ($([<T $i>]),*,) where ($([<T $i>]),*,): Lattice  {
-         fn bottom() -> Self {
-               ($([<T $i>]::bottom()),*,)
-         }
-      
-         fn top() -> Self {
-            ($([<T $i>]::top()),*,)
-         }
-      }
-      );
-   };
-}
-tuple_lattice_impl!(0);
-tuple_lattice_impl!(0, 1);
-tuple_lattice_impl!(0, 1, 2);
-tuple_lattice_impl!(0, 1, 2, 3);
-tuple_lattice_impl!(0, 1, 2, 3, 4);
-tuple_lattice_impl!(0, 1, 2, 3, 4, 5);
-tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6);
-tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6, 7);
-tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6, 7, 8);
-tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
-tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-
-impl ProtoLattice for () {
-   fn meet(self, _other: Self) -> Self { () }
-   fn join(self, _other: Self) -> Self { () }
-}
-
-impl BoundedLattice for () {
-   fn bottom() -> Self { () }
-   fn top() -> Self { () }
-}
-
 impl<T: ProtoLattice> ProtoLattice for Option<T> {
    fn meet(self, other: Self) -> Self {
       match (self, other) {
@@ -172,17 +125,6 @@ impl<T: BoundedLattice + Eq> BoundedLattice for Option<T> where Option<T> : Latt
    fn top() -> Self { Some(T::top()) }
 }
 
-
-#[test]
-fn test_tuple_lattice(){
-   let t1 = (1, 3);
-   let t2 = (0, 10);
-
-   assert_eq!(Lattice::meet(t1, t2), (0, 3));
-   assert_eq!(Lattice::join(t1, t2), (1, 10));
-
-   assert!((1,3) < (2,3));
-}
 
 impl<T: ProtoLattice + Clone> ProtoLattice for Rc<T> {
    fn meet(self, other: Self) -> Self {
