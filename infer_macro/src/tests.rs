@@ -10,15 +10,24 @@ use crate::{infer_impl};
 #[test]
 fn test_macro() {
    let inp = quote!{
-      relation foo(i32);
-      relation bar(i32, i32);
-      relation res(i32, i32);
+      // relation foo(i32);
+      // relation bar(i32, i32);
+      // relation res(i32);
+      relation bar_refl(i32);
+      relation bar3(i32, i32, i32);
 
-      foo(1);
-      bar(2, 1);
-      bar(1, 1);
+      // foo(3);
+      // bar(2, 1);
+      // bar(1, 1);
+      // bar(3, 3);
 
-      res(*x, *x) <-- bar(x, x);
+      // bar_refl(*x) <-- bar(x, x);
+
+      // res(*x) <-- foo(x), bar(x, x);
+
+      bar_refl(*x) <-- bar3(x, x, (*x + 1));
+
+      // res(*x) <-- foo(x);
    };
    write_to_scratchpad(inp);
 }
@@ -43,9 +52,7 @@ fn test_macro1() {
 
 fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
    let code = infer_impl(tokens);
-   assert!(code.is_ok());
-
-   let code = code.unwrap();
+   let code = code.expect("code is not ok!");
 
    std::fs::write("src/scratchpad.rs", code.to_string()).unwrap();
    std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
@@ -166,5 +173,20 @@ fn exp_condensation() {
    for scc in sccs.iter(){
       println!("{:?}", scc);
    }
+}
 
+#[test]
+fn exp_items_in_fn(){
+   let mut p = Default::default();
+   for i in 0..10 {
+      p = {
+         #[derive(Debug, Default)]
+         struct Point{x: i32, y: i32}
+         impl Point {
+            pub fn size(&self) -> i32 {self.x * self.x + self.y * self.y}
+         }
+         Point{x:i, y: i+1}
+      };
+   }
+   println!("point is {:?}, with size {}", p, p.size());
 }

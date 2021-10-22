@@ -7,7 +7,7 @@ use quote::{ToTokens};
 use itertools::{Itertools};
 use derive_syn_parse::Parse;
 
-use crate::utils::{expr_to_ident, pattern_get_vars};
+use crate::utils::{expr_get_vars, expr_to_ident, pattern_get_vars};
 
 
 // resources:
@@ -18,6 +18,7 @@ use crate::utils::{expr_to_ident, pattern_get_vars};
 
 mod kw {
    syn::custom_keyword!(relation);
+   syn::custom_punctuation!(LongLeftArrow, <--);
 }
 
 // #[derive(Clone)]
@@ -237,6 +238,9 @@ impl Parse for RuleNode {
          input.parse::<Token![<]>()?;
          input.parse::<Token![-]>()?;
          input.parse::<Token![-]>()?;
+         // TODO this does not work with quote!
+         // input.parse::<kw::LongLeftArrow>()?;
+
          let body_items = Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty(input)?;
          input.parse::<Token![;]>()?;
          Ok(RuleNode{ head_clauses, body_items: body_items.into_iter().collect()})
@@ -371,19 +375,18 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
             let mut new_cond_clauses = vec![];
             for arg_ind in 0..cl.args.len() {
                let expr = cl.args[arg_ind].unwrap_expr_ref();
-               if let Some(ident) = expr_to_ident(expr) {
-                  if let Some(cl_ind) = grounded_vars.get(&ident){
-                     if *cl_ind == i {
-                        let new_ident = fresh_ident(&ident.to_string(), ident.span());
-                        cl.args[arg_ind] = BodyClauseArg::Expr(parse2(new_ident.to_token_stream()).unwrap());
-                        new_cond_clauses.push(CondClause::If(
-                           parse2(quote_spanned! {ident.span()=> if #new_ident == #ident}).unwrap()
-                        ));
-                     }
-                  } else {
-                     grounded_vars.insert(ident, i);
-                  }
-               };
+               let expr_has_vars_from_same_caluse =
+                  expr_get_vars(&expr).iter()
+                  .any(|var| if let Some(cl_ind) = grounded_vars.get(&var) {*cl_ind == i} else {false});
+               if expr_has_vars_from_same_caluse {
+                  let new_ident = fresh_ident(&expr_to_ident(expr).map(|e| e.to_string()).unwrap_or("expr_replaced".to_string()), expr.span());
+                  new_cond_clauses.push(CondClause::If(
+                     parse2(quote_spanned! {expr.span()=> if #new_ident.eq(&(#expr))}).unwrap()
+                  ));
+                  cl.args[arg_ind] = BodyClauseArg::Expr(parse2(new_ident.to_token_stream()).unwrap());
+               } else if let Some(ident) = expr_to_ident(expr) {
+                  grounded_vars.entry(ident).or_insert(i);
+               }
             }
             for new_cond_cl in new_cond_clauses.into_iter().rev() {
                cl.cond_clauses.insert(0, new_cond_cl);

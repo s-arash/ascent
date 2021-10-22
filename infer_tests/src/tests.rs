@@ -311,6 +311,8 @@ fn test_dl_repeated_vars(){
       relation bar(i32, i32);
       relation res(i32);
       relation bar_refl(i32);
+      relation bar3(i32, i32, i32);
+      relation bar3_res(i32);
 
       foo(3);
       bar(2, 1);
@@ -321,11 +323,17 @@ fn test_dl_repeated_vars(){
 
       res(*x) <-- foo(x), bar(x, x);
 
-      res(*x) <-- foo(x);
+      bar3(10,10,11);
+      bar3(1,1,1);
+      bar3(1,2,3);
+      bar3(2,1,3);
+
+      bar3_res(*x) <-- bar3(x, x, *x + 1);
    };
    let mut prog = DLProgram::default();
    prog.run();
    println!("res: {:?}", prog.res);
    assert!(rels_equal([(3,)], prog.res));
    assert!(rels_equal([(1,), (3,)], prog.bar_refl));
+   assert!(rels_equal([(10,)], prog.bar3_res));
 }

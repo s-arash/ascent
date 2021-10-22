@@ -1,9 +1,11 @@
+use std::borrow::Borrow;
 use std::{collections::HashSet};
 
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 
 use quote::ToTokens;
+use syn::{Block, Stmt};
 use syn::parse::{Parse, ParseBuffer};
 use syn::{Expr, Pat, Path, Type, parse::ParseStream, parse2, punctuated::Punctuated, spanned::Spanned};
 
@@ -65,6 +67,164 @@ pub fn map_punctuated<T, P, U>(punc: Punctuated<T,P>, mut f: impl FnMut (T) -> U
    };
    res
 }
+pub fn block_get_vars(block: &Block) -> Vec<Ident> {
+   let mut bound_vars = HashSet::new();
+   let mut used_vars = vec![];
+   for stmt in block.stmts.iter() {
+      let (stmt_bound_vars, stmt_used_vars) = stmt_get_vars(stmt);
+      for used_var in stmt_used_vars.into_iter() {
+         if !bound_vars.contains(&used_var) {
+            used_vars.push(used_var);
+         }
+      }
+      bound_vars.extend(stmt_bound_vars);
+   }
+   used_vars
+}
+
+pub fn stmt_get_vars(stmt: &Stmt) -> (Vec<Ident>, Vec<Ident>) {
+   let mut bound_vars = vec![];
+   let mut used_vars = vec![];
+   match stmt {
+      Stmt::Local(l) => {
+         bound_vars.extend(pattern_get_vars(&l.pat));
+         if let Some(init) = &l.init {used_vars.extend(expr_get_vars(&init.1))}
+      },
+      Stmt::Item(_) => {},
+      Stmt::Expr(e) => used_vars.extend(expr_get_vars(&e)),
+      Stmt::Semi(e, _) => used_vars.extend(expr_get_vars(&e))
+   }
+   (bound_vars, used_vars)
+}
+
+pub fn expr_get_vars(expr: &Expr) -> Vec<Ident> {
+   let mut res = vec![];
+   match expr {
+      Expr::Array(arr) => {
+         for vs in arr.elems.iter() {
+            res.extend(expr_get_vars(vs))
+         }
+      }
+      Expr::Assign(assign) => res.extend(expr_get_vars(&assign.right)),
+      Expr::AssignOp(assign_op) => res.extend(expr_get_vars(&assign_op.right)),
+      Expr::Async(a) => res.extend(block_get_vars(&a.block)),
+      Expr::Await(a) => res.extend(expr_get_vars(&a.base)),
+      Expr::Binary(b) => {
+         res.extend(expr_get_vars(&b.left));
+         res.extend(expr_get_vars(&b.right))
+      }
+      Expr::Block(b) => res.extend(block_get_vars(&b.block)),
+      Expr::Box(e) => res.extend(expr_get_vars(&e.expr)),
+      Expr::Break(b) => if let Some(b_e) = &b.expr {res.extend(expr_get_vars(b_e))},
+      Expr::Call(c) => {
+         res.extend(expr_get_vars(&c.func));
+         for arg in c.args.iter() {
+            res.extend(expr_get_vars(arg))
+         }
+      }
+      Expr::Cast(c) => res.extend(expr_get_vars(&c.expr)),
+      Expr::Closure(c) => {
+         let block_vars = expr_get_vars(&c.body);
+         let input_vars : HashSet<_> = c.inputs.iter().flat_map(pattern_get_vars).map(|v| v.to_string()).collect();
+         res.extend(block_vars.into_iter().filter(|v| !input_vars.contains(&v.to_string())));
+         // TODO is to_string required?
+      },
+      Expr::Continue(c) => {}
+      Expr::Field(f) => res.extend(expr_get_vars(&f.base)),
+      Expr::ForLoop(f) => {
+         res.extend(expr_get_vars(&f.expr));
+         let pat_vars: HashSet<_> = pattern_get_vars(&f.pat).into_iter().collect();
+         let block_vars = block_get_vars(&f.body);
+         res.extend(block_vars.into_iter().filter(|v| !pat_vars.contains(v)));
+      },
+      Expr::Group(g) => res.extend(expr_get_vars(&g.expr)),
+      Expr::If(e) => {
+         res.extend(expr_get_vars(&e.cond));
+         res.extend(block_get_vars(&e.then_branch));
+         if let Some(eb) = &e.else_branch {
+            res.extend(expr_get_vars(&eb.1))
+         }
+      }
+      Expr::Index(i) => {
+         res.extend(expr_get_vars(&i.expr));
+         res.extend(expr_get_vars(&i.index))
+      }
+      Expr::Let(l) => res.extend(expr_get_vars(&l.expr)),
+      Expr::Lit(_) => {}
+      Expr::Loop(l) => res.extend(block_get_vars(&l.body)),
+      Expr::Macro(m) => {
+         eprintln!("WARNING: cannot determine free varaibles of macro invocations. macro invocation:\n{}", 
+                   expr.to_token_stream().to_string())
+      },
+      Expr::Match(m) => {
+         res.extend(expr_get_vars(&m.expr));
+         for arm in m.arms.iter() {
+            res.extend(expr_get_vars(&arm.body));
+         }
+      }
+      Expr::MethodCall(c) => {
+         res.extend(expr_get_vars(&c.receiver));
+         for arg in c.args.iter() {
+            res.extend(expr_get_vars(arg));
+         }
+      }
+      Expr::Paren(p) => res.extend(expr_get_vars(&p.expr)),
+      Expr::Path(p) => {
+         if let Some(ident) = p.path.get_ident() {
+            res.push(ident.clone())
+         }
+      }
+      Expr::Range(r) => {
+         if let Some(from) = &r.from {
+            res.extend(expr_get_vars(from))
+         };
+         if let Some(to) = &r.to {
+            res.extend(expr_get_vars(to))
+         };
+      }
+      Expr::Reference(r) => res.extend(expr_get_vars(&r.expr)),
+      Expr::Repeat(r) => {
+         res.extend(expr_get_vars(&r.expr));
+         res.extend(expr_get_vars(&r.len))
+      }
+      Expr::Return(r) => {
+         if let Some(e) = &r.expr {
+            res.extend(expr_get_vars(e))
+         }
+      }
+      Expr::Struct(s) => {
+         for f in s.fields.iter() {
+            res.extend(expr_get_vars(&f.expr))
+         }
+         if let Some(rest) = &s.rest {
+            res.extend(expr_get_vars(rest))
+         }
+      }
+      Expr::Try(t) => res.extend(expr_get_vars(&t.expr)),
+      Expr::TryBlock(t) => res.extend(block_get_vars(&t.block)),
+      Expr::Tuple(t) => {
+         for e in t.elems.iter() {
+            res.extend(expr_get_vars(e))
+         }
+      }
+      Expr::Type(t) => res.extend(expr_get_vars(&t.expr)),
+      Expr::Unary(u) => res.extend(expr_get_vars(&u.expr)),
+      Expr::Unsafe(u) => res.extend(block_get_vars(&u.block)),
+      Expr::Verbatim(_) => {}
+      Expr::While(w) => {
+         res.extend(expr_get_vars(&w.cond));
+         res.extend(block_get_vars(&w.body));
+      }
+      Expr::Yield(y) => {
+         if let Some(e) = &y.expr {
+            res.extend(expr_get_vars(e))
+         }
+      }
+      _ => {}
+   }
+   res
+}
+
 
 pub fn pattern_get_vars(pat: &Pat) -> Vec<Ident> {
    let mut res = vec![];
@@ -128,6 +288,27 @@ fn test_pattern_get_vars(){
    let pat : syn::Pat = parse2(pattern).unwrap();
    assert_eq!(collect_set(["x", "y", "z"].iter().map(ToString::to_string)), 
               pattern_get_vars(&pat).into_iter().map(|id| id.to_string()).collect());
+}
+
+#[test]
+fn test_expr_get_vars(){
+   let expr = quote! {
+      {
+         let res = 0;
+         for i in [0..10] {
+            let x = i + a;
+            res += x / {|m, (n, o)| m + n - o}(2, (b, 42))
+         }
+         res
+      } 
+   };
+   let expected = vec!["a", "b"];
+   let result = expr_get_vars(& parse2(expr).unwrap());
+   let result   =   result.into_iter().map(|v| v.to_string()).collect::<HashSet<_>>();
+   let expected = expected.into_iter().map(|v| v.to_string()).collect::<HashSet<_>>();
+
+   println!("result: {:?}", result);
+   assert_eq!(result, expected)
 }
 
 

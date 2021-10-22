@@ -57,7 +57,6 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
             });
          }
       }
-      //for reference:
    }
 
    quote! {
@@ -78,6 +77,7 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
       impl DLProgram {
          #[allow(non_snake_case)]
          pub fn run(&mut self) {
+            use core::cmp::PartialEq;
             #(#sccs_compiled)*
          }
          #[allow(non_snake_case)]
