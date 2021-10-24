@@ -10,17 +10,20 @@ use crate::{infer_impl};
 #[test]
 fn test_macro() {
    let inp = quote!{
-      relation foo(i32);
-      relation bar(i32, i32);
-      relation res(i32, i32);
+      lattice shortest_path(i32, i32, u32);
+      relation edge(i32, i32, u32);
 
-      foo(1);
-      bar(2, 1);
-      bar(1, 1);
+      shortest_path(*x,*y, {println!("adding sp({},{},{})?", x, y, w ); *w}) <-- edge(x, y, w);
+      shortest_path(*x, *z, {println!("adding sp({},{},{})?", x, z, w + l); (w + l)}) <-- edge(x, y, w), shortest_path(y, z, l);
 
-      res(*x, *x) <-- bar(x, x);
+      edge(1, 2, 30);
+      edge(2, 3, 50);
+      edge(1, 3, 40);
+      edge(2, 4, 100);
+      edge(4, 1, 1000);
+
    };
-   write_to_scratchpad(inp);
+   write_infer_run_to_scratchpad(inp);
 }
 #[test]
 fn test_macro1() {
@@ -41,17 +44,23 @@ fn test_macro1() {
    write_to_scratchpad(inp);
 }
 
-fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   let code = infer_impl(tokens);
-   assert!(code.is_ok());
-
-   let code = code.unwrap();
-
-   std::fs::write("src/scratchpad.rs", code.to_string()).unwrap();
+fn write_to_scratchpad_base(tokens: TokenStream, is_infer_run: bool) -> TokenStream {
+   let code = infer_impl(tokens, is_infer_run);
+   let code = code.expect("code is not ok!");
+   let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
+   let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
+   std::fs::write("src/scratchpad.rs", code_in_template).unwrap();
    std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
    code
 }
 
+fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, false)
+}
+
+fn write_infer_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, true)
+}
 
 #[test]
 fn test_macro_tc() {
@@ -183,5 +192,20 @@ fn exp_condensation() {
    for scc in sccs.iter(){
       println!("{:?}", scc);
    }
+}
 
+#[test]
+fn exp_items_in_fn(){
+   let mut p = Default::default();
+   for i in 0..10 {
+      p = {
+         #[derive(Debug, Default)]
+         struct Point{x: i32, y: i32}
+         impl Point {
+            pub fn size(&self) -> i32 {self.x * self.x + self.y * self.y}
+         }
+         Point{x:i, y: i+1}
+      };
+   }
+   println!("point is {:?}, with size {}", p, p.size());
 }

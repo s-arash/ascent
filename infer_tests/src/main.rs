@@ -20,7 +20,7 @@ fn lambda_calc_example() {
    let foo1 = vec![(1,2,3), (1,2,4), (10, 20, 30)];
    let foo2 = vec![(1, Some(3)), (10, Some(30)), (1, None)];
    let baz = vec![(1, Ref("x".to_string())), (2, id)];
-   let mut db = DLProgram::default();
+   let mut db = InferProgram::default();
    db.foo1 = foo1;
    db.foo2 = foo2;
    db.baz = baz;
@@ -81,7 +81,7 @@ mod tc{
 }
 
 fn main(){
-   let mut tc = tc::DLProgram::default();
+   let mut tc = tc::InferProgram::default();
 
    for i in 0..1000 {
       tc.edge.push((i, i + 1));

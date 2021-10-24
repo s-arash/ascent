@@ -7,7 +7,7 @@ use syn::{Expr, Type, parse2, spanned::Spanned};
 use crate::{infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_spanned, tuple_type}};
 use crate::infer_mir::MirRelationVersion::*;
 
-pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
+pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::TokenStream {
    
    let mut relation_fields = vec![];
 
@@ -32,7 +32,7 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
    for (i, scc) in sccs_ordered.iter().enumerate() {
       let msg = format!("scc {}", i);
       sccs_compiled.push(quote!{
-         Self::comment(#msg);
+         comment(#msg);
       });
       sccs_compiled.push(compile_mir_scc(scc, mir));
    }
@@ -65,18 +65,41 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
       }
    }
 
-   quote! {
+
+   let run_func = if is_infer_run {quote!{}} else {
+      quote! {
+         #[allow(non_snake_case)]
+         pub fn run(&mut self) {
+            use core::cmp::PartialEq;
+            let _self = self;
+            #(#sccs_compiled)*
+         }
+      }
+   };
+   let run_code = if !is_infer_run {quote!{}} else {
+      quote! {
+         use core::cmp::PartialEq;
+         let _self = &mut res;
+         #(#sccs_compiled)*
+      }
+   };
+   let res = quote! {
       use std::collections::{HashMap, HashSet};
+      fn move_index_contents<K, V>(hm1: &mut HashMap<K, HashSet<V>>, hm2: &mut HashMap<K, HashSet<V>>) 
+         where K : ::core::cmp::Eq + ::core::hash::Hash, V: ::core::cmp::Eq + ::core::hash::Hash {
+         for (k,v) in hm1.drain(){
+            let set = hm2.entry(k).or_default();
+            set.extend(v);
+         }
+      }
+      fn comment(_: &str){}
       #[derive(Default)]
-      pub struct DLProgram {
+      pub struct InferProgram {
          #(#relation_fields)*
       }
       #[allow(non_snake_case)]
-      impl DLProgram {
-         #[allow(non_snake_case)]
-         pub fn run(&mut self) {
-            #(#sccs_compiled)*
-         }
+      impl InferProgram {
+         #run_func
          #[allow(non_snake_case)]
          pub fn update_indices(&mut self) {
             #update_indices_body
@@ -90,15 +113,17 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
             struct LatTypeConstraints<T> where T : Clone + Eq + Hash + Lattice{_t: ::core::marker::PhantomData<T>}
             #(#type_constaints)*
          }
-
-         fn move_index_contents<K, V>(hm1: &mut HashMap<K, HashSet<V>>, hm2: &mut HashMap<K, HashSet<V>>) 
-            where K : ::core::cmp::Eq + ::core::hash::Hash, V: ::core::cmp::Eq + ::core::hash::Hash {
-            for (k,v) in hm1.drain(){
-               let set = hm2.entry(k).or_default();
-               set.extend(v);
-            }
+      }
+   };
+   if !is_infer_run {res} else {
+      quote! {
+         // #[allow(non_snake_case)]
+         {
+            #res
+            let mut res = InferProgram::default();
+            #run_code
+            res
          }
-         fn comment(_: &str){}
       }
    }
 }
@@ -116,19 +141,19 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
       let total_field = &rel.ir_name;
       let ty = rel_index_type(&rel.key_type());
       move_total_to_delta.push(quote! {
-         let #delta_var_name : &mut #ty = &mut self.#total_field;
+         let #delta_var_name : &mut #ty = &mut _self.#total_field;
          let mut #total_var_name : #ty = HashMap::default();
          let mut #new_var_name : #ty = HashMap::default();
       });
 
       shift_delta_to_total_new_to_delta.push(quote_spanned!{rel.relation.name.span()=>
-         Self::move_index_contents(#delta_var_name, &mut #total_var_name);
+         move_index_contents(#delta_var_name, &mut #total_var_name);
          #delta_var_name.clear();
          std::mem::swap(&mut #new_var_name, #delta_var_name);
       });
 
       move_total_to_field.push(quote_spanned!{rel.relation.name.span()=>
-         self.#total_field = #total_var_name;
+         _self.#total_field = #total_var_name;
       });
    }
    
@@ -144,7 +169,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
                              rule.head_clause.iter().map(|hcl| hcl.rel.name.to_string()).join(", "),
                              rule.body_items.iter().map(bitem_to_str).join(", "));
       evaluate_rules.push(quote! {
-         Self::comment(#msg);
+         comment(#msg);
       });
       evaluate_rules.push(compile_mir_rule(rule, scc, mir, 0));
    }
@@ -265,7 +290,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                if let Some(matching) = #rel_version_var_name.get( &#selected_args_tuple) {
                   for &ind in matching.iter() {
                      // TODO we may be doing excessive cloning
-                     let row = &self.#bclause_rel_name[ind].clone();
+                     let row = &_self.#bclause_rel_name[ind].clone();
                      #(#new_vars_assignmnets)*
                      #conds_then_next_loop
                   }
@@ -326,9 +351,9 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                   #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
                   #head_rel_full_index_var_name_total.contains_key(&new_row))
                {
-                  let new_row_ind = self.#head_rel_name.len();
+                  let new_row_ind = _self.#head_rel_name.len();
                   #(#update_indices)*
-                  self.#head_rel_name.push(new_row);
+                  _self.#head_rel_name.push(new_row);
                   changed = true;
                }
             };
@@ -350,16 +375,16 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                   .or_else(|| #head_lat_full_index_var_name_full.get(&lattice_key)) 
                {
                   let existing_ind = *existing_ind.iter().next().unwrap();
-                  let lat_changed = ::infer::Lattice::join_mut(&mut self.#head_rel_name[existing_ind].#tuple_lat_index, new_row.#tuple_lat_index);
+                  let lat_changed = ::infer::Lattice::join_mut(&mut _self.#head_rel_name[existing_ind].#tuple_lat_index, new_row.#tuple_lat_index);
                   if lat_changed {
                      let new_row_ind = existing_ind;
                      #(#update_indices)*
                      changed = true;
                   }
                } else {
-                  let new_row_ind = self.#head_rel_name.len();
+                  let new_row_ind = _self.#head_rel_name.len();
                   #(#update_indices)*
-                  self.#head_rel_name.push(new_row);
+                  _self.#head_rel_name.push(new_row);
                   changed = true;
                }
             };

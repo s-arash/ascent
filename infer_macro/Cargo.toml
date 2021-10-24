@@ -17,3 +17,6 @@ itertools = "0.10"
 petgraph = "0.6.0"
 derive-syn-parse = "0.1.5"
 lazy_static = "1.4.0"
+
+[dev-dependencies]
+infer = {path = "../infer"}
