@@ -1,9 +1,9 @@
 use stopwatch::Stopwatch;
 
 mod tc {
-   use infer::dl;
+   use infer::infer;
 
-   dl! {
+   infer! {
       relation edge(i32, i32);
       relation path(i32, i32);
       // edge(x, x + 1) <-- for x in (0..1000);
@@ -15,7 +15,7 @@ mod tc {
 }
 
 fn bench_tc(nodes_count: i32) {
-   let mut tc = tc::DLProgram::default();
+   let mut tc = tc::InferProgram::default();
 
    for i in 0..nodes_count {
       tc.edge.push((i, i + 1));

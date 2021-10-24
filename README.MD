@@ -3,7 +3,7 @@
 
 **Example** Computing all the connected nodes in a graph:
 ```Rust
-dl!{
+infer!{
    relation edge(i32, i32);
    relation path(i32, i32);
    

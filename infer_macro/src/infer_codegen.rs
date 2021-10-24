@@ -7,7 +7,7 @@ use syn::{Expr, Type, parse2, spanned::Spanned};
 use crate::{infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_spanned, tuple_type}};
 use crate::infer_mir::MirRelationVersion::*;
 
-pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
+pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::TokenStream {
    
    let mut relation_fields = vec![];
 
@@ -59,7 +59,25 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
       }
    }
 
-   quote! {
+
+   let run_func = if is_infer_run {quote!{}} else {
+      quote! {
+         #[allow(non_snake_case)]
+         pub fn run(&mut self) {
+            use core::cmp::PartialEq;
+            let _self = self;
+            #(#sccs_compiled)*
+         }
+      }
+   };
+   let run_code = if !is_infer_run {quote!{}} else {
+      quote! {
+         use core::cmp::PartialEq;
+         let _self = &mut res;
+         #(#sccs_compiled)*
+      }
+   };
+   let res = quote! {
       use std::collections::{HashMap, HashSet};
       fn move_index_contents<K, V>(hm1: &mut HashMap<K, HashSet<V>>, hm2: &mut HashMap<K, HashSet<V>>) 
          where K : Eq + std::hash::Hash, V: Eq + std::hash::Hash {
@@ -70,16 +88,12 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
       }
       fn comment(_: &str){}
       #[derive(Default)]
-      pub struct DLProgram {
+      pub struct InferProgram {
          #(#relation_fields)*
       }
       #[allow(non_snake_case)]
-      impl DLProgram {
-         #[allow(non_snake_case)]
-         pub fn run(&mut self) {
-            use core::cmp::PartialEq;
-            #(#sccs_compiled)*
-         }
+      impl InferProgram {
+         #run_func
          #[allow(non_snake_case)]
          pub fn update_indices(&mut self) {
             #update_indices_body
@@ -90,6 +104,17 @@ pub(crate) fn compile_mir(mir: &InferMir) -> proc_macro2::TokenStream {
             // struct TypeConstraints where #(#type_constaints),* {}
             struct TypeConstraints<T> where T : Clone + Eq + Hash{_t: ::core::marker::PhantomData<T>}
             #(#type_constaints)*
+         }
+      }
+   };
+   if !is_infer_run {res} else {
+      quote! {
+         // #[allow(non_snake_case)]
+         {
+            #res
+            let mut res = InferProgram::default();
+            #run_code
+            res
          }
       }
    }
@@ -108,7 +133,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
       let total_field = &rel.ir_name;
       let ty = rel_index_type(&rel.key_type());
       move_total_to_delta.push(quote! {
-         let #delta_var_name : &mut #ty = &mut self.#total_field;
+         let #delta_var_name : &mut #ty = &mut _self.#total_field;
          let mut #total_var_name : #ty = HashMap::default();
          let mut #new_var_name : #ty = HashMap::default();
       });
@@ -120,7 +145,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
       });
 
       move_total_to_field.push(quote_spanned!{rel.relation.name.span()=>
-         self.#total_field = #total_var_name;
+         _self.#total_field = #total_var_name;
       });
    }
    
@@ -257,7 +282,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                if let Some(matching) = #rel_version_var_name.get( &#selected_args_tuple) {
                   for &ind in matching.iter() {
                      // TODO we may be doing excessive cloning
-                     let row = &self.#bclause_rel_name[ind].clone();
+                     let row = &_self.#bclause_rel_name[ind].clone();
                      #(#new_vars_assignmnets)*
                      #conds_then_next_loop
                   }
@@ -318,9 +343,9 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
                #head_rel_full_index_var_name_total.contains_key(&new_row))
             {
-               let new_row_ind = self.#head_rel_name.len();
+               let new_row_ind = _self.#head_rel_name.len();
                #(#update_indices)*
-               self.#head_rel_name.push(new_row);
+               _self.#head_rel_name.push(new_row);
                changed = true;
             }
          };

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use infer::dl;
+use infer::*;
 
 type SrcLine = u32;
 
@@ -31,7 +31,7 @@ fn instr_vals(instr: &Instr) -> Vec<&Val>{
 }
 
 use Instr::*;
-dl! {
+infer! {
    relation trace(SrcLine, Trace); //scrline duplicates the head of trace for fast lookup
    relation source(SrcLine, Instr);
    relation store(Trace, Register, i32);

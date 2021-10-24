@@ -51,7 +51,7 @@ fn test_macro1() {
 }
 
 fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   let code = infer_impl(tokens);
+   let code = infer_impl(tokens, false);
    let code = code.expect("code is not ok!");
 
    std::fs::write("src/scratchpad.rs", code.to_string()).unwrap();

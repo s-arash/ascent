@@ -17,9 +17,32 @@ use proc_macro::TokenStream;
 use syn::Result;
 use crate::{infer_codegen::compile_mir, infer_hir::{compile_infer_program_to_hir}, infer_mir::{compile_hir_to_mir}};
 
+/// The main macro of the infer library. Allows writing logical inference rules similar to Datalog.
+/// Example:
+/// ```
+/// # #[macro_use] extern crate infer_macro;
+/// # use infer_macro::infer;
+/// infer!{
+///   relation edge(i32, i32);
+///   relation path(i32, i32);
+///   
+///   path(*x, *y) <-- edge(x,y);
+///   path(*x, *z) <-- edge(x,y), path(y, z);
+/// }
+/// 
+/// fn main() {
+///   let mut tc_comp = InferProgram::default();
+///   tc_comp.edge = vec![(1,2), (2,3)];
+///   tc_comp.update_indices();
+///   tc_comp.run();
+///   println!("{:?}", tc_comp.path);
+/// }
+/// ```
+/// this macro creates a type named `InferProgram` that can be instantiated using `InferProgram::default()`.
+/// The type has a `run()` method, which runs the computation to a fixed point.
 #[proc_macro]
 pub fn infer(input: TokenStream) -> TokenStream {
-   let res = infer_impl(input.into());
+   let res = infer_impl(input.into(), false);
    
    match res {
     Ok(res) => res.into(),
@@ -27,12 +50,33 @@ pub fn infer(input: TokenStream) -> TokenStream {
    }
 }
 
+
+/// Like `infer`, except that invocations of this macro evaluate to an expression containing all the relations
+/// defined inside the macro body, and evaluated to a fixed point.
+/// The advantage of `infer_run` compared to `infer` is the fact that `infer_run` has access to local variables
+/// in scope:
+/// ```
+/// # #[macro_use] extern crate infer_macro;
+/// # use infer_macro::infer_run;
+/// let r = vec![(1,2), (2,3)];
+/// let r_tc = infer_run!{
+///    relation tc(i32, i32);
+///    tc(*x, *y) <-- for (x, y) in r.iter();
+///    tc(*x, *z) <-- for (x, y) in r.iter(), tc(y, z);
+/// }.tc;
+///
+/// ```
 #[proc_macro]
-pub fn dl(input: TokenStream) -> TokenStream{
-   infer(input)
+pub fn infer_run(input: TokenStream) -> TokenStream {
+   let res = infer_impl(input.into(), true);
+   
+   match res {
+      Ok(res) => res.into(),
+      Err(err) => TokenStream::from(err.to_compile_error()),
+   }
 }
 
-fn infer_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::TokenStream> {
+fn infer_impl(input: proc_macro2::TokenStream, is_infer_run: bool) -> Result<proc_macro2::TokenStream> {
    let prog: InferProgram = syn::parse2(input)?;
    // println!("prog relations: {}", prog.relations.len());
    // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
@@ -46,7 +90,7 @@ fn infer_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::TokenStrea
 
    // println!("mir relations: {}", mir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
 
-   let code = compile_mir(&mir);
+   let code = compile_mir(&mir, is_infer_run);
 
    Ok(code)
 }
