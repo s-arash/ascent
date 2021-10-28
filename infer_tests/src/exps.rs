@@ -19,3 +19,11 @@ fn types_eq<T1, T2>() -> bool{
 // impl<T, U> TypesEq<U> for T {
 //     const ARE_EQUAL : bool = false;
 // }
+
+fn exp_type_param<T>(inp: T) {
+   struct Inner<T> {
+      one: T,
+   }
+   let instance = Inner {one: inp};
+   
+}

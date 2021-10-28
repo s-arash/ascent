@@ -1,13 +1,30 @@
 use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::{BTreeSet};
 use std::hash::Hash;
+use std::ops::Deref;
 
 use super::Lattice;
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct Set<T: PartialEq + Eq + Hash>(pub HashSet<T>);
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Set<T: PartialEq + Eq + Hash + Ord>(pub BTreeSet<T>);
 
-impl<T: Eq + Hash> PartialOrd for Set<T> {
+impl<T: PartialEq + Eq + Hash + Ord> Set<T> {
+   pub fn singleton(item: T) -> Self {
+      let mut set = BTreeSet::new();
+      set.insert(item);
+      Set(set)
+   }
+}
+
+impl<T: PartialEq + Eq + Hash + Ord> Deref for Set<T>{
+   type Target = BTreeSet<T>;
+
+   fn deref(&self) -> &Self::Target {
+      &self.0
+   }
+}
+
+impl<T: Eq + Hash + Ord> PartialOrd for Set<T> {
    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
       if self.0 == other.0 {
          Some(Ordering::Equal)
@@ -21,19 +38,19 @@ impl<T: Eq + Hash> PartialOrd for Set<T> {
    }
 }
 
-impl<T: Eq + Hash + Clone> Lattice for Set<T> {
+impl<T: Eq + Hash + Clone + Ord> Lattice for Set<T> {
    fn meet_mut(&mut self, mut other: Self) -> bool {
       let self_len = self.0.len();
-      let mut new_self = HashSet::new();
+      let mut old_self = BTreeSet::new();
+      std::mem::swap(&mut self.0, &mut old_self);
       if self.0.len() > other.0.len() {
          std::mem::swap(self, &mut other);
       }
-      for item in self.0.drain() {
+      for item in old_self.into_iter() {
          if other.0.contains(&item) {
-            new_self.insert(item);
+            self.0.insert(item);
          }
       }
-      *self = Set(new_self);
       self_len != self.0.len()
    }
 

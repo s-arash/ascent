@@ -112,6 +112,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
             struct TypeConstraints<T> where T : Clone + Eq + Hash{_t: ::core::marker::PhantomData<T>}
             struct LatTypeConstraints<T> where T : Clone + Eq + Hash + Lattice{_t: ::core::marker::PhantomData<T>}
             #(#type_constaints)*
+            // too restrictive?
          }
       }
    };
@@ -375,7 +376,8 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                   .or_else(|| #head_lat_full_index_var_name_full.get(&lattice_key)) 
                {
                   let existing_ind = *existing_ind.iter().next().unwrap();
-                  let lat_changed = ::infer::Lattice::join_mut(&mut _self.#head_rel_name[existing_ind].#tuple_lat_index, new_row.#tuple_lat_index);
+                  // TODO possible excessive cloning here?
+                  let lat_changed = ::infer::Lattice::join_mut(&mut _self.#head_rel_name[existing_ind].#tuple_lat_index, new_row.#tuple_lat_index.clone());
                   if lat_changed {
                      let new_row_ind = existing_ind;
                      #(#update_indices)*

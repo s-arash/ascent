@@ -1,6 +1,7 @@
 pub mod constant_propagation;
-mod set;
+pub mod set;
 pub mod product;
+pub mod ord_lattice;
 pub use product::Product;
 pub mod tuple;
 use std::{ops::Deref, rc::Rc};
@@ -16,8 +17,14 @@ pub trait ProtoLattice: PartialOrd + Sized{
 
 pub trait Lattice: PartialOrd + Sized{
 
+   /// potentially updates `self` to be the join of `self` and `other`. 
+   ///
+   /// Returns true if `self` was updated.
    fn meet_mut(&mut self, other: Self) -> bool;
 
+   /// potentially updates `self` to be the meet of `self` and `other`. 
+   ///
+   /// Returns true if `self` was updated.
    fn join_mut(&mut self, other: Self) -> bool;
 
    #[inline]

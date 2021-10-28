@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, fmt::Display, fmt::Debug, fmt::Formatter};
+use std::{cmp::Ordering, fmt::Debug, fmt::Display, fmt::Formatter, ops::Deref};
 
 use crate::Lattice;
 
@@ -14,6 +14,13 @@ use super::{BoundedLattice};
 /// assert!(Dual(2) < Dual(1));
 /// ```
 pub struct Dual<T>(pub T);
+
+impl<T> Deref for Dual<T>{
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl<T: Debug> Debug for Dual<T> {
    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.0.fmt(f) }

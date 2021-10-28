@@ -10,17 +10,14 @@ use crate::{infer_impl};
 #[test]
 fn test_macro() {
    let inp = quote!{
-      lattice shortest_path(i32, i32, u32);
-      relation edge(i32, i32, u32);
+      relation foo(i32, i32);
+      relation bar(i32, i32);
 
-      shortest_path(*x,*y, {println!("adding sp({},{},{})?", x, y, w ); *w}) <-- edge(x, y, w);
-      shortest_path(*x, *z, {println!("adding sp({},{},{})?", x, z, w + l); (w + l)}) <-- edge(x, y, w), shortest_path(y, z, l);
+      bar(x, x+1) <-- for x in 0..10;
+      foo(*x, *y) <-- bar(x, y);
 
-      edge(1, 2, 30);
-      edge(2, 3, 50);
-      edge(1, 3, 40);
-      edge(2, 4, 100);
-      edge(4, 1, 1000);
+      lattice foo_as_set(Set<(i32, i32)>);
+      foo_as_set(Set::singleton((*x, *y))) <-- foo(x, y);
 
    };
    write_infer_run_to_scratchpad(inp);

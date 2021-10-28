@@ -351,16 +351,17 @@ fn test_dl_lattice(){
       shortest_path(*x, *y, Dual(*w)) <-- edge(x, y, w);
       shortest_path(*x, *z, Dual(w + l.0)) <-- edge(x, y, w), shortest_path(y, z, l);
 
-      edge(1, 2, 30);
-      edge(2, 3, 50);
-      edge(1, 3, 40);
-      edge(2, 4, 100);
-      edge(4, 1, 1000);
-
+      edge(1, 2, x + 30) <-- for x in 0..100;
+      edge(2, 3, x + 50) <-- for x in 0..100;
+      edge(1, 3, x + 40) <-- for x in 0..100;
+      edge(2, 4, x + 100) <-- for x in 0..100;
+      edge(1, 4, x + 200) <-- for x in 0..100;
    };
    let mut prog = InferProgram::default();
    prog.run();
-   println!("shortest_path ({} tuples):\n{:?}", prog.shortest_path.len(), prog.shortest_path);
+   println!("shortest_path ({} tuples):", prog.shortest_path.len());
+   println!("\n{:?}", prog.shortest_path);
+   assert!(rels_equal(prog.shortest_path, [(1,2, Dual(30)), (1, 3, Dual(40)), (1,4, Dual(130)), (2,3, Dual(50)), (2, 4, Dual(100))]))
 }
 
 #[test]
@@ -370,7 +371,7 @@ fn test_dl_lattice2(){
       relation edge(i32, i32, u32);
 
       shortest_path(*x,*y, {println!("adding sp({},{},{})?", x, y, w ); Dual(*w)}) <-- edge(x, y, w);
-      shortest_path(*x, *z, {println!("adding sp({},{},{})?", x, z, w + l.0); Dual(w + l.0)}) <-- edge(x, y, w), shortest_path(y, z, l);
+      shortest_path(*x, *z, {println!("adding sp({},{},{})?", x, z, *w + len.0); Dual(w + len.0)}) <-- edge(x, y, w), shortest_path(y, z, len);
 
       edge(1, 2, 30);
       edge(2, 3, 50);
@@ -434,4 +435,28 @@ fn test_infer_run_tc(){
       }.tc
    }
    assert!(rels_equal([(1,2), (2, 3), (1, 3)], compute_tc(&[(1,2), (2,3)])));
+}
+
+#[test]
+fn test_infer_negation_through_lattices(){
+   use infer::lattice::set::Set;
+   let res = infer_run!{
+      relation foo(i32, i32);
+      relation bar(i32, i32);
+
+      bar(x, x+1) <-- for x in 0..10;
+      foo(*x, *y) <-- bar(x, y);
+
+      lattice foo_as_set(Set<(i32, i32)>);
+      foo_as_set(Set::singleton((*x, *y))) <-- foo(x, y);
+
+      relation baz(i32, i32);
+      baz(1, 2);
+      baz(1, 3);
+
+      relation res(i32, i32);
+      res(*x, *y) <-- baz(x, y), foo_as_set(all_foos) if !all_foos.contains(&(*x, *y));
+   };
+   println!("res: {:?}", res.res);
+   assert!(rels_equal([(1,3)], res.res));
 }
