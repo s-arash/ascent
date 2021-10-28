@@ -3,16 +3,17 @@ use std::{collections::{HashMap, HashSet}, ops::Index};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
-use syn::{Error, Expr, Type, spanned::Spanned};
+use syn::{Error, Expr, Type, parse2, spanned::Spanned};
 
-use crate::{InferProgram, utils::{expr_to_ident, into_set, pattern_get_vars, tuple, tuple_type}};
+use crate::{InferProgram, infer_syntax::Declaration, utils::{expr_to_ident, into_set, pattern_get_vars, tuple, tuple_type}};
 use crate::infer_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
 
 pub(crate) struct InferIr {
    pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
    pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
-   pub rules: Vec<IrRule>
+   pub rules: Vec<IrRule>,
+   pub declaration: Declaration,
 }
 
 pub(crate) struct IrRule {
@@ -99,11 +100,13 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<I
          }
       }
    }
+   let declaration = prog.declaration.clone().unwrap_or(parse2(quote! {pub struct InferProgram;}).unwrap());
    Ok(InferIr{
       rules: ir_rules,
       relations_ir_relations,
       relations_full_indices,
-      lattices_full_indices
+      lattices_full_indices,
+      declaration
    })
 }
 

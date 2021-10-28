@@ -5,7 +5,7 @@ use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap:
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
-use crate::{infer_hir::IrBodyItem, infer_mir::MirRelationVersion::*, utils::{exp_cloned, tuple, tuple_type}};
+use crate::{infer_hir::IrBodyItem, infer_mir::MirRelationVersion::*, infer_syntax::Declaration, utils::{exp_cloned, tuple, tuple_type}};
 use crate::infer_syntax::{CondClause, GeneratorNode, RelationIdentity};
 use crate::{infer_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, InferIr}};
 
@@ -15,6 +15,7 @@ pub(crate) struct InferMir {
    pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
    pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
+   pub declaration: Declaration
 }
 
 pub(crate) struct MirScc {
@@ -173,6 +174,7 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
       relations_ir_relations: hir.relations_ir_relations.clone(),
       relations_full_indices: hir.relations_full_indices.clone(),
       lattices_full_indices: hir.lattices_full_indices.clone(),
+      declaration: hir.declaration.clone()
    }
 }
 

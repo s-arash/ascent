@@ -1,6 +1,6 @@
 extern crate proc_macro;
 use proc_macro2::Span;
-use syn::{Expr, Ident, Pat, Result, Token, Type, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned};
+use syn::{Expr, GenericParam, Generics, Ident, Pat, Result, Token, Type, Visibility, WhereClause, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned, token::{Comma, Gt, Lt}};
 use std::{collections::{HashMap}, sync::Mutex};
 
 use quote::{ToTokens};
@@ -20,6 +20,27 @@ mod kw {
    syn::custom_keyword!(relation);
    syn::custom_keyword!(lattice);
    syn::custom_punctuation!(LongLeftArrow, <--);
+}
+
+
+#[derive(Clone, Parse)]
+pub struct Declaration {
+   pub visibility: Visibility,
+   pub struct_kw: Token![struct],
+   pub ident: Ident,
+   #[call(parse_generics_with_where_clause)]
+   pub generics: Generics,
+   pub where_clause: Option<WhereClause>,
+   pub semi: Token![;]
+}
+
+/// Parse impl on Generics does not parse WhereClauses, hence this function
+fn parse_generics_with_where_clause(input: ParseStream) -> Result<Generics> {
+   let mut res = Generics::parse(input)?;
+   if input.peek(Token![where]) {
+      res.where_clause = Some(input.parse()?);
+   }
+   Ok(res)
 }
 
 // #[derive(Clone)]
@@ -257,11 +278,15 @@ impl Parse for RuleNode {
 // #[derive(Clone)]
 pub(crate) struct InferProgram {
    pub rules : Vec<RuleNode>,
-   pub relations : Vec<RelationNode>
+   pub relations : Vec<RelationNode>,
+   pub declaration: Option<Declaration>,
 }
 
 impl Parse for InferProgram {
    fn parse(input: ParseStream) -> Result<Self> {
+      let declaration = if input.peek(Token![pub]) || input.peek(Token![struct]) {
+         Some(Declaration::parse(input)?)
+      } else {None};
       let mut rules = vec![];
       let mut relations = vec![];
       while !input.is_empty() {
@@ -271,7 +296,7 @@ impl Parse for InferProgram {
             rules.push(RuleNode::parse(input)?);
          }
       }
-      Ok(InferProgram{rules, relations})
+      Ok(InferProgram{rules, relations, declaration})
    }
 }
 

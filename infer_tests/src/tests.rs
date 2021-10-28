@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::{cmp::max, collections::HashMap, hash, rc::Rc};
 use infer::Dual;
-
+use std::hash::Hash;
 
 use std::collections::{self, HashSet};
 use infer::infer;
@@ -459,4 +459,45 @@ fn test_infer_negation_through_lattices(){
    };
    println!("res: {:?}", res.res);
    assert!(rels_equal([(1,3)], res.res));
+}
+
+#[test]
+fn test_infer_explicit_decl(){
+   #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+   struct Node(pub i32);
+   infer!{
+      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash;
+      relation edge(TNode, TNode);
+      relation path(TNode, TNode);
+
+      path(x.clone(), y.clone()) <-- edge(x,y);
+      path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
+   }
+   let mut prog = TC::default();
+   prog.edge = vec![(Node(1),Node(2)), (Node(2), Node(3))];
+   prog.update_indices();
+   prog.run();
+   println!("path: {:?}", prog.path);
+   assert!(rels_equal([(Node(1),Node(2)), (Node(2),Node(3)), (Node(1),Node(3))], prog.path));
+
+}
+
+#[test]
+fn test_infer_run_explicit_decl(){
+   fn compute_tc<TNode: Clone + Eq + Hash>(edges: &[(TNode, TNode)]) -> Vec<(TNode, TNode)> {
+      infer_run!{
+         struct TC<TNode> where TNode: Clone + Eq + Hash;
+         relation edge(TNode, TNode);
+         relation path(TNode, TNode);
+         edge(x.clone(), y.clone()) <-- for (x, y) in edges.iter();
+
+         path(x.clone(), y.clone()) <-- edge(x,y);
+         path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
+      }.path
+   }
+
+   let res = compute_tc(&[(1,2), (2, 3)]);
+   println!("res: {:?}", res);
+   assert!(rels_equal([(1,2), (2,3), (1,3)], res));
+
 }

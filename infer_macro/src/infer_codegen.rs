@@ -10,6 +10,7 @@ use crate::infer_mir::MirRelationVersion::*;
 pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::TokenStream {
    
    let mut relation_fields = vec![];
+   let mut field_defaults = vec![];
 
    for (rel, rel_indices) in mir.relations_ir_relations.iter(){
       let name = &rel.name;
@@ -17,6 +18,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
       relation_fields.push(quote! {
          pub #name : Vec<#field_types>,
       });
+      field_defaults.push(quote! {#name : Default::default()});
       for ind in rel_indices.iter(){
          let name = &ind.ir_name;
          let index_type: Vec<Type> = ind.indices.iter().map(|&i| rel.field_types[i].clone()).collect();
@@ -24,9 +26,10 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
          relation_fields.push(quote!{
             pub #name: std::collections::HashMap< #index_type , std::collections::HashSet<usize>>,
          });
+         field_defaults.push(quote! {#name : Default::default()});
       }
    }
-   
+
    let sccs_ordered = &mir.sccs;
    let mut sccs_compiled = vec![];
    for (i, scc) in sccs_ordered.iter().enumerate() {
@@ -83,6 +86,10 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
          #(#sccs_compiled)*
       }
    };
+   let (impl_generics, ty_generics, where_clause) = mir.declaration.generics.split_for_impl();
+   let vis = &mir.declaration.visibility;
+   let struct_name = &mir.declaration.ident;
+   let generics = &mir.declaration.generics;
    let res = quote! {
       use std::collections::{HashMap, HashSet};
       fn move_index_contents<K, V>(hm1: &mut HashMap<K, HashSet<V>>, hm2: &mut HashMap<K, HashSet<V>>) 
@@ -93,12 +100,11 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
          }
       }
       fn comment(_: &str){}
-      #[derive(Default)]
-      pub struct InferProgram {
+      #vis struct #struct_name #generics {
          #(#relation_fields)*
       }
       #[allow(non_snake_case)]
-      impl InferProgram {
+      impl #impl_generics #struct_name #ty_generics #where_clause {
          #run_func
          #[allow(non_snake_case)]
          pub fn update_indices(&mut self) {
@@ -115,13 +121,20 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
             // too restrictive?
          }
       }
+      impl #impl_generics Default for #struct_name #ty_generics #where_clause {
+         fn default() -> Self {
+            #struct_name {
+               #(#field_defaults),*
+            }
+         }
+      }
    };
    if !is_infer_run {res} else {
       quote! {
          // #[allow(non_snake_case)]
          {
             #res
-            let mut res = InferProgram::default();
+            let mut res = #struct_name::default();
             #run_code
             res
          }
