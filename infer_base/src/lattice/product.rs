@@ -1,6 +1,6 @@
 use paste::paste;
 
-use super::{BoundedLattice, Lattice, ProtoLattice};
+use super::{BoundedLattice, Lattice};
 use std::cmp::Ordering;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -48,7 +48,7 @@ macro_rules! tuple_lattice_impl{
             Some(res)
          }
       }
-      impl< $([<T $i>]: Lattice),* > ProtoLattice for Product<($([<T $i>]),*,)> {
+      impl< $([<T $i>]: Lattice),* > Lattice for Product<($([<T $i>]),*,)> {
          fn meet(self, other: Self) -> Self {
             Product(($(self.0.$i.meet(other.0.$i)),*,))
          }

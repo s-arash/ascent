@@ -6,7 +6,7 @@ use std::cmp::Ordering::*;
 macro_rules! tuple_lattice_impl{
    ($($i:tt),*) => {
       paste!(
-      impl< $([<T $i>]: BoundedLattice),* > super::ProtoLattice for ($([<T $i>]),*,) {
+      impl< $([<T $i>]: BoundedLattice),* > super::Lattice for ($([<T $i>]),*,) {
          #[allow(unused_assignments)]
          fn meet(self, other: Self) -> Self {
             let mut state = Some(Equal);
@@ -79,7 +79,7 @@ tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6, 7, 8);
 tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
 tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 
-impl super::ProtoLattice for () {
+impl super::Lattice for () {
    fn meet(self, _other: Self) -> Self { () }
    fn join(self, _other: Self) -> Self { () }
 }
@@ -114,7 +114,7 @@ fn test_tuple_lattice(){
          }
       }
    }
-   impl super::ProtoLattice for Diamond {
+   impl super::Lattice for Diamond {
       fn meet(self, other: Self) -> Self {
          match (self, other) {
             (Bottom, _) => Bottom,

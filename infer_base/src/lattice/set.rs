@@ -65,4 +65,14 @@ impl<T: Eq + Hash + Clone + Ord> Lattice for Set<T> {
 
       self_len != self.0.len()
    }
+
+   fn meet(mut self, other: Self) -> Self {
+       self.meet_mut(other);
+       self
+   }
+
+   fn join(mut self, other: Self) -> Self {
+      self.join_mut(other);
+      self
+   }
 }
