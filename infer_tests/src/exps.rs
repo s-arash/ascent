@@ -1,4 +1,4 @@
-
+#![allow(warnings)]
 
 fn exp_type_eq(){
    

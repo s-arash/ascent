@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use std::rc::Rc;
 
 use infer::*;

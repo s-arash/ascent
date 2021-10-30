@@ -71,7 +71,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
 
    let run_func = if is_infer_run {quote!{}} else {
       quote! {
-         #[allow(non_snake_case)]
+         #[allow(non_snake_case, unused_imports)]
          pub fn run(&mut self) {
             use core::cmp::PartialEq;
             let _self = self;
@@ -111,15 +111,13 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
          pub fn update_indices(&mut self) {
             #update_indices_body
          }
-
+         #[allow(unused_imports)]
          fn type_constaints() {
             use ::core::clone::Clone; use ::core::cmp::Eq; use ::core::hash::Hash;
             use ::infer::Lattice;
-            // struct TypeConstraints where #(#type_constaints),* {}
             struct TypeConstraints<T> where T : Clone + Eq + Hash{_t: ::core::marker::PhantomData<T>}
             struct LatTypeConstraints<T> where T : Clone + Eq + Hash + Lattice{_t: ::core::marker::PhantomData<T>}
             #(#type_constaints)*
-            // too restrictive?
          }
          pub fn summary() -> &'static str {
             #summary
@@ -135,11 +133,14 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
    };
    if !is_infer_run {res} else {
       quote! {
-         // #[allow(non_snake_case)]
          {
             #res
             let mut res = #struct_name::default();
-            #run_code
+            #[allow(non_snake_case, unused_imports)]
+            {
+               comment("running...");
+               #run_code
+            }
             res
          }
       }
@@ -202,6 +203,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
    }
 
    let evaluate_rules_loop = if scc.is_looping { quote! {
+      #[allow(unused_assignments, unused_variables)]
       loop {
          let mut changed = false;
          // evaluate rules
@@ -214,6 +216,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
          if !changed {break;}
       }
    }} else {quote! {
+      #[allow(unused_assignments, unused_variables)]
       {
          let mut changed = false;
          #(#evaluate_rules)*

@@ -1,32 +1,30 @@
-use std::fmt::{Debug, Display};
-use std::marker::PhantomData;
+#![cfg(test)]
+use std::fmt::{Debug};
 use std::ops::Deref;
-use std::{cmp::max, collections::HashMap, hash, rc::Rc};
+use std::{cmp::max, rc::Rc};
 use infer::Dual;
 use std::hash::Hash;
 
-use std::collections::{self, HashSet};
 use infer::infer;
 use infer::infer_run;
-// use ::infer::dl;
 
-use derive_more::*;
 use LambdaCalcExpr::*;
 use crate::utils::*;
 use itertools::Itertools;
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
-enum LambdaCalcExpr{
+pub enum LambdaCalcExpr{
    Ref(&'static str),
    Lam(&'static str, Rc<LambdaCalcExpr>),
    App(Rc<LambdaCalcExpr>, Rc<LambdaCalcExpr>)
 }
 
 impl LambdaCalcExpr {
+   #[allow(dead_code)]
    fn depth(&self) -> usize {
       match self{
          LambdaCalcExpr::Ref(_) => 0,
-         LambdaCalcExpr::Lam(x,b) => 1 + b.depth(),
+         LambdaCalcExpr::Lam(_x,b) => 1 + b.depth(),
          LambdaCalcExpr::App(f,e) => 1 + max(f.depth(), e.depth())
       }
    }
@@ -41,14 +39,16 @@ fn lam(x: &'static str, e: LambdaCalcExpr) -> LambdaCalcExpr {
 fn sub(exp: &LambdaCalcExpr, var: &str, e: &LambdaCalcExpr) -> LambdaCalcExpr {
    match exp {
       Ref(x) if *x == var => e.clone(),
-      Ref(x) => exp.clone(),
+      Ref(_x) => exp.clone(),
       App(ef,ea) => app(sub(ef, var, e), sub(ea, var, e)),
-      Lam(x, eb) if *x == var => exp.clone(),
+      Lam(x, _eb) if *x == var => exp.clone(),
       Lam(x, eb) => lam(x, sub(eb, var, e))
    }
 }
 
+#[allow(non_snake_case)]
 fn U() -> LambdaCalcExpr {lam("x", app(Ref("x"), Ref("x")))}
+#[allow(non_snake_case)]
 fn I() -> LambdaCalcExpr {lam("x", Ref("x"))}
 
 #[test]
@@ -67,7 +67,7 @@ fn test_dl_lambda(){
 
       eval(exp.clone(), exp.clone()) <-- do_eval(exp) if let Lam(_,_) = exp;
 
-      do_eval(ef.as_ref().clone()) <-- do_eval(?App(ef,ea));
+      do_eval(ef.as_ref().clone()) <-- do_eval(?App(ef,_ea));
 
       do_eval(sub(fb, fx, ea)) <-- 
          do_eval(?App(ef, ea)), 
@@ -306,7 +306,6 @@ fn test_dl_disjunctions(){
    assert!(rels_equal([(3,30), (2, 20)], prog.bar));
 }
 
-struct MyStruct{}
 #[test]
 fn test_dl_repeated_vars(){
    infer!{
@@ -399,7 +398,7 @@ fn test_infer_run(){
       bar(*y) <-- foo(x, y);
    };
 
-   let res2 = infer_run!{
+   let _res2 = infer_run!{
       relation foo(i32);
       foo(42);
    };
