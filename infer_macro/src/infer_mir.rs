@@ -21,14 +21,15 @@ pub(crate) struct InferMir {
 pub(crate) struct MirScc {
    pub rules: Vec<MirRule>,
    pub dynamic_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
-   pub body_only_relations: HashMap<RelationIdentity, HashSet<IrRelation>>
+   pub body_only_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
+   pub is_looping: bool
 }
 
 
 pub(crate) fn mir_summary(mir: &InferMir) -> String{
    let mut res = String::new();
    for (i, scc) in mir.sccs.iter().enumerate() {
-      writeln!(&mut res, "scc {}:", i);
+      writeln!(&mut res, "scc {}, is_looping: {}:", i, scc.is_looping);
       for r in scc.rules.iter() {
          writeln!(&mut res, "  {}", mir_rule_summary(r));
       }
@@ -174,8 +175,10 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
 
       }
 
+      let mut is_looping = false;
       for rel in dynamic_relations.keys().cloned().collect_vec() {
          if let Some(indices) = body_only_relations.remove(&rel){
+            is_looping = true;
             for ind in indices {
                dynamic_relations.entry(rel.clone()).or_default().insert(ind);
             }
@@ -189,7 +192,8 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
       let mir_scc = MirScc{
          rules,
          dynamic_relations,
-         body_only_relations
+         body_only_relations,
+         is_looping
       };
       mir_sccs.push(mir_scc);
    }

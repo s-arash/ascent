@@ -201,11 +201,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
       evaluate_rules.push(compile_mir_rule(rule, scc, mir, 0));
    }
 
-   quote! {
-      // define variables for delta and new versions of dynamic relations in the scc
-      // move total versions of dynamic indices to delta
-      #(#move_total_to_delta)*
-
+   let evaluate_rules_loop = if scc.is_looping { quote! {
       loop {
          let mut changed = false;
          // evaluate rules
@@ -217,6 +213,20 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
          #(#shift_delta_to_total_new_to_delta)*
          if !changed {break;}
       }
+   }} else {quote! {
+      {
+         let mut changed = false;
+         #(#evaluate_rules)*
+         #(#shift_delta_to_total_new_to_delta)*
+         #(#shift_delta_to_total_new_to_delta)*
+      }
+   }};
+   quote! {
+      // define variables for delta and new versions of dynamic relations in the scc
+      // move total versions of dynamic indices to delta
+      #(#move_total_to_delta)*
+
+      #evaluate_rules_loop
 
       #(#move_total_to_field)*
    }

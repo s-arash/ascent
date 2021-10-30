@@ -502,3 +502,40 @@ fn test_infer_run_explicit_decl(){
    assert!(rels_equal([(1,2), (2,3), (1,3)], res));
 
 }
+
+#[test]
+fn test_infer_fac(){
+   infer!{
+      struct Fac;
+      relation fac(u64, u64);
+      relation do_fac(u64);
+
+      fac(0, 1) <-- do_fac(0);
+      do_fac(x - 1) <-- do_fac(x) if *x > 0;
+      fac(*x, x * sub1fac) <-- do_fac(x) if *x > 0, fac(x - 1, sub1fac);
+
+      do_fac(10);
+   }
+   let mut prog = Fac::default();
+   prog.run();
+   println!("fac: {:?}", prog.fac);
+   println!("{}", Fac::summary());
+   assert!(prog.fac.contains(&(5, 120)));
+}
+
+#[test]
+fn test_consuming_infer_run_tc(){
+   fn compute_tc(inp: impl Iterator<Item = (i32, i32)>) -> Vec<(i32,i32)> {
+      infer_run!{
+         relation tc(i32, i32);
+         relation r(i32, i32);
+
+         r(x, y) <-- for (x, y) in inp;
+         tc(*x, *y) <-- r(x, y);
+         tc(*x, *z) <-- r(x, y), tc(y, z);
+      }.tc
+   }
+   let res = compute_tc([(1,2), (2,3)].into_iter());
+   println!("res: {:?}", res);
+   assert!(rels_equal([(1,2), (2, 3), (1, 3)], compute_tc([(1,2), (2,3)].into_iter())));
+}
