@@ -4,7 +4,7 @@ use itertools::{Iterate, Itertools};
 use proc_macro2::Ident;
 use syn::{Expr, Type, parse2, spanned::Spanned};
 
-use crate::{infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_spanned, tuple_type}};
+use crate::{infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name, mir_summary}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_spanned, tuple_type}};
 use crate::infer_mir::MirRelationVersion::*;
 
 pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::TokenStream {
@@ -86,6 +86,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
          #(#sccs_compiled)*
       }
    };
+   let summary = mir_summary(mir);
    let (impl_generics, ty_generics, where_clause) = mir.declaration.generics.split_for_impl();
    let vis = &mir.declaration.visibility;
    let struct_name = &mir.declaration.ident;
@@ -120,6 +121,9 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
             #(#type_constaints)*
             // too restrictive?
          }
+         pub fn summary() -> &'static str {
+            #summary
+         }
       }
       impl #impl_generics Default for #struct_name #ty_generics #where_clause {
          fn default() -> Self {
@@ -148,7 +152,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
    let mut shift_delta_to_total_new_to_delta = vec![];
    let mut move_total_to_field = vec![];
 
-   for rel in scc.dynamic_relation_indices.iter() {
+   for rel in scc.dynamic_relations.iter().flat_map(|(rel, indices)| indices.iter()) {
       let delta_var_name = ir_relation_version_var_name(&rel.ir_name, MirRelationVersion::Delta);
       let total_var_name = ir_relation_version_var_name(&rel.ir_name, MirRelationVersion::Total);
       let new_var_name = ir_relation_version_var_name(&rel.ir_name, MirRelationVersion::New);
@@ -168,6 +172,15 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
 
       move_total_to_field.push(quote_spanned!{rel.relation.name.span()=>
          _self.#total_field = #total_var_name;
+      });
+   }
+   for rel in scc.body_only_relations.iter().flat_map(|(rel, indices)| indices.iter()) {
+      let total_var_name = ir_relation_version_var_name(&rel.ir_name, MirRelationVersion::Total);
+      let ty = rel_index_type(&rel.key_type());
+      let total_field = &rel.ir_name;
+
+      move_total_to_delta.push(quote! {
+         let #total_var_name : &mut #ty = &mut _self.#total_field;
       });
    }
    

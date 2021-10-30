@@ -361,6 +361,7 @@ fn test_dl_lattice(){
    prog.run();
    println!("shortest_path ({} tuples):", prog.shortest_path.len());
    println!("\n{:?}", prog.shortest_path);
+   println!("{}", InferProgram::summary());
    assert!(rels_equal(prog.shortest_path, [(1,2, Dual(30)), (1, 3, Dual(40)), (1,4, Dual(130)), (2,3, Dual(50)), (2, 4, Dual(100))]))
 }
 

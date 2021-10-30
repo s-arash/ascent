@@ -13,14 +13,14 @@ fn test_macro() {
       relation foo(i32, i32);
       relation bar(i32, i32);
 
-      bar(x, x+1) <-- for x in 0..10;
+      // bar(x, x+1) <-- for x in 0..10;
       foo(*x, *y) <-- bar(x, y);
 
-      lattice foo_as_set(Set<(i32, i32)>);
-      foo_as_set(Set::singleton((*x, *y))) <-- foo(x, y);
+      // lattice foo_as_set(Set<(i32, i32)>);
+      // foo_as_set(Set::singleton((*x, *y))) <-- foo(x, y);
 
    };
-   write_infer_run_to_scratchpad(inp);
+   write_to_scratchpad(inp);
 }
 #[test]
 fn test_macro1() {
@@ -35,6 +35,7 @@ fn test_macro1() {
       bar(3, 6);
       bar(5, 10);
 
+      foo(*x, y * z) <-- baz(x, y, z);
       baz(*x, *y, *z) <-- foo(x, y), bar(x + y , z);
    };
 
