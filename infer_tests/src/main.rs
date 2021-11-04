@@ -3,7 +3,7 @@
 #![allow(unused_imports)]
 
 mod tests;
-mod utils;
+pub mod utils;
 mod se;
 mod exps;
 
@@ -18,7 +18,9 @@ infer!{
    relation path(i32, i32);
 
    path(*x, *y) <-- edge(x,y);
-   path(*x, *z) <-- edge(x,y), path(y, z);
+   // path(*x, *z) <-- edge(x,y), path(y, z);
+   //path(*x, *z) <-- path(y, z), edge(x, y);
+   path(*x, *z) <-- path(x, y), path(y, z);
 }
 
 fn main(){

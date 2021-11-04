@@ -73,7 +73,9 @@ pub enum BodyItemNode {
    #[peek(Ident, name = "BodyClauseNode")]
    Clause(BodyClauseNode),
    #[peek(syn::token::Paren, name = "Dsjunction node")]
-   Disjunction(DisjunctionNode)
+   Disjunction(DisjunctionNode),
+   #[peek(Token![if], name = "Dsjunction node")]
+   Cond(CondClause)
 }
 
 #[derive(Clone)]
@@ -322,6 +324,7 @@ fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
       match bitem {
          BodyItemNode::Generator(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Clause(_) => vec![vec![bitem.clone()]],
+         &BodyItemNode::Cond(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Disjunction(d) => {
             let mut res = vec![];
             for disjunt in d.disjuncts.iter() {
@@ -430,6 +433,12 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
                grounded_vars.entry(ident).or_insert(i);
             }
          },
+         BodyItemNode::Cond(CondClause::IfLet(if_let_cl)) => {
+            for ident in pattern_get_vars(&if_let_cl.pattern) {
+               grounded_vars.entry(ident).or_insert(i);
+            }
+         }
+         BodyItemNode::Cond(CondClause::If(_)) => (),
          _ => panic!("unrecognized BodyItemNode variant")
       }
    }

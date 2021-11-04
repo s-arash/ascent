@@ -10,17 +10,14 @@ use crate::{infer_impl};
 #[test]
 fn test_macro() {
    let inp = quote!{
-      relation foo(i32, i32);
-      relation bar(i32, i32);
-
-      bar(x, x+1) <-- for x in 0..10;
-      foo(*x, *y) <-- bar(x, y), bar(y, x);
-      bar(*x, x * 10) <-- foo(x, x);
-      foo(1, 2);
-
-      // lattice foo_as_set(Set<(i32, i32)>);
-      // foo_as_set(Set::singleton((*x, *y))) <-- foo(x, y);
-
+      struct TC;
+      relation edge(i32, i32);
+      relation path(i32, i32);
+   
+      path(*x, *y) <-- edge(x,y);
+      // path(*x, *z) <-- edge(x,y), path(y, z);
+      //path(*x, *z) <-- path(y, z), edge(x, y);
+      path(*x, *z) <-- path(x, y), path(y, z);
    };
    write_infer_run_to_scratchpad(inp);
 }
@@ -30,48 +27,27 @@ fn test_macro1() {
       relation foo(i32, i32);
       relation bar(i32, i32);
       relation baz(i32, i32, i32);
-      foo(1, 2);
-      foo(2, 3);
-      foo(3, 5);
 
-      bar(3, 6);
-      bar(5, 10);
+      baz(*x, *y, *z) <-- foo(x, y), bar(y, z);
 
-      foo(*x, y * z) <-- baz(x, y, z);
-      baz(*x, *y, *z) <-- foo(x, y), bar(x + y , z);
+      foo(x+1, 2), bar(y+1, 3) <-- baz(x, y, z);
    };
 
    write_to_scratchpad(inp);
 }
 
-fn write_to_scratchpad_base(tokens: TokenStream, is_infer_run: bool) -> TokenStream {
-   let code = infer_impl(tokens, is_infer_run);
-   let code = code.expect("code is not ok!");
-   let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
-   let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
-   std::fs::write("src/scratchpad.rs", code_in_template).unwrap();
-   std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
-   code
-}
-
-fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, false)
-}
-
-fn write_infer_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, true)
-}
-
 #[test]
-fn test_macro_tc() {
+fn test_macro2() {
    let input = quote! {
-       relation edge(i32, i32);
-       relation path(i32, i32);
+      struct Fac;
+      relation fac(u64, u64);
+      relation do_fac(u64);
 
-       path(*x, *y) <-- edge(x,y);
-       path(*x, *z) <-- edge(x,y), path(y, z);
-      //  path(*x, *z) <-- path(x,y), edge(y, z);
+      fac(0, 1) <-- do_fac(0);
+      do_fac(x - 1) <-- do_fac(x), if *x > 0;
+      fac(*x, x * sub1fac) <-- do_fac(x) if *x > 0, fac(x - 1, sub1fac);
 
+      do_fac(10);
    };
 
    write_to_scratchpad(input);
@@ -208,4 +184,22 @@ fn exp_items_in_fn(){
       };
    }
    println!("point is {:?}, with size {}", p, p.size());
+}
+
+fn write_to_scratchpad_base(tokens: TokenStream, is_infer_run: bool) -> TokenStream {
+   let code = infer_impl(tokens, is_infer_run);
+   let code = code.expect("code is not ok!");
+   let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
+   let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
+   std::fs::write("src/scratchpad.rs", code_in_template).unwrap();
+   std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
+   code
+}
+
+fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, false)
+}
+
+fn write_infer_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, true)
 }

@@ -65,7 +65,7 @@ fn test_dl_lambda(){
 
       eval(exp.clone(), exp.clone()) <-- do_eval(?exp @Ref(_));
 
-      eval(exp.clone(), exp.clone()) <-- do_eval(exp) if let Lam(_,_) = exp;
+      eval(exp.clone(), exp.clone()) <-- do_eval(exp), if let Lam(_,_) = exp;
 
       do_eval(ef.as_ref().clone()) <-- do_eval(?App(ef,_ea));
 
@@ -342,7 +342,7 @@ fn test_dl_repeated_vars(){
 
 
 #[test]
-fn test_dl_lattice(){
+fn test_dl_lattice1(){
    infer!{
       lattice shortest_path(i32, i32, Dual<u32>);
       relation edge(i32, i32, u32);
@@ -350,12 +350,12 @@ fn test_dl_lattice(){
       shortest_path(*x, *y, Dual(*w)) <-- edge(x, y, w);
       shortest_path(*x, *z, Dual(w + l.0)) <-- edge(x, y, w), shortest_path(y, z, l);
 
-      edge(1, 2, x + 30) <-- for x in 0..100;
-      edge(2, 3, x + 50) <-- for x in 0..100;
-      edge(1, 3, x + 40) <-- for x in 0..100;
+      edge(1, 2, x + 30)  <-- for x in 0..100;
+      edge(2, 3, x + 50)  <-- for x in 0..100;
+      edge(1, 3, x + 40)  <-- for x in 0..100;
       edge(2, 4, x + 100) <-- for x in 0..100;
       edge(1, 4, x + 200) <-- for x in 0..100;
-   };
+   }
    let mut prog = InferProgram::default();
    prog.run();
    println!("shortest_path ({} tuples):", prog.shortest_path.len());
@@ -438,6 +438,36 @@ fn test_infer_run_tc(){
 }
 
 #[test]
+fn test_infer_run_tc_generic(){
+   fn compute_tc<TNode: Clone + Hash + Eq>(r: &[(TNode, TNode)]) -> Vec<(TNode,TNode)> {
+      infer_run!{
+         struct TC<TNode: Clone + Hash + Eq>;
+         relation tc(TNode, TNode);
+         tc(x.clone(), y.clone()) <-- for (x, y) in r.iter();
+         tc(x.clone(), z.clone()) <-- for (x, y) in r.iter(), tc(y, z);
+      }.tc
+   }
+   assert!(rels_equal([(1,2), (2, 3), (1, 3)], compute_tc(&[(1,2), (2,3)])));
+}
+
+#[test]
+fn test_infer_tc_generic(){
+   infer!{
+      struct TC<TNode: Clone + Hash + Eq>;
+      relation tc(TNode, TNode);
+      relation r(TNode, TNode);
+      tc(x.clone(), y.clone()) <-- r(x,y);
+      tc(x.clone(), z.clone()) <-- r(x, y), tc(y, z);
+   }
+   let mut prog = TC::default();
+   prog.r = vec![(1,2), (2,3)];
+   prog.update_indices();
+   prog.run();
+   assert!(rels_equal([(1,2), (2, 3), (1, 3)], prog.tc));
+}
+
+
+#[test]
 fn test_infer_negation_through_lattices(){
    use infer::lattice::set::Set;
    let res = infer_run!{
@@ -455,7 +485,7 @@ fn test_infer_negation_through_lattices(){
       baz(1, 3);
 
       relation res(i32, i32);
-      res(*x, *y) <-- baz(x, y), foo_as_set(all_foos) if !all_foos.contains(&(*x, *y));
+      res(*x, *y) <-- baz(x, y), foo_as_set(all_foos), if !all_foos.contains(&(*x, *y));
    };
    println!("res: {:?}", res.res);
    assert!(rels_equal([(1,3)], res.res));
@@ -510,7 +540,7 @@ fn test_infer_fac(){
       relation do_fac(u64);
 
       fac(0, 1) <-- do_fac(0);
-      do_fac(x - 1) <-- do_fac(x) if *x > 0;
+      do_fac(x - 1) <-- do_fac(x), if *x > 0;
       fac(*x, x * sub1fac) <-- do_fac(x) if *x > 0, fac(x - 1, sub1fac);
 
       do_fac(10);
@@ -519,6 +549,9 @@ fn test_infer_fac(){
    prog.run();
    println!("fac: {:?}", prog.fac);
    println!("{}", Fac::summary());
+   println!("{}", prog.relation_sizes_summary());
+   println!("{}", prog.scc_times_summary());
+
    assert!(prog.fac.contains(&(5, 120)));
 }
 
@@ -537,4 +570,30 @@ fn test_consuming_infer_run_tc(){
    let res = compute_tc([(1,2), (2,3)].into_iter());
    println!("res: {:?}", res);
    assert!(rels_equal([(1,2), (2, 3), (1, 3)], compute_tc([(1,2), (2,3)].into_iter())));
+}
+
+#[test]
+fn test_infer_simple_join(){
+   let res = infer_run!{
+      relation bar(i32, i32);
+      relation foo(i32, i32);
+      relation baz(i32, i32);
+
+      bar(2, 3);
+      foo(1, 2);
+      bar(2, 1);
+
+      baz(*x, *z) <-- foo(x, y), bar(y, z), if x != z;
+      foo(*x, *y), bar(*x, *y) <-- baz(x, y);
+   };
+   println!("baz: {:?}", res.baz);
+   assert!(rels_equal([(1, 3)], res.baz));
+}
+
+#[test]
+fn exp_vec_capacity(){
+   let mut vec = Vec::<usize>::default();
+   println!("new vec capacity: {}", vec.capacity());
+   vec.push(42);
+   println!("after 1 insertion capacity: {}", vec.capacity());
 }

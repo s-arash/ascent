@@ -19,6 +19,7 @@ pub(crate) struct InferIr {
 pub(crate) struct IrRule {
    pub head_clauses: Vec<IrHeadClause>,
    pub body_items: Vec<IrBodyItem>,
+   pub is_simple_join: bool,
 }
 
 #[derive(Clone)]
@@ -31,9 +32,11 @@ pub(crate) struct IrHeadClause{
 
 pub(crate) enum IrBodyItem {
    Clause(IrBodyClause),
-   Generator(GeneratorNode)
+   Generator(GeneratorNode),
+   Cond(CondClause)
 }
 
+#[derive(Clone)]
 pub(crate) struct IrBodyClause {
    pub rel : IrRelation,
    pub args : Vec<Expr>,
@@ -52,7 +55,6 @@ impl IrBodyClause {
 pub(crate) struct IrRelation {
    pub relation: RelationIdentity,
    pub indices: Vec<usize>,
-   pub ir_name: Ident,
 }
 
 impl IrRelation {
@@ -60,10 +62,13 @@ impl IrRelation {
       let index_types : Vec<_> = self.indices.iter().map(|&i| self.relation.field_types[i].clone()).collect();
       tuple_type(&index_types)
    }
+   pub fn ir_name(&self) -> Ident {
+      ir_name_for_rel_indices(&self.relation.name, &self.indices)
+   }
 }
 
 pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<InferIr>{
-   let ir_rules : Vec<IrRule> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
+   let ir_rules : Vec<(IrRule, Vec<IrRelation>)> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
    let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
    let mut relations_full_indices = HashMap::new();
    let mut lattices_full_indices = HashMap::new();
@@ -76,7 +81,6 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<I
          let lat_full_index = IrRelation{
             relation: rel_identity.clone(),
             indices: indices,
-            ir_name: ir_name,
          };
          relations_ir_relations.entry(rel_identity.clone()).or_default().insert(lat_full_index.clone());
          lattices_full_indices.insert(rel_identity.clone(), lat_full_index);
@@ -87,22 +91,24 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<I
       let rel_full_index = IrRelation{
          relation: rel_identity.clone(),
          indices: full_indices,
-         ir_name: ir_name
       };
       relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_full_index.clone());
       relations_full_indices.insert(rel_identity, rel_full_index);
    }
-   for ir_rule in ir_rules.iter(){
+   for (ir_rule, extra_relations) in ir_rules.iter(){
       for bcl in ir_rule.body_items.iter(){
          if let IrBodyItem::Clause(ref bcl) = bcl {
             let relation = &bcl.rel.relation;
             relations_ir_relations.entry(relation.clone()).or_default().insert(bcl.rel.clone());
          }
       }
+      for extra_rel in extra_relations.iter(){
+         relations_ir_relations.entry(extra_rel.relation.clone()).or_default().insert(extra_rel.clone());
+      }
    }
    let declaration = prog.declaration.clone().unwrap_or(parse2(quote! {pub struct InferProgram;}).unwrap());
    Ok(InferIr{
-      rules: ir_rules,
+      rules: ir_rules.into_iter().map(|(rule, extra_rels)| rule).collect_vec(),
       relations_ir_relations,
       relations_full_indices,
       lattices_full_indices,
@@ -110,12 +116,19 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<I
    })
 }
 
-fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<IrRule> {
+fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<(IrRule, Vec<IrRelation>)> {
    let mut body_items = vec![];
    let mut grounded_vars = vec![];
-   for bitem in rule.body_items.iter() {
+   let mut all_args_vars = true;
+   let mut all_items_simple_clauses = true;
+   for (bitem_ind, bitem) in rule.body_items.iter().enumerate() {
       match bitem {
          BodyItemNode::Clause(ref bcl) => {
+            if (bcl.cond_clauses.len() > 0 && bitem_ind > 0) || 
+               bitem_ind > 1 
+            {
+               all_items_simple_clauses = false;
+            }
             let mut indices = vec![];
             for (i,arg) in bcl.args.iter().enumerate() {
                if let Some(var) = expr_to_ident(arg.unwrap_expr_ref()) {
@@ -125,28 +138,30 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
                      grounded_vars.push(var);
                   }
                } else {
+                  all_args_vars = false;
                   indices.push(i);
                }
             }
             let ir_name = ir_name_for_rel_indices(&bcl.rel, &indices);
             let relation = prog.relations.iter().filter(|r| r.name.to_string() == bcl.rel.to_string()).next();
-
+            
             let relation = match relation {
                 Some(rel) => rel,
                 None => return Err(Error::new(bcl.rel.span(), format!("relation {} not defined", bcl.rel))),
             };
+            if relation.is_lattice {
+               all_items_simple_clauses = false;
+            }
 
             for cond_clause in bcl.cond_clauses.iter() {
                if let CondClause::IfLet(if_let_cl) = &cond_clause {
-                  let pat_vars = pattern_get_vars(&if_let_cl.pattern);
-                  grounded_vars.extend(pat_vars);
+                  grounded_vars.extend(pattern_get_vars(&if_let_cl.pattern));
                }
             }
             
             let ir_rel = IrRelation{
                relation: relation.into(),
                indices,
-               ir_name
             };
             let ir_bcl = IrBodyClause {
                rel: ir_rel,
@@ -158,10 +173,18 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
             body_items.push(IrBodyItem::Clause(ir_bcl));
          },
          BodyItemNode::Generator(ref gen) => {
-            for ident in pattern_get_vars(&gen.pattern) {
-               grounded_vars.push(ident);
-            }
+            all_items_simple_clauses = false;
+            grounded_vars.extend(pattern_get_vars(&gen.pattern));
             body_items.push(IrBodyItem::Generator(gen.clone()));
+         },
+         &BodyItemNode::Cond(ref cl) => {
+            body_items.push(IrBodyItem::Cond(cl.clone()));
+            if bitem_ind <= 1 {
+               all_items_simple_clauses = false;
+            }
+            if let CondClause::IfLet(if_let_cl) = cl {
+               grounded_vars.extend(pattern_get_vars(&if_let_cl.pattern));
+            }
          }
          _ => panic!("unrecognized body item")
       }
@@ -184,13 +207,49 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
       };
       head_clauses.push(head_clause);
    }
-
-   Ok(IrRule {
-      head_clauses: head_clauses, body_items
-   })
+   let is_simple_join = all_args_vars && all_items_simple_clauses && body_items.len() >= 2; 
+   let extra_ir_relations = if is_simple_join {
+      let (bcl1, bcl2) = match (&body_items[0], &body_items[1]) {
+         (IrBodyItem::Clause(bcl1), IrBodyItem::Clause(bcl2)) => (bcl1, bcl2),
+          _ => unreachable!()
+      };  
+      let bcl2_vars = bcl2.args.iter().filter_map(expr_to_ident).collect_vec();
+      let indices = get_indices_given_grounded_variables(&bcl1.args, &bcl2_vars);
+      let new_cl1_ir_relation = IrRelation{
+         // ir_name: ir_name_for_rel_indices(&bcl1.rel.relation.name, &indices),
+         indices,
+         relation: bcl1.rel.relation.clone(),
+      };
+      let new_cl2_ir_relation = IrRelation {
+         // ir_name: ir_name_for_rel_indices(&bcl2.rel.relation.name, &[]),
+         indices: vec![],
+         relation: bcl2.rel.relation.clone(),
+      };
+      vec![new_cl1_ir_relation, new_cl2_ir_relation]
+   } else {vec![]};
+   Ok((IrRule {
+      is_simple_join,
+      head_clauses, 
+      body_items, 
+   }, extra_ir_relations))
 }
 
-fn ir_name_for_rel_indices(rel: &Ident, indices: &[usize]) -> Ident {
+pub fn ir_name_for_rel_indices(rel: &Ident, indices: &[usize]) -> Ident {
    let name = format!("{}_indices_{}", rel, indices.iter().join("_"));
    Ident::new(&name, rel.span())
+}
+
+/// for a clause with args, returns the indices assuming vars are grounded.
+pub fn get_indices_given_grounded_variables(args: &[Expr], vars: &[Ident]) -> Vec<usize>{
+   let mut res = vec![];
+   for (i, arg) in args.iter().enumerate(){
+      if let Some(arg_var) = expr_to_ident(arg){
+         if vars.contains(&arg_var) {
+            res.push(i);
+         }
+      } else {
+         res.push(i);
+      }  
+   }
+   res
 }
