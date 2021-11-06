@@ -80,7 +80,10 @@ fn test_dl_lambda(){
    };
 
    let mut prog = InferProgram::default();
+   // println!("{}", InferProgram::summary());
    prog.run();   
+   // println!("input:{:?}\n", prog.input);
+   // println!("eval: {}\n", prog.eval.iter().map(|(e,v)| format!("{:?} ===> {:?}", e, v)).join("\n"));
    println!("output: {:?}", prog.output);
    assert!(prog.output.contains(&(I(),)));
    assert!(prog.output.len() == 1);
@@ -584,6 +587,25 @@ fn test_infer_simple_join(){
       bar(2, 1);
 
       baz(*x, *z) <-- foo(x, y), bar(y, z), if x != z;
+      foo(*x, *y), bar(*x, *y) <-- baz(x, y);
+   };
+   println!("baz: {:?}", res.baz);
+   assert!(rels_equal([(1, 3)], res.baz));
+}
+
+#[test]
+fn test_infer_simple_join2(){
+   let res = infer_run!{
+      relation bar(i32, i32);
+      relation foo(i32, i32);
+      relation baz(i32, i32);
+
+      foo(1, 2);
+      foo(10, 2);
+      bar(2, 3);
+      bar(2, 1);
+
+      baz(*x, *z) <-- foo(x, y) if *x != 10, bar(y, z), if x != z;
       foo(*x, *y), bar(*x, *y) <-- baz(x, y);
    };
    println!("baz: {:?}", res.baz);

@@ -1,5 +1,5 @@
 #![cfg(test)]
-use std::clone;
+use std::{clone, cmp::max, rc::Rc};
 
 use petgraph::dot::{Config, Dot};
 use proc_macro2::TokenStream;
@@ -10,6 +10,7 @@ use crate::{infer_impl};
 #[test]
 fn test_macro() {
    let inp = quote!{
+      //#![include_rule_times]
       struct TC;
       relation edge(i32, i32);
       relation path(i32, i32);
@@ -24,13 +25,13 @@ fn test_macro() {
 #[test]
 fn test_macro1() {
    let inp = quote!{
-      relation foo(i32, i32);
-      relation bar(i32, i32);
-      relation baz(i32, i32, i32);
+      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash;
+      relation edge(TNode, TNode);
+      relation path(TNode, TNode);
 
-      baz(*x, *y, *z) <-- foo(x, y), bar(y, z);
-
-      foo(x+1, 2), bar(y+1, 3) <-- baz(x, y, z);
+      path(x.clone(), y.clone()) <-- edge(x,y), path(x, y);
+      path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
+      path(x.clone(), z.clone()) <-- path(x,y), path(y, z);
    };
 
    write_to_scratchpad(inp);
@@ -39,15 +40,28 @@ fn test_macro1() {
 #[test]
 fn test_macro2() {
    let input = quote! {
-      struct Fac;
-      relation fac(u64, u64);
-      relation do_fac(u64);
+      relation foo(i32);
+      relation bar(i32, i32);
+      relation res(i32);
+      relation bar_refl(i32);
+      relation bar3(i32, i32, i32);
+      relation bar3_res(i32);
 
-      fac(0, 1) <-- do_fac(0);
-      do_fac(x - 1) <-- do_fac(x), if *x > 0;
-      fac(*x, x * sub1fac) <-- do_fac(x) if *x > 0, fac(x - 1, sub1fac);
+      foo(3);
+      bar(2, 1);
+      bar(1, 1);
+      bar(3, 3);
 
-      do_fac(10);
+      bar_refl(*x) <-- bar(x, x);
+
+      res(*x) <-- foo(x), bar(x, x);
+
+      bar3(10,10,11);
+      bar3(1,1,1);
+      bar3(1,2,3);
+      bar3(2,1,3);
+
+      bar3_res(*x) <-- bar3(x, x, *x + 1);
    };
 
    write_to_scratchpad(input);
@@ -202,4 +216,35 @@ fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
 
 fn write_infer_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
    write_to_scratchpad_base(tokens, true)
+}
+
+
+#[test]
+fn test_macro_lambda_calc(){
+   let inp = quote!{
+      relation output(LambdaCalcExpr);
+      relation input(LambdaCalcExpr);
+      relation do_eval(LambdaCalcExpr);
+      relation eval(LambdaCalcExpr, LambdaCalcExpr);
+
+      input(app(U(), I()));
+      do_eval(exp.clone()) <-- input(exp);
+      output(res.clone()) <-- input(exp), eval(exp, res);
+
+      eval(exp.clone(), exp.clone()) <-- do_eval(?exp @Ref(_));
+
+      eval(exp.clone(), exp.clone()) <-- do_eval(exp), if let Lam(_,_) = exp;
+
+      do_eval(ef.as_ref().clone()) <-- do_eval(?App(ef,_ea));
+
+      do_eval(sub(fb, fx, ea)) <-- 
+         do_eval(?App(ef, ea)), 
+         eval(ef.deref(), ?Lam(fx, fb));
+      
+      eval(exp.clone(), final_res.clone()) <-- 
+         do_eval(?exp @ App(ef, ea)), // this requires nightly
+         eval(ef.deref(), ?Lam(fx, fb)),
+         eval(sub(fb, fx, ea), final_res);
+   };
+   write_to_scratchpad(inp);
 }

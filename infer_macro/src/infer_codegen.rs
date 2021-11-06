@@ -4,9 +4,8 @@ use itertools::{Iterate, Itertools};
 use proc_macro2::{Ident, Span};
 use syn::{Expr, Type, parse2, spanned::Spanned};
 
-use crate::{infer_mir::{InferMir, MirBodyItem, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name, mir_summary}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_spanned, tuple_type}};
+use crate::{infer_hir::IrRelation, infer_mir::{InferMir, MirBodyItem, MirRelation, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name, mir_rule_summary, mir_summary}, infer_syntax::CondClause, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_spanned, tuple_type}};
 use crate::infer_mir::MirRelationVersion::*;
-
 pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::TokenStream {
    
    let mut relation_fields = vec![];
@@ -23,7 +22,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
          let name = &ind.ir_name();
          let index_type: Vec<Type> = ind.indices.iter().map(|&i| rel.field_types[i].clone()).collect();
          let index_type = tuple_type(&index_type);
-         let rel_index_type = rel_index_type(&index_type, ind.relation.is_lattice);
+         let rel_index_type = rel_index_type(ind);
          relation_fields.push(quote!{
             #[allow(non_snake_case)]
             pub #name: #rel_index_type,
@@ -35,6 +34,8 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
    let sccs_ordered = &mir.sccs;
    let mut scc_time_fields = vec![];
    let mut scc_time_field_defaults = vec![];
+   let mut rule_time_fields = vec![];
+   let mut rule_time_fields_defaults = vec![];
    for i in 0..mir.sccs.len(){
       let name = scc_time_field_name(i);
       scc_time_fields.push(quote!{
@@ -43,12 +44,22 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
       scc_time_field_defaults.push(quote!{
          #name: std::time::Duration::ZERO,
       });
+      for (rule_ind, rule) in mir.sccs[i].rules.iter().enumerate() {
+         let name = rule_time_field_name(i, rule_ind);
+         rule_time_fields.push(quote!{
+            pub #name: std::time::Duration,
+         });
+         rule_time_fields_defaults.push(quote!{
+            #name: std::time::Duration::ZERO,
+         });
+      }
    }
+
    
    let mut sccs_compiled = vec![];
    for (i, scc) in sccs_ordered.iter().enumerate() {
       let msg = format!("scc {}", i);
-      let scc_compiled = compile_mir_scc(scc, mir);
+      let scc_compiled = compile_mir_scc(mir, i);
       let scc_time_field_name = scc_time_field_name(i);
       sccs_compiled.push(quote!{
          comment(#msg);
@@ -119,12 +130,15 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
    } else { quote! {
       pub fn summary() -> &'static str {#summary}
    }};
+   let rule_time_fields = if mir.config.include_rule_times {rule_time_fields} else {vec![]};
+   let rule_time_fields_defaults = if mir.config.include_rule_times {rule_time_fields_defaults} else {vec![]};
    let res = quote! {
       use std::collections::{HashMap, HashSet};
       fn comment(_: &str){}
       #vis struct #struct_name #generics {
          #(#relation_fields)*
          #(#scc_time_fields)*
+         #(#rule_time_fields)*
       }
       impl #impl_generics #struct_name #ty_generics #where_clause {
          #run_func
@@ -149,6 +163,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
             #struct_name {
                #(#field_defaults)*
                #(#scc_time_field_defaults)*
+               #(#rule_time_fields_defaults)*
             }
          }
       }
@@ -169,8 +184,11 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
    }
 }
 
-fn rel_index_type(key_type: &Type, is_lattice: bool) -> Type {
-   let ty = if is_lattice {quote! {
+fn rel_index_type(rel: &IrRelation) -> Type {
+   let key_type = rel.key_type();
+   let ty = if rel.is_full_index() {quote!{
+      infer::internal::RelFullIndexType<#key_type>
+   }} else if rel.relation.is_lattice {quote! {
       infer::internal::LatticeIndexType<#key_type>
    }} else { quote! {
       infer::internal::RelIndexType<#key_type>
@@ -181,9 +199,13 @@ fn rel_index_type(key_type: &Type, is_lattice: bool) -> Type {
 fn scc_time_field_name(i: usize) -> Ident {
    Ident::new(&format!("scc{}_duration", i), Span::call_site())
 }
+fn rule_time_field_name(scc_ind: usize, rule_ind: usize) ->Ident {
+   Ident::new(&format!("rule{}_{}_duration", scc_ind, rule_ind), Span::call_site())
+}
 
-fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
+fn compile_mir_scc(mir: &InferMir, scc_ind: usize) -> proc_macro2::TokenStream {
 
+   let scc = &mir.sccs[scc_ind];
    let mut move_total_to_delta = vec![];
    let mut shift_delta_to_total_new_to_delta = vec![];
    let mut move_total_to_field = vec![];
@@ -194,7 +216,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
       let total_var_name = ir_relation_version_var_name(&ir_name, MirRelationVersion::Total);
       let new_var_name = ir_relation_version_var_name(&ir_name, MirRelationVersion::New);
       let total_field = &rel.ir_name();
-      let ty = rel_index_type(&rel.key_type(), rel.relation.is_lattice);
+      let ty = rel_index_type(&rel);
       move_total_to_delta.push(quote! {
          #[allow(non_snake_case)]
          let #delta_var_name : &mut #ty = &mut _self.#total_field;
@@ -216,7 +238,7 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
    }
    for rel in scc.body_only_relations.iter().flat_map(|(rel, indices)| indices.iter()) {
       let total_var_name = ir_relation_version_var_name(&rel.ir_name(), MirRelationVersion::Total);
-      let ty = rel_index_type(&rel.key_type(), rel.relation.is_lattice);
+      let ty = rel_index_type(&rel);
       let total_field = &rel.ir_name();
 
       move_total_to_delta.push(quote! {
@@ -233,14 +255,23 @@ fn compile_mir_scc(scc: &MirScc, mir: &InferMir) -> proc_macro2::TokenStream {
          MirBodyItem::Cond(_cl) => format!("if_")
       }
    }
-   for rule in scc.rules.iter() {
-      let msg = format!("{} <-- {}",
+   for (i, rule) in scc.rules.iter().enumerate() {
+      let msg = format!("{} <-- {}{}",
                              rule.head_clause.iter().map(|hcl| hcl.rel.name.to_string()).join(", "),
-                             rule.body_items.iter().map(bitem_to_str).join(", "));
+                             rule.body_items.iter().map(bitem_to_str).join(", "),
+                             if rule.reorderable {" REORD"} else {""});
+      let rule_compiled = compile_mir_rule(rule, scc, mir, 0);
+      let rule_time_field = rule_time_field_name(scc_ind, i);
+      let (before_rule_var, update_rule_time_field) = if mir.config.include_rule_times {
+         (quote! {let before_rule = ::std::time::Instant::now();}, 
+          quote!{_self.#rule_time_field += before_rule.elapsed();})
+      } else {(quote!{}, quote!{})};
       evaluate_rules.push(quote! {
+         #before_rule_var
          comment(#msg);
+         #rule_compiled
+         #update_rule_time_field
       });
-      evaluate_rules.push(compile_mir_rule(rule, scc, mir, 0));
    }
 
    let evaluate_rules_loop = if scc.is_looping { quote! {
@@ -302,6 +333,27 @@ fn compile_scc_times_summary_body(mir: &InferMir) -> proc_macro2::TokenStream {
       res.push(quote!{
          writeln!(&mut res, "scc {} time: {:?}", #i_str, self.#scc_time_field_name).unwrap();
       });
+      if mir.config.include_rule_times {
+         let mut sum_of_rule_times = quote!{ std::time::Duration::ZERO };
+         for (rule_ind, rule) in mir.sccs[i].rules.iter().enumerate() {
+            let rule_time_field = rule_time_field_name(i, rule_ind);
+            sum_of_rule_times = quote!{ #sum_of_rule_times + self.#rule_time_field};
+         }
+         res.push(quote! {
+            let sum_of_rule_times = #sum_of_rule_times;
+            writeln!(&mut res, "  some of rule times: {:?}", sum_of_rule_times).unwrap();
+         });
+         for (rule_ind, rule) in mir.sccs[i].rules.iter().enumerate() {
+            let rule_time_field = rule_time_field_name(i, rule_ind);
+            let rule_summary = mir_rule_summary(rule);
+            res.push(quote!{
+               writeln!(&mut res, "  rule {}\n    time: {:?}", #rule_summary, self.#rule_time_field).unwrap();
+            });
+         }
+         res.push(quote!{
+            writeln!(&mut res, "-----------------------------------------").unwrap();
+         });
+      }
    }
    quote!{
       use std::fmt::Write;
@@ -365,14 +417,62 @@ fn compile_cond_clause(cond: &CondClause, body: proc_macro2::TokenStream) -> pro
 
 fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: usize) -> proc_macro2::TokenStream {
 
+   if clause_ind == 0 && rule.reorderable {
+      let mut rule_cp1 = rule.clone();
+      let mut rule_cp2 = rule.clone();
+      rule_cp1.reorderable = false;
+      rule_cp2.reorderable = false;
+      rule_cp2.body_items.swap(0, 1);
+      let rule_cp1_compiled = compile_mir_rule(&rule_cp1, scc, mir, 0);
+      let rule_cp2_compiled = compile_mir_rule(&rule_cp2, scc, mir, 0);
+
+      if let (MirBodyItem::Clause(bcl1), MirBodyItem::Clause(bcl2)) = (&rule.body_items[0], &rule.body_items[1]){
+         // let rel1_full_index = &mir.relations_full_indices[&bcl1.rel.relation];
+         let rel1_var_name = bcl1.rel.var_name();
+         
+         // let rel2_full_index = &mir.relations_full_indices[&bcl2.rel.relation];
+         let rel2_var_name = bcl2.rel.var_name();
+
+         
+         // TODO testting:
+         // return if bcl1.rel.version == Total && bcl2.rel.version == Delta {
+         //    rule_cp2_compiled
+         // } else {
+         //    rule_cp1_compiled
+         // };
+
+         return if (&bcl1.rel.relation, bcl1.rel.version) == (&bcl2.rel.relation, bcl2.rel.version) {
+            rule_cp1_compiled
+         } else {
+            quote_spanned!{bcl1.rel_args_span=>
+               if #rel1_var_name.len() <= #rel2_var_name.len() {
+                  #rule_cp1_compiled
+               } else {
+                  #rule_cp2_compiled
+               }
+            }
+         };
+      } else {
+         panic!("unexpected body items in reorderable rule")
+      }
+   }
    if clause_ind < rule.body_items.len(){
       let bitem = &rule.body_items[clause_ind];
-      let next_loop = compile_mir_rule(rule, scc, mir, clause_ind + 1);
+      let doing_simple_join = rule.has_simple_join && clause_ind == 0;
+      let next_loop = if doing_simple_join {
+         compile_mir_rule(rule, scc, mir, clause_ind + 2)
+      } else {
+         compile_mir_rule(rule, scc, mir, clause_ind + 1)
+      };
 
       match bitem {
          MirBodyItem::Clause(bclause) => {
-            let bclause_rel_name = &bclause.rel.relation.name;
-            let selected_args = &bclause.selected_args();
+            if doing_simple_join {
+               // println!("doing simple join for {}", mir_rule_summary(rule));
+            }
+            let (clause_ind, bclause) = 
+               if doing_simple_join {(1, rule.body_items[1].unwrap_clause())} 
+               else {(clause_ind, bclause)};
 
             fn bitem_vars(bitem : &MirBodyItem) -> Vec<Ident> {
                match bitem {
@@ -382,13 +482,14 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                   MirBodyItem::Cond(CondClause::If(_)) => vec![]
                }
             }
+
+            let bclause_rel_name = &bclause.rel.relation.name;
+            let selected_args = &bclause.selected_args();
             let pre_clause_vars = rule.body_items.iter().take(clause_ind)
                                        .flat_map(bitem_vars)
                                        .collect::<Vec<_>>();
 
-            let clause_vars = bclause.args.iter().enumerate()
-                                 .filter_map(|(i,v)| expr_to_ident(v).map(|v| (i, v)))
-                                 .collect::<Vec<_>>();
+            let clause_vars = bclause.vars();
             let common_vars = clause_vars.iter().filter(|(_i,v)| pre_clause_vars.contains(v)).collect::<Vec<_>>();
             let common_vars_no_indices = common_vars.iter().map(|(_i,v)| v.clone()).collect::<Vec<_>>();
 
@@ -408,16 +509,110 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                conds_then_next_loop = compile_cond_clause(cond, conds_then_next_loop);
             }
 
-            quote_spanned! {bclause.rel_args_span=>
-               if let Some(matching) = #rel_version_var_name.get( &#selected_args_tuple) {
-                  for &ind in matching.iter() {
+            // we need to clone if the relation appears in the head of the rule and we are not the last clause.
+            // let cloning_needed = rule.body_items[(clause_ind + 1)..].iter().any(|bi| !matches!(bi, MirBodyItem::Cond(_))) &&
+            //                      rule.head_clause.iter().any(|hcl| &hcl.rel.name == bclause_rel_name);
+
+            fn maybe_clone(cloning_needed: bool, span: Span) -> proc_macro2::TokenStream {
+               if cloning_needed {quote_spanned! {span=> .clone()}} 
+               else {quote! { }}
+            }
+            let cloning_needed = true;
+            let row_maybe_clone = maybe_clone(cloning_needed, bclause.rel_args_span);
+
+            fn dot_iter_for_rel_index(rel: &MirRelation, var_name: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+               if rel.is_full_index {
+                  quote_spanned! {var_name.span()=> [#var_name]}
+               } else {
+                  quote_spanned!{var_name.span()=> #var_name.iter()}
+               }
+            }
+            let matching_dot_iter = dot_iter_for_rel_index(&bclause.rel, quote_spanned!{bclause.rel_args_span=> matching});
+
+            // TODO cleanup
+            // The special case where the first clause has indices, but there are no expressions
+            // in the args of the first cluase
+            if doing_simple_join {
+               let cl1 = rule.body_items[0].unwrap_clause();
+               let cl2 = bclause;
+               let cl1_var_name = cl1.rel.var_name();
+               let cl2_var_name = cl2.rel.var_name();
+               let cl1_vars = cl1.vars();
+               let mut cl1_vars_assignments = vec![];
+               let mut cl1_join_vars_assignments = vec![];
+               for (tuple_ind, &i) in cl1.rel.indices.iter().enumerate() {
+                  let var = expr_to_ident(&cl1.args[i]).unwrap();
+                  let tuple_ind = syn::Index{index: tuple_ind as u32, span: var.span()};
+                  cl1_join_vars_assignments.push(quote_spanned! {var.span()=> let #var = &cl1_joined_columns.#tuple_ind;});
+               }
+               let cl2_vars = cl2.args.iter().filter_map(expr_to_ident).collect_vec();
+               for (i,var) in cl1_vars.iter(){
+                  let i_ind = syn::Index{index: *i as u32, span: var.span()};
+                  if cl1.rel.indices.contains(i) {continue;}
+                  cl1_vars_assignments.push(quote_spanned! {var.span()=> let #var = &row.#i_ind;});
+               }
+               let joined_args_for_cl2_cloned = cl2.selected_args().iter().map(exp_cloned).collect_vec();
+               let joined_args_tuple_for_cl2 = tuple_spanned(&joined_args_for_cl2_cloned, cl2.args_span);
+               
+               let cl1_rel_name = &cl1.rel.relation.name;
+               let cl2_rel_name = &cl2.rel.relation.name;
+               let cl1_tuple_indices_dot_iter = dot_iter_for_rel_index(&cl1.rel, quote_spanned!(cl1.rel_args_span=> cl1_tuple_indices));
+
+               let cl1_cloning_needed = true;
+               let cl1_row_maybe_clone = maybe_clone(cl1_cloning_needed, cl1.rel_args_span);
+
+               let mut cl1_conds_then_rest = quote! {
+                  for &ind in #matching_dot_iter {
                      // TODO we may be doing excessive cloning
-                     let row = &_self.#bclause_rel_name[ind].clone();
+                     let row = &_self.#cl2_rel_name[ind] #row_maybe_clone;
                      #(#new_vars_assignmnets)*
                      #conds_then_next_loop
                   }
+               };
+               for cond in cl1.cond_clauses.iter().rev() {
+                  cl1_conds_then_rest = compile_cond_clause(cond, cl1_conds_then_rest);
+               }
+               quote_spanned! {cl1.rel_args_span=>
+                  for (cl1_joined_columns, cl1_tuple_indices) in #cl1_var_name.iter() {
+                     #(#cl1_join_vars_assignments)*
+                     if let Some(matching) = #cl2_var_name.get(&#joined_args_tuple_for_cl2) {
+                        for &cl1_ind in #cl1_tuple_indices_dot_iter{
+                           let row = &_self.#cl1_rel_name[cl1_ind] #cl1_row_maybe_clone;
+                           #(#cl1_vars_assignments)*
+                           #cl1_conds_then_rest
+                        }
+                     }
+                  }
+               }
+            } else {  
+               if clause_ind == 0 && !bclause.rel.indices.is_empty() && 
+               bclause.args.iter().filter_map(expr_to_ident).count() == bclause.args.len() {
+               let bclause_rel_no_ind = &mir.relations_no_indices[&bclause.rel.relation];
+               let rel_no_ind_version_var_name = ir_relation_version_var_name(&bclause_rel_no_ind.ir_name(), bclause.rel.version);
+               quote_spanned! {bclause.rel_args_span=>
+                  if let Some(matching) = #rel_no_ind_version_var_name.get(&()) {
+                     for &ind in matching.iter() {
+                        // TODO we may be doing excessive cloning
+                        let row = &_self.#bclause_rel_name[ind] #row_maybe_clone;
+                        #(#new_vars_assignmnets)*
+                        #conds_then_next_loop
+                     }
+                  }
+               }
+            } else {
+               quote_spanned! {bclause.rel_args_span=>
+                  if let Some(matching) = #rel_version_var_name.get( &#selected_args_tuple) {
+                     for &ind in #matching_dot_iter {
+                        // TODO we may be doing excessive cloning
+                        let row = &_self.#bclause_rel_name[ind] #row_maybe_clone;
+                        #(#new_vars_assignmnets)*
+                        #conds_then_next_loop
+                     }
+                  }
                }
             }
+         }
+
          },
          MirBodyItem::Generator(gen) => {
             let pat = &gen.pattern;
@@ -430,7 +625,6 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
          }
         MirBodyItem::Cond(cond) => compile_cond_clause(cond, next_loop),
       }
-      
    } else {
       let mut add_rows = vec![];
 

@@ -1,13 +1,13 @@
 extern crate proc_macro;
 use proc_macro2::Span;
-use syn::{Expr, GenericParam, Generics, Ident, Pat, Result, Token, Type, Visibility, WhereClause, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned, token::{Comma, Gt, Lt}};
+use syn::{Attribute, Expr, GenericParam, Generics, Ident, Pat, Result, Token, Type, Visibility, WhereClause, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned, token::{Comma, Gt, Lt}};
 use std::{collections::{HashMap}, sync::Mutex};
 
 use quote::{ToTokens};
 use itertools::{Itertools};
 use derive_syn_parse::Parse;
 
-use crate::utils::{expr_get_vars, expr_to_ident, pattern_get_vars};
+use crate::utils::{expr_get_vars, expr_to_ident, pat_to_ident, pattern_get_vars};
 
 
 // resources:
@@ -277,15 +277,31 @@ impl Parse for RuleNode {
    }
 }
 
+pub(crate) fn rule_node_summary(rule: &RuleNode) -> String {
+   fn bitem_to_str(bitem: &BodyItemNode) -> String {
+      match bitem {
+         BodyItemNode::Generator(gen) => format!("for_{}", pat_to_ident(&gen.pattern).map(|x| x.to_string()).unwrap_or_default()),
+         BodyItemNode::Clause(bcl) => format!("{}", bcl.rel.to_string()),
+         BodyItemNode::Disjunction(_) => todo!(),
+         BodyItemNode::Cond(cl) => format!("if_"),
+      }
+   }
+   format!("{} <-- {}",
+            rule.head_clauses.iter().map(|hcl| hcl.rel.to_string()).join(", "),
+            rule.body_items.iter().map(bitem_to_str).join(", "))
+}
+
 // #[derive(Clone)]
 pub(crate) struct InferProgram {
    pub rules : Vec<RuleNode>,
    pub relations : Vec<RelationNode>,
    pub declaration: Option<Declaration>,
+   pub attributes: Vec<syn::Attribute>,
 }
 
 impl Parse for InferProgram {
    fn parse(input: ParseStream) -> Result<Self> {
+      let attributes = Attribute::parse_inner(input)?;
       let declaration = if input.peek(Token![pub]) || input.peek(Token![struct]) {
          Some(Declaration::parse(input)?)
       } else {None};
@@ -298,7 +314,7 @@ impl Parse for InferProgram {
             rules.push(RuleNode::parse(input)?);
          }
       }
-      Ok(InferProgram{rules, relations, declaration})
+      Ok(InferProgram{rules, relations, declaration, attributes})
    }
 }
 

@@ -73,11 +73,12 @@ fn bench_lattice(){
 
 fn bench_tc_path_join_path(nodes_count: i32) {
    infer! {
+      #![include_rule_times]
       struct TCPathJoinPath;
       relation edge(i32, i32);
       relation path(i32, i32);
-      path(*x, *y) <-- edge(x,y);
       path(*x, *z) <-- path(x,y), path(y, z);
+      path(*x, *y) <-- edge(x,y);
    }
    let mut tc = TCPathJoinPath::default();
    println!("{}", TCPathJoinPath::summary());
@@ -90,13 +91,14 @@ fn bench_tc_path_join_path(nodes_count: i32) {
    let mut stopwatch = Stopwatch::start_new();
    tc.run();
    stopwatch.stop();
-
+   println!("{}", TCPathJoinPath::summary());
    println!("tc path_join_path for {} nodes took {:?}", nodes_count, stopwatch.elapsed());
+   println!("summary: \n{}", tc.scc_times_summary());
    println!("path size: {}", tc.path.len());
 }
 
 fn main() {
    // bench_tc(1000);
-   // bench_tc_path_join_path(1000);
-   bench_lattice();
+   bench_tc_path_join_path(1000);
+   //bench_lattice();
 }
