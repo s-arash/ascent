@@ -1,5 +1,5 @@
 extern crate proc_macro;
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use syn::{Attribute, Expr, GenericParam, Generics, Ident, Pat, Result, Token, Type, Visibility, WhereClause, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned, token::{Comma, Gt, Lt}};
 use std::{collections::{HashMap}, sync::Mutex};
 
@@ -47,6 +47,7 @@ fn parse_generics_with_where_clause(input: ParseStream) -> Result<Generics> {
 pub struct RelationNode{
    pub name: Ident,
    pub field_types : Punctuated<Type, Token![,]>,
+   pub initialization: Option<Expr>,
    pub semi_colon: Token![;],
    pub is_lattice: bool,
 }
@@ -58,11 +59,16 @@ impl Parse for RelationNode {
       let content;
       parenthesized!(content in input);
       let field_types = content.parse_terminated(Type::parse)?;
+      let initialization = if input.peek(Token![=]) {
+         input.parse::<Token![=]>()?;
+         Some(input.parse::<Expr>()?)
+      } else {None};
+
       let semi_colon = input.parse::<Token![;]>()?;
       if is_lattice && field_types.empty_or_trailing() {
          return Err(input.error(format!("empty lattice is not allowed")));
       }
-      Ok(RelationNode{name, field_types, semi_colon, is_lattice})
+      Ok(RelationNode{name, field_types, semi_colon, is_lattice, initialization})
    }
 }
 
@@ -74,8 +80,11 @@ pub enum BodyItemNode {
    Clause(BodyClauseNode),
    #[peek(syn::token::Paren, name = "Dsjunction node")]
    Disjunction(DisjunctionNode),
-   #[peek(Token![if], name = "Dsjunction node")]
-   Cond(CondClause)
+   #[peek_with(peek_if_or_let, name = "if condition")]
+   Cond(CondClause),
+}
+fn peek_if_or_let(parse_stream: ParseStream) -> bool {
+   parse_stream.peek(Token![if]) || parse_stream.peek(Token![let])
 }
 
 #[derive(Clone)]
@@ -168,22 +177,43 @@ pub struct IfClause {
    pub cond: Expr 
 }
 
+#[derive(Parse, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct LetClause {
+   pub let_keyword: Token![let],
+   pub pattern: syn::Pat,
+   pub eq_symbol : Token![=],
+   pub exp: syn::Expr,
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CondClause {
    IfLet(IfLetClause),
    If(IfClause),
+   Let(LetClause),
 }
 
+impl CondClause {
+   pub fn bound_vars(&self) -> Vec<Ident> {
+      match self {
+        CondClause::IfLet(cl) => pattern_get_vars(&cl.pattern),
+        CondClause::If(_) => vec![],
+        CondClause::Let(cl) => pattern_get_vars(&cl.pattern),
+      }
+   }
+}
 impl Parse for CondClause {
    fn parse(input: ParseStream) -> Result<Self> {
       if input.peek(Token![if]) {
          if input.peek2(Token![let]) {
             let cl: IfLetClause = input.parse()?;
-            return Ok(Self::IfLet(cl));
+            Ok(Self::IfLet(cl))
          } else {
             let cl: IfClause = input.parse()?;
-            return Ok(Self::If(cl));
+            Ok(Self::If(cl))
          }
+      } else if input.peek(Token![let]) {
+         let cl: LetClause = input.parse()?;
+         Ok(Self::Let(cl))
       } else {
          Err(input.error("expected either if clause or if let clause"))
       }
@@ -449,8 +479,9 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
                grounded_vars.entry(ident).or_insert(i);
             }
          },
-         BodyItemNode::Cond(CondClause::IfLet(if_let_cl)) => {
-            for ident in pattern_get_vars(&if_let_cl.pattern) {
+         BodyItemNode::Cond(ref cond_cl @ CondClause::IfLet(_)) |
+         BodyItemNode::Cond(ref cond_cl @ CondClause::Let(_)) => {
+            for ident in cond_cl.bound_vars() {
                grounded_vars.entry(ident).or_insert(i);
             }
          }

@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use super::{BoundedLattice, Lattice};
 
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
 #[allow(dead_code)]
 pub enum ConstPropagation<T> {
    Bottom,

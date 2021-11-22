@@ -13,7 +13,11 @@ bencher = "0.1.5"
 derive_more = "0.99.16"
 itertools = "0.10"
 quote = "1.0"
+arrayvec = "0.7"
+const-fnv1a-hash = "1.0.1"
 
+[dev-dependencies]
+rand = "0.8.4"
 
 [[bench]]
 name = "benches"

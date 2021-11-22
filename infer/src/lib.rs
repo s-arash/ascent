@@ -1,3 +1,7 @@
+// #![feature(hash_raw_entry)]
+#![allow(mixed_script_confusables)]
+// #![feature(adt_const_params)]
+
 pub mod internal;
 
 pub use infer_macro::infer;

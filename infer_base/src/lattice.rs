@@ -10,18 +10,18 @@ pub use dual::Dual;
 
 pub trait Lattice: PartialOrd + Sized{
 
-   /// potentially updates `self` to be the join of `self` and `other`. 
+   /// ensures `self` is the join of `self` and `other`
    ///
-   /// Returns true if `self` was updated.
+   /// Returns true if `self` was changed.
    fn meet_mut(&mut self, other: Self) -> bool {
       let res = !(*self <= other);
       crate::util::update(self, |x| x.meet(other));
       res
    }
 
-   /// potentially updates `self` to be the meet of `self` and `other`. 
+   /// ensures `self` is the meet of `self` and `other`. 
    ///
-   /// Returns true if `self` was updated.
+   /// Returns true if `self` was changed.
    fn join_mut(&mut self, other: Self) -> bool {
       let res = !(*self >= other);
       crate::util::update(self, |x| x.join(other));
@@ -75,6 +75,11 @@ num_lattice_impl!(f32);
 num_lattice_impl!(f64);
 
 
+impl Lattice for String {
+   fn meet(self, other: Self)-> Self {self.min(other)}
+   fn join(self, other: Self) -> Self {self.max(other)}
+}
+
 impl<T: Lattice> Lattice for Option<T> {
    fn meet(self, other: Self) -> Self {
       match (self, other) {
@@ -100,11 +105,19 @@ impl<T: BoundedLattice + Eq> BoundedLattice for Option<T> where Option<T> : Latt
 
 impl<T: Lattice + Clone> Lattice for Rc<T> {
    fn meet(self, other: Self) -> Self {
-      Rc::new(self.deref().clone().meet(other.deref().clone()))
+      let cmp = self.partial_cmp(&other);
+      match cmp {
+         Some(cmp) => if cmp.is_le() {self.clone()} else {other.clone()},
+         None => Rc::new(self.deref().clone().meet(other.deref().clone())),
+      }
    }
 
    fn join(self, other: Self) -> Self {
-      Rc::new(self.deref().clone().join(other.deref().clone()))
+      let cmp = self.partial_cmp(&other);
+      match cmp {
+         Some(cmp) => if cmp.is_ge() {self.clone()} else {other.clone()},
+         None => Rc::new(self.deref().clone().join(other.deref().clone())),
+      }
    }
 }
 

@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
 use stopwatch::Stopwatch;
 use infer::infer;
@@ -17,6 +18,28 @@ mod tc {
       // path(*x, *z) <-- path(x,y), edge(y, z);
 
    }
+}
+
+fn loop_graph(nodes: usize) -> Vec<(i32, i32)> {
+   let mut res = vec![];
+   let nodes = nodes as i32;
+   for x in 0..nodes {
+       res.push((x, (x + 1) % nodes));
+   }
+   res
+}
+
+fn complete_graph(nodes: usize) -> Vec<(i32, i32, u32)> {
+   let mut res = vec![];
+   let nodes = nodes as i32;
+   for x in 0..nodes {
+       for y in 0..nodes {
+           if x != y {
+               res.push((x, y, 1));
+           }
+       }
+   }
+   res
 }
 
 fn bench_tc(nodes_count: i32) {
@@ -73,12 +96,12 @@ fn bench_lattice(){
 
 fn bench_tc_path_join_path(nodes_count: i32) {
    infer! {
-      #![include_rule_times]
+      // #![include_rule_times]
       struct TCPathJoinPath;
       relation edge(i32, i32);
       relation path(i32, i32);
-      path(*x, *z) <-- path(x,y), path(y, z);
-      path(*x, *y) <-- edge(x,y);
+      path(x, z) <-- path(x,y), path(y, z);
+      path(x, y) <-- edge(x,y);
    }
    let mut tc = TCPathJoinPath::default();
    println!("{}", TCPathJoinPath::summary());
@@ -97,8 +120,44 @@ fn bench_tc_path_join_path(nodes_count: i32) {
    println!("path size: {}", tc.path.len());
 }
 
+fn bench_hash(){
+
+   let mut hm = HashMap::new();
+   let mut bt = BTreeMap::new();
+
+   let iters = 10_000_000;
+
+   let random_nums = rand::seq::index::sample(&mut rand::thread_rng(), iters, iters);
+
+   let before = Instant::now();
+   for i in random_nums.iter() {
+      hm.insert((i, i, i), i * 2);
+   }
+   println!("hm took {:?}", before.elapsed());
+   
+   let before = Instant::now();
+   for i in random_nums.iter() {
+      bt.insert((i, i, i), i * 2);
+   }
+   println!("btree took {:?}", before.elapsed());
+}
+fn bench_tc_for_graph(graph: Vec<(i32, i32)>, name: &str) {
+
+   let before = Instant::now();
+   let mut tc = tc::InferProgram::default();
+   tc.edge = graph;
+   tc.update_indices();
+   tc.run();
+   let elapsed = before.elapsed();
+   println!("tc for {} took {:?}", name, elapsed);
+   // println!("summary: \n{}", tc.scc_times_summary());
+   println!("path size: {}", tc.path.len());
+}
+
 fn main() {
    // bench_tc(1000);
    bench_tc_path_join_path(1000);
+   // bench_tc_for_graph(loop_graph(4000), "loop 4000");
    //bench_lattice();
+   // bench_hash();
 }

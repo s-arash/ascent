@@ -6,6 +6,7 @@ mod tests;
 pub mod utils;
 mod se;
 mod exps;
+mod analysis_exp;
 
 use std::{any::Any, cmp::max, rc::Rc};
 use stopwatch::Stopwatch;
@@ -23,7 +24,7 @@ infer!{
    path(*x, *z) <-- path(x, y), path(y, z);
 }
 
-fn main(){
+fn _run_tc_bench(){
    let mut tc = TC::default();
 
    for i in 0..1000 {
@@ -37,5 +38,8 @@ fn main(){
 
    println!("tc took {:?}", stopwatch.elapsed());
    println!("path size: {}", tc.path.len());
+}
 
+fn main(){
+   analysis_exp::analysis_exp();
 }

@@ -1,12 +1,14 @@
-use std::{collections::{HashMap, HashSet}, hash::{BuildHasherDefault, Hash}};
+use std::{collections::{HashMap, HashSet}, hash::{BuildHasherDefault, Hash}, rc::Rc, time::{Duration, Instant}};
 
 use infer_base::Lattice;
 use nohash_hasher::BuildNoHashHasher;
 use rustc_hash::FxHasher;
 
+// pub use hashbrown;
 pub type RelIndexType<K> = HashMap<K, Vec<usize>, BuildHasherDefault<FxHasher>>;
 pub type LatticeIndexType<K> = HashMap<K, HashSet<usize, BuildNoHashHasher<usize>>, BuildHasherDefault<FxHasher>>;
-pub type RelFullIndexType<K> = HashMap<K, usize, BuildHasherDefault<FxHasher>>;
+// pub type RelFullIndexType<K> = HashMap<K, usize, BuildHasherDefault<FxHasher>>;
+pub type RelFullIndexType<K> = hashbrown::HashMap<K, usize, BuildHasherDefault<FxHasher>>;
 pub type RelNoIndexType = Vec<usize>;
 
 pub trait RelIndexTrait{
@@ -33,11 +35,15 @@ pub trait RelIndexTrait{
 //    }
 // }
 
+pub static mut MOVE_REL_INDEX_CONTENTS_TOTAL_TIME : Duration = Duration::ZERO;
+pub static mut INDEX_INSERT_TOTAL_TIME : Duration = Duration::ZERO;
+
 impl<K: Eq + Hash> RelIndexTrait for RelIndexType<K>{
    type Key = K;
 
    #[inline(always)]
    fn move_index_contents(from: &mut RelIndexType<K>, to: &mut RelIndexType<K>) {
+      let before = Instant::now();
       if from.len() > to.len() {
          std::mem::swap(from, to);
       }
@@ -56,12 +62,24 @@ impl<K: Eq + Hash> RelIndexTrait for RelIndexType<K>{
             },
          }
       }
+      unsafe {
+         MOVE_REL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
+      }
    }
 
    #[inline(always)]
    fn index_insert(hm: &mut RelIndexType<K>, key: K, tuple_index: usize) {
-      hm.entry(key).or_insert_with(|| Vec::with_capacity(8)).push(tuple_index);
+      // let before = Instant::now();
+      // hm.entry(key).or_insert_with(|| Vec::with_capacity(8)).push(tuple_index);
+      use std::collections::hash_map::Entry::*;
+      match hm.entry(key){
+         Occupied(mut vec) => vec.get_mut().push(tuple_index),
+         Vacant(vacant) => {vacant.insert(vec![tuple_index]);},
+      }
       // hm.entry(key).or_default().push(tuple_index);
+      // unsafe {
+      //    INDEX_INSERT_TOTAL_TIME += before.elapsed();
+      // }
    }
 }
 impl RelIndexTrait for RelNoIndexType {
@@ -93,25 +111,79 @@ impl<K: Eq + Hash> RelIndexTrait for LatticeIndexType<K>{
    }
 }
 
+pub static mut MOVE_FULL_INDEX_CONTENTS_TOTAL_TIME : Duration = Duration::ZERO;
 impl<K: Eq + Hash> RelIndexTrait for RelFullIndexType<K>{
     type Key = K;
 
    fn move_index_contents(from: &mut Self, to: &mut Self) {
+      // let before = Instant::now();
       if from.len() > to.len() {
          std::mem::swap(from, to);
       }
+      to.reserve(from.len());
       for (k, v) in from.drain() {
          to.insert(k, v); // TODO could be improved
       }
+      // unsafe {
+      //    MOVE_FULL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
+      // }
+
    }
 
    fn index_insert(hm: &mut Self, key: Self::Key, tuple_index: usize) {
-      assert!(hm.insert(key, tuple_index).is_none(), 
-         "inserting duplicate index into RelFullIndexType, index:{}", tuple_index);
+      hm.insert(key, tuple_index);
+      // TODO undo this
+      // assert!(hm.insert(key, tuple_index).is_none(), 
+      //    "inserting duplicate index into RelFullIndexType, index:{}", tuple_index);
    }
 }
+
+#[inline]
+/// if an entry for `key` does not exsit, inserts `v` for it and returns true.
+pub fn full_index_insert_if_not_present<K: Eq + Hash + Clone>(hm: &mut RelFullIndexType<K>, key: &K, v: usize) -> bool {
+
+   match hm.raw_entry_mut().from_key(key) {
+    hashbrown::hash_map::RawEntryMut::Occupied(_) => false,
+    hashbrown::hash_map::RawEntryMut::Vacant(vacant) => {vacant.insert(key.clone(), v); true},
+   }
+   // match hm.entry(key) {
+   //    Occupied(_) => false,
+   //    Vacant(vacant) => {vacant.insert(v); true},
+   // }
+}
+
 
 /// type constraints for relation columns
 pub struct TypeConstraints<T> where T : Clone + Eq + Hash{_t: ::core::marker::PhantomData<T>}
 /// type constraints for a lattice
 pub struct LatTypeConstraints<T> where T : Clone + Eq + Hash + Lattice{_t: ::core::marker::PhantomData<T>}
+
+#[inline(always)]
+pub fn comment(_: &str){}
+
+
+pub trait Convert<TSource> {
+   fn convert(source: TSource) -> Self;
+}
+
+impl<T> Convert<T> for T {
+   #[inline(always)]
+   fn convert(source: T) -> T {source}
+}
+
+impl<T> Convert<&T> for T where T: Clone {
+   #[inline(always)]
+   fn convert(source: &T) -> T {source.clone()}
+}
+
+impl Convert<&str> for String {
+   fn convert(source: &str) -> Self {
+      source.to_string()
+   }
+}
+
+impl<T: Clone> Convert<&Rc<T>> for T {
+   fn convert(source: &Rc<T>) -> Self {
+      source.as_ref().clone()
+   }
+}

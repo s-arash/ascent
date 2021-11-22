@@ -1,6 +1,9 @@
 #![cfg(test)]
+#![allow(irrefutable_let_patterns)]
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{Debug};
 use std::ops::Deref;
+use std::primitive;
 use std::{cmp::max, rc::Rc};
 use infer::Dual;
 use std::hash::Hash;
@@ -65,7 +68,7 @@ fn test_dl_lambda(){
 
       eval(exp.clone(), exp.clone()) <-- do_eval(?exp @Ref(_));
 
-      eval(exp.clone(), exp.clone()) <-- do_eval(exp), if let Lam(_,_) = exp;
+      eval(exp.clone(), exp.clone()) <-- do_eval(?exp @Lam(_,_));
 
       do_eval(ef.as_ref().clone()) <-- do_eval(?App(ef,_ea));
 
@@ -89,9 +92,94 @@ fn test_dl_lambda(){
    assert!(prog.output.len() == 1);
 }
 
+
+fn _test_dl_lambda2(){
+   type Time = u32;
+   type Addr = u32;
+   #[derive(Clone, Hash, PartialEq, Eq, Debug)]
+   enum Storable {
+      Value(LambdaCalcExpr, Env),
+      Kont(Continuation)
+   }
+   use Storable::*;
+   #[derive(Clone, Hash, PartialEq, Eq, Debug)]
+   enum Continuation {
+      Fn(LambdaCalcExpr, Env, Addr),
+      Ar(LambdaCalcExpr, Env, Addr)
+   }
+   use Continuation::*;
+   type Env = Rc<BTreeMap<&'static str, Addr>>;
+   fn tick(_t: &Time, _k: &Continuation) -> Time {
+      todo!()
+   }
+   fn alloc(_e: &LambdaCalcExpr, _ρ: &Env, _a: &Addr, _t: &Time, _k: &Continuation) -> Addr { todo!()}
+   fn upd(ρ: &Env, var: &'static str, addr: Addr) -> Env{
+      let mut ρ = ρ.deref().clone();
+      ρ.insert(var, addr);
+      Rc::new(ρ)
+   }
+   // #[derive(Clone, Hash, PartialEq, Eq)]
+   // struct State(LambdaCalcExpr, Env, Addr, Time);
+   infer!{
+      struct CESK;
+      relation output(LambdaCalcExpr);
+      relation input(LambdaCalcExpr);
+      relation σ(Addr, Storable);
+      relation ς(LambdaCalcExpr, Env, Addr, Time);
+      input(app(U(), I()));
+
+
+      ς(v, ρ2, a, tick(t, k)) <--
+         ς(?Ref(x), ρ, a, t),
+         σ(ρ[x], ?Value(v, ρ2)),
+         σ(a, ?Kont(k));
+
+      σ(b, Kont(Ar(e1.deref().clone(), ρ.clone(), *a))),
+      ς(e0.deref().clone(), ρ, b, tick(t, k)) <--
+         ς(?e@App(e0, e1), ρ, addr, t),
+         σ(a, ?Kont(k)),
+         let b = alloc(e, ρ, addr, t, k);
+
+      σ(b, Kont(Fn(v.clone(), ρ.clone(), *c))),
+      ς(e, ρ2, b, tick(t, k)) <--
+         ς(?v@Lam(..), ρ, a, t),
+         σ(a, ?Kont(k)),
+         if let Ar(e, ρ2, c) = k,
+         let b = alloc(v, ρ, a, t, k);
+
+      σ(b, Value(v.clone(), ρ.clone())),
+      ς(e, upd(&ρ2, x, b), b, tick(t, k)) <--
+         ς(?v@Lam(..), ρ, a, t),
+         σ(a, ?Kont(k)),
+         if let Fn(Lam(x, e), ρ2, c) = k,
+         let b = alloc(v, ρ, a, t, k);
+   };
+   use std::collections::HashSet;
+   type Store = Rc<BTreeMap<Addr, BTreeSet<Storable>>>;
+   infer!{
+      struct CeskLocalStore;
+      relation output(LambdaCalcExpr);
+      relation input(LambdaCalcExpr);
+      relation ς(LambdaCalcExpr, Env, Store, Addr, Time);
+      // rule 1:
+      ς(v.clone(), ρ2.clone(), σ.clone(), *a, tick(t, k)) <--
+         ς(?Ref(x), ρ, σ, a, t),
+         for sv in σ[&ρ[x]].iter(), if let Value(v, ρ2) = sv,
+         for sa in σ[a].iter(), if let Kont(k) = sa;
+      // ...
+   }
+   let mut prog = CESK::default();
+   // println!("{}", InferProgram::summary());
+   prog.run();   
+   // println!("input:{:?}\n", prog.input);
+   // println!("eval: {}\n", prog.eval.iter().map(|(e,v)| format!("{:?} ===> {:?}", e, v)).join("\n"));
+}
+
+
 #[test]
 fn test_dl_patterns(){
    infer!{
+      #![include_rule_times]
       relation foo(i32, Option<i32>);
       relation bar(i32, i32);
       foo(1, None);
@@ -156,14 +244,14 @@ fn test_dl2(){
 }
 
 #[test]
-fn test_dl_expressions(){
+fn test_infer_expressions_and_inits(){
    infer!{
-      relation foo(i32, i32);
-      relation bar(i32, i32);
-      relation baz(i32, i32, i32);
-      foo(1, 2);
+      relation foo(i32, i32) = vec![(1, 2)];
       foo(2, 3);
       foo(3, 5);
+      
+      relation bar(i32, i32);
+      relation baz(i32, i32, i32);
 
       bar(3, 6);
       bar(5, 10);
@@ -410,6 +498,20 @@ fn test_infer_run(){
 }
 
 #[test]
+fn test_infer_run_rel_init(){
+   let foo_contents = (0..10).flat_map(|x| (x+1..10).map(move |y| (x,y))).collect_vec();
+   let res = infer_run!{
+      relation foo(i32, i32) = foo_contents;
+      relation bar(i32);
+
+      bar(*x), bar(*y) <-- foo(x, y);
+   };
+
+   println!("foo: {:?}", res.foo);
+   assert_eq!(res.foo.len(), 45);
+}
+
+#[test]
 fn test_inferception(){
    let res = infer_run!{
       relation inferception_input(i32);
@@ -430,14 +532,15 @@ fn test_inferception(){
 
 #[test]
 fn test_infer_run_tc(){
-   fn compute_tc(r: &[(i32, i32)]) -> Vec<(i32,i32)> {
+   fn compute_tc(inp: Vec<(i32, i32)>) -> Vec<(i32,i32)> {
       infer_run!{
+         relation r(i32, i32) = inp;
          relation tc(i32, i32);
-         tc(*x, *y) <-- for (x, y) in r.iter();
-         tc(*x, *z) <-- for (x, y) in r.iter(), tc(y, z);
+         tc(x, y) <-- r(x, y);
+         tc(x, z) <-- r(x, y), tc(y, z);
       }.tc
    }
-   assert!(rels_equal([(1,2), (2, 3), (1, 3)], compute_tc(&[(1,2), (2,3)])));
+   assert!(rels_equal([(1,2), (2, 3), (1, 3)], compute_tc(vec![(1,2), (2,3)])));
 }
 
 #[test]

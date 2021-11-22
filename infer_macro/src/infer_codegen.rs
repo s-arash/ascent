@@ -62,7 +62,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
       let scc_compiled = compile_mir_scc(mir, i);
       let scc_time_field_name = scc_time_field_name(i);
       sccs_compiled.push(quote!{
-         comment(#msg);
+         infer::internal::comment(#msg);
          let _scc_start_time = ::std::time::Instant::now();
          #scc_compiled
          _self.#scc_time_field_name += _scc_start_time.elapsed();
@@ -80,8 +80,6 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
    let mut lat_field_type_names = HashSet::<String>::new();
 
    
-   /// for reference: 
-   struct TypeConstraints where i32: ::core::clone::Clone + ::core::cmp::Eq + ::core::hash::Hash {}
    for relation in mir.relations_ir_relations.keys() {
       use crate::quote::ToTokens;
       for (i,field_type) in relation.field_types.iter().enumerate() {
@@ -101,6 +99,20 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
       }
    }
 
+   let mut relation_initializations = vec![];
+   for (rel, init) in mir.relations_initializations.iter() {
+      let rel_name = &rel.name;
+      relation_initializations.push(quote! {
+         _self.#rel_name = #init;
+      });
+   }
+   if mir.relations_initializations.len() > 0 {
+      relation_initializations.push(quote! {
+         _self.update_indices();
+      })
+   }
+
+
    let run_func = if is_infer_run {quote!{}} else {
       quote! {
          #[allow(unused_imports)]
@@ -115,9 +127,12 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
       quote! {
          use core::cmp::PartialEq;
          let _self = &mut res;
+         #(#relation_initializations)*
          #(#sccs_compiled)*
       }
    };
+   let relation_initializations_for_default_impl = 
+      if is_infer_run {vec![]} else {relation_initializations};
    let summary = mir_summary(mir);
    let (impl_generics, ty_generics, where_clause) = mir.declaration.generics.split_for_impl();
    let vis = &mir.declaration.visibility;
@@ -133,8 +148,8 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
    let rule_time_fields = if mir.config.include_rule_times {rule_time_fields} else {vec![]};
    let rule_time_fields_defaults = if mir.config.include_rule_times {rule_time_fields_defaults} else {vec![]};
    let res = quote! {
-      use std::collections::{HashMap, HashSet};
-      fn comment(_: &str){}
+      // use std::collections::{HashMap, HashSet};
+      // use ::infer::internal::comment;
       #vis struct #struct_name #generics {
          #(#relation_fields)*
          #(#scc_time_fields)*
@@ -160,11 +175,13 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
       }
       impl #impl_generics Default for #struct_name #ty_generics #where_clause {
          fn default() -> Self {
-            #struct_name {
+            let mut _self = #struct_name {
                #(#field_defaults)*
                #(#scc_time_field_defaults)*
                #(#rule_time_fields_defaults)*
-            }
+            };
+            #(#relation_initializations_for_default_impl)*
+            _self
          }
       }
    };
@@ -175,7 +192,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
             let mut res: #struct_name #ty_generics = #struct_name::default();
             #[allow(unused_imports)]
             {
-               comment("running...");
+               infer::internal::comment("running...");
                #run_code
             }
             res
@@ -221,14 +238,14 @@ fn compile_mir_scc(mir: &InferMir, scc_ind: usize) -> proc_macro2::TokenStream {
          #[allow(non_snake_case)]
          let #delta_var_name : &mut #ty = &mut _self.#total_field;
          #[allow(non_snake_case)]
-         let mut #total_var_name : #ty = HashMap::default();
+         let mut #total_var_name : #ty = Default::default();
          #[allow(non_snake_case)]
-         let mut #new_var_name : #ty = HashMap::default();
+         let mut #new_var_name : #ty = Default::default();
       });
 
       shift_delta_to_total_new_to_delta.push(quote_spanned!{rel.relation.name.span()=>
          infer::internal::RelIndexTrait::move_index_contents(#delta_var_name, &mut #total_var_name);
-         #delta_var_name.clear();
+         // #delta_var_name.clear();
          std::mem::swap(&mut #new_var_name, #delta_var_name);
       });
 
@@ -248,18 +265,9 @@ fn compile_mir_scc(mir: &InferMir, scc_ind: usize) -> proc_macro2::TokenStream {
    }
    
    let mut evaluate_rules = vec![];
-   fn bitem_to_str(bitem: &MirBodyItem) -> String {
-      match bitem {
-         MirBodyItem::Clause(bcl) => format!("{}_{}", bcl.rel.ir_name, bcl.rel.version.to_string()),
-         MirBodyItem::Generator(gen) => format!("for_{}", pat_to_ident(&gen.pattern).map(|x| x.to_string()).unwrap_or_default()),
-         MirBodyItem::Cond(_cl) => format!("if_")
-      }
-   }
+
    for (i, rule) in scc.rules.iter().enumerate() {
-      let msg = format!("{} <-- {}{}",
-                             rule.head_clause.iter().map(|hcl| hcl.rel.name.to_string()).join(", "),
-                             rule.body_items.iter().map(bitem_to_str).join(", "),
-                             if rule.reorderable {" REORD"} else {""});
+      let msg = mir_rule_summary(rule);
       let rule_compiled = compile_mir_rule(rule, scc, mir, 0);
       let rule_time_field = rule_time_field_name(scc_ind, i);
       let (before_rule_var, update_rule_time_field) = if mir.config.include_rule_times {
@@ -268,7 +276,7 @@ fn compile_mir_scc(mir: &InferMir, scc_ind: usize) -> proc_macro2::TokenStream {
       } else {(quote!{}, quote!{})};
       evaluate_rules.push(quote! {
          #before_rule_var
-         comment(#msg);
+         infer::internal::comment(#msg);
          #rule_compiled
          #update_rule_time_field
       });
@@ -404,6 +412,14 @@ fn compile_cond_clause(cond: &CondClause, body: proc_macro2::TokenStream) -> pro
             }
          }
       }
+      CondClause::Let(let_clause) => {
+         let pat = &let_clause.pattern;
+         let expr = &let_clause.exp;
+         quote_spanned! {let_clause.let_keyword.span()=>
+            let #pat = #expr;
+            #body
+         }
+      }
       CondClause::If(if_clause) => {
          let cond = &if_clause.cond;
          quote_spanned! {if_clause.if_keyword.span()=>
@@ -479,6 +495,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                   MirBodyItem::Clause(cl) => cl.args.iter().filter_map(expr_to_ident).collect(),
                   MirBodyItem::Generator(gen) => pat_to_ident(&gen.pattern).into_iter().collect(),
                   MirBodyItem::Cond(CondClause::IfLet(if_let)) => pat_to_ident(&if_let.pattern).into_iter().collect(),
+                  MirBodyItem::Cond(CondClause::Let(let_cl)) => pat_to_ident(&let_cl.pattern).into_iter().collect(),
                   MirBodyItem::Cond(CondClause::If(_)) => vec![]
                }
             }
@@ -585,20 +602,22 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                   }
                }
             } else {  
-               if clause_ind == 0 && !bclause.rel.indices.is_empty() && 
+               if false && clause_ind == 0 && !bclause.rel.indices.is_empty() && 
                bclause.args.iter().filter_map(expr_to_ident).count() == bclause.args.len() {
-               let bclause_rel_no_ind = &mir.relations_no_indices[&bclause.rel.relation];
-               let rel_no_ind_version_var_name = ir_relation_version_var_name(&bclause_rel_no_ind.ir_name(), bclause.rel.version);
-               quote_spanned! {bclause.rel_args_span=>
-                  if let Some(matching) = #rel_no_ind_version_var_name.get(&()) {
-                     for &ind in matching.iter() {
-                        // TODO we may be doing excessive cloning
-                        let row = &_self.#bclause_rel_name[ind] #row_maybe_clone;
-                        #(#new_vars_assignmnets)*
-                        #conds_then_next_loop
-                     }
-                  }
-               }
+               // TODO clean up:
+               // let bclause_rel_no_ind = &mir.relations_no_indices[&bclause.rel.relation];
+               // let rel_no_ind_version_var_name = ir_relation_version_var_name(&bclause_rel_no_ind.ir_name(), bclause.rel.version);
+               // quote_spanned! {bclause.rel_args_span=>
+               //    if let Some(matching) = #rel_no_ind_version_var_name.get(&()) {
+               //       for &ind in matching.iter() {
+               //          // TODO we may be doing excessive cloning
+               //          let row = &_self.#bclause_rel_name[ind] #row_maybe_clone;
+               //          #(#new_vars_assignmnets)*
+               //          #conds_then_next_loop
+               //       }
+               //    }
+               // }
+               unreachable!()
             } else {
                quote_spanned! {bclause.rel_args_span=>
                   if let Some(matching) = #rel_version_var_name.get( &#selected_args_tuple) {
@@ -631,7 +650,8 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
       for hcl in rule.head_clause.iter() {
 
          let head_rel_name = &hcl.rel.name;
-         let new_row_tuple = tuple_spanned(&hcl.args, hcl.args_span);
+         let hcl_args_converted = hcl.args.iter().cloned().map(convert_head_arg).collect_vec();
+         let new_row_tuple = tuple_spanned(&hcl_args_converted, hcl.args_span);
          
          let head_relation = &hcl.rel;
          let row_type = tuple_type(&head_relation.field_types);
@@ -640,6 +660,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
          let rel_indices = scc.dynamic_relations.get(head_relation);
          if let Some(rel_indices) = rel_indices {
             for rel_ind in rel_indices.iter(){
+               if rel_ind.is_full_index() {continue};
                let var_name = ir_relation_version_var_name(&rel_ind.ir_name(), New);
                let args_tuple : Vec<Expr> = rel_ind.indices.iter().map(|&i| {
                   let i_ind = syn::Index::from(i);
@@ -662,18 +683,25 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             let add_row = quote_spanned!{hcl.span=>
                // comment("check if the tuple already exists");
                let new_row: #row_type = #new_row_tuple;
-               if !(#head_rel_full_index_var_name_new.contains_key(&new_row) ||
-                  #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
-                  #head_rel_full_index_var_name_total.contains_key(&new_row))
-               {
-                  let new_row_ind = _self.#head_rel_name.len();
-                  #(#update_indices)*
-                  _self.#head_rel_name.push(new_row);
-                  changed = true;
-                  // TODO remove
-                  // if new_row_ind % 100000 == 0 && new_row_ind > 0 {
-                  //    eprintln!("{} size: {}", #head_rel_name_string, new_row_ind);
-                  // }
+               // if !(#head_rel_full_index_var_name_new.contains_key(&new_row) ||
+               //    #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
+               //    #head_rel_full_index_var_name_total.contains_key(&new_row))
+               // {
+               //    let new_row_ind = _self.#head_rel_name.len();
+               //    #(#update_indices)*
+               //    _self.#head_rel_name.push(new_row);
+               //    changed = true;
+               // }
+
+               let new_row_ind = _self.#head_rel_name.len();
+               if !(#head_rel_full_index_var_name_total.contains_key(&new_row) ||
+                    #head_rel_full_index_var_name_delta.contains_key(&new_row)){
+                  if infer::internal::full_index_insert_if_not_present(&mut #head_rel_full_index_var_name_new, 
+                                                                       &new_row, new_row_ind){
+                     #(#update_indices)*
+                     _self.#head_rel_name.push(new_row);
+                     changed = true;
+                  }
                }
             };
             add_rows.push(add_row);
@@ -714,5 +742,13 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
       quote!{
          #(#add_rows)*
       }
+   }
+}
+
+fn convert_head_arg(arg: Expr) -> Expr {
+   if let Some(var) = expr_to_ident(&arg){
+      parse2(quote_spanned!{arg.span()=> infer::internal::Convert::convert(#var)}).unwrap()
+   } else {
+      arg
    }
 }

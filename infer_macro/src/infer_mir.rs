@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, fmt::Display, iter::FromIterator};
+use std::{collections::{HashMap, HashSet}, fmt::Display, iter::FromIterator, rc::Rc};
 use std::fmt::Write;
 use itertools::Itertools;
 use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap::DiGraphMap};
@@ -14,9 +14,10 @@ pub(crate) struct InferMir {
    pub deps: HashMap<usize, HashSet<usize>>,
    pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
    pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
+   // pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
+   pub relations_initializations: HashMap<RelationIdentity, Rc<Expr>>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub declaration: Declaration,
-   pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
    pub config: InferConfig
 }
 
@@ -263,7 +264,8 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
       relations_ir_relations: hir.relations_ir_relations.clone(),
       relations_full_indices: hir.relations_full_indices.clone(),
       lattices_full_indices: hir.lattices_full_indices.clone(),
-      relations_no_indices: hir.relations_no_indices.clone(),
+      // relations_no_indices: hir.relations_no_indices.clone(),
+      relations_initializations: hir.relations_initializations.clone(),
       declaration: hir.declaration.clone(),
       config: hir.config.clone()
    }

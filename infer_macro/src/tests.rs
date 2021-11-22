@@ -12,7 +12,7 @@ fn test_macro() {
    let inp = quote!{
       //#![include_rule_times]
       struct TC;
-      relation edge(i32, i32);
+      relation edge(i32, i32) = vec![(1, 2)];
       relation path(i32, i32);
    
       path(*x, *y) <-- edge(x,y);
@@ -20,7 +20,7 @@ fn test_macro() {
       //path(*x, *z) <-- path(y, z), edge(x, y);
       path(*x, *z) <-- path(x, y), path(y, z);
    };
-   write_infer_run_to_scratchpad(inp);
+   write_to_scratchpad(inp);
 }
 #[test]
 fn test_macro1() {
@@ -127,25 +127,10 @@ fn exp_borrowing(){
    //    }
    // }
 
-   let x: i32 = 42;
-   let y: i32 = <i32 as Convert<_>>::convert(&x);
+   // let x: Vec<i32> = vec![42];
+   // let y: Vec<i32> = Convert::convert(&x);
+   // let z: Vec<i32> = Convert::convert(x);
 }
-
-trait Convert<TSource> {
-   #[inline]
-   fn convert(source: TSource) -> Self;
-}
-
-impl<T> Convert<T> for T {
-   #[inline(always)]
-   fn convert(source: T) -> T {source}
-}
-
-impl<T> Convert<&T> for T where T: Clone {
-   #[inline(always)]
-   fn convert(source: &T) -> T {source.clone()}
-}
-
 
 #[test]
 fn exp_condensation() {

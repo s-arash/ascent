@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, ops::Index};
+use std::{collections::{HashMap, HashSet}, ops::Index, rc::Rc};
 
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
@@ -38,7 +38,8 @@ pub(crate) struct InferIr {
    pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
    pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
-   pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
+   // pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
+   pub relations_initializations: HashMap<RelationIdentity, Rc<Expr>>,
    pub rules: Vec<IrRule>,
    pub declaration: Declaration,
    pub config: InferConfig,
@@ -105,7 +106,8 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<I
    let ir_rules : Vec<(IrRule, Vec<IrRelation>)> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
    let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
    let mut relations_full_indices = HashMap::new();
-   let mut relations_no_indices = HashMap::new();
+   let mut relations_initializations = HashMap::new();
+   // let mut relations_no_indices = HashMap::new();
    let mut lattices_full_indices = HashMap::new();
    for rel in prog.relations.iter(){
       let rel_identity = RelationIdentity::from(rel);
@@ -134,6 +136,9 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<I
       relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_full_index.clone());
       // relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_no_index.clone());
       relations_full_indices.insert(rel_identity.clone(), rel_full_index);
+      if let Some(init_expr) = &rel.initialization {
+         relations_initializations.insert(rel_identity.clone(), Rc::new(init_expr.clone()));
+      }
       // relations_no_indices.insert(rel_identity, rel_no_index);
    }
    for (ir_rule, extra_relations) in ir_rules.iter(){
@@ -153,7 +158,8 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<I
       relations_ir_relations,
       relations_full_indices,
       lattices_full_indices,
-      relations_no_indices,
+      relations_initializations,
+      // relations_no_indices,
       declaration,
       config: InferConfig::new(prog.attributes.clone())?
    })
@@ -199,9 +205,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
             }
 
             for cond_clause in bcl.cond_clauses.iter() {
-               if let CondClause::IfLet(if_let_cl) = &cond_clause {
-                  grounded_vars.extend(pattern_get_vars(&if_let_cl.pattern));
-               }
+               grounded_vars.extend(cond_clause.bound_vars());
             }
             
             let ir_rel = IrRelation{
@@ -229,9 +233,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
             if bitem_ind <= 1 {
                first_two_items_simple_clauses = false;
             }
-            if let CondClause::IfLet(if_let_cl) = cl {
-               grounded_vars.extend(pattern_get_vars(&if_let_cl.pattern));
-            }
+            grounded_vars.extend(cl.bound_vars());
          }
          _ => panic!("unrecognized body item")
       }
