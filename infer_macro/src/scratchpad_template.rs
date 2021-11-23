@@ -44,6 +44,9 @@ fn U() -> LambdaCalcExpr {lam("x", app(Ref("x"), Ref("x")))}
 #[allow(non_snake_case)]
 fn I() -> LambdaCalcExpr {lam("x", Ref("x"))}
 
+fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
+   inp.map(|tuple| tuple.0).min().cloned().into_iter()
+}
 
 #[warn(warnings)]
 #[warn(unused_imports)]

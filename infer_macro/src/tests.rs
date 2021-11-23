@@ -67,6 +67,19 @@ fn test_macro2() {
    write_to_scratchpad(input);
 }
 
+#[test]
+fn test_macro_agg() {
+   let inp = quote!{
+      relation foo(i32, i32);
+      relation bar(i32, i32, i32);
+      relation baz(i32, i32, i32);
+
+      baz(x, y, min_z) <--
+         foo(x, y),
+         agg min_z = min(z) in bar(x, y, z);
+   };
+   write_to_scratchpad(inp);
+}
 
 #[test]
 fn test_macro_generator() {

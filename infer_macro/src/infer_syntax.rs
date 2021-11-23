@@ -20,6 +20,7 @@ mod kw {
    syn::custom_keyword!(relation);
    syn::custom_keyword!(lattice);
    syn::custom_punctuation!(LongLeftArrow, <--);
+   syn::custom_keyword!(agg);
 }
 
 
@@ -76,6 +77,8 @@ impl Parse for RelationNode {
 pub enum BodyItemNode {
    #[peek(Token![for], name = "GeneratorNode")]
    Generator(GeneratorNode),
+   #[peek(kw::agg, name = "GeneratorNode")]
+   Agg(AggClauseNode),
    #[peek(Ident, name = "BodyClauseNode")]
    Clause(BodyClauseNode),
    #[peek(syn::token::Paren, name = "Dsjunction node")]
@@ -263,6 +266,26 @@ impl Parse for HeadClauseNode{
    }
 }
 
+#[derive(Clone, Parse)]
+pub struct AggClauseNode {
+   pub agg_kw: kw::agg,
+   pub pat: Pat,
+   pub eq_token: Token![=],
+   pub agg: Ident,
+   #[paren]
+   pub agg_arg_paren: syn::token::Paren,
+   #[inside(agg_arg_paren)]
+   #[call(Punctuated::parse_terminated)]
+   pub bound_args: Punctuated<Ident, Token![,]>,
+   pub in_kw: Token![in],
+   pub rel : Ident,
+   #[paren]
+   rel_arg_paren: syn::token::Paren,
+   #[inside(rel_arg_paren)]
+   #[call(Punctuated::parse_terminated)]
+   pub rel_args : Punctuated<Expr, Token![,]>
+}
+
 pub struct RuleNode {
    pub head_clauses: Punctuated<HeadClauseNode, Token![,]>,
    pub body_items: Vec<BodyItemNode>// Punctuated<BodyItemNode, Token![,]>,
@@ -314,6 +337,7 @@ pub(crate) fn rule_node_summary(rule: &RuleNode) -> String {
          BodyItemNode::Clause(bcl) => format!("{}", bcl.rel.to_string()),
          BodyItemNode::Disjunction(_) => todo!(),
          BodyItemNode::Cond(cl) => format!("if_"),
+         BodyItemNode::Agg(agg) => format!("agg {}", agg.rel)
       }
    }
    format!("{} <-- {}",
@@ -370,7 +394,8 @@ fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
       match bitem {
          BodyItemNode::Generator(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Clause(_) => vec![vec![bitem.clone()]],
-         &BodyItemNode::Cond(_) => vec![vec![bitem.clone()]],
+         BodyItemNode::Cond(_) => vec![vec![bitem.clone()]],
+         &BodyItemNode::Agg(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Disjunction(d) => {
             let mut res = vec![];
             for disjunt in d.disjuncts.iter() {
@@ -486,7 +511,12 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
             }
          }
          BodyItemNode::Cond(CondClause::If(_)) => (),
-         _ => panic!("unrecognized BodyItemNode variant")
+         BodyItemNode::Agg(agg) => {
+            for ident in pattern_get_vars(&agg.pat){
+               grounded_vars.entry(ident).or_insert(i);
+            }
+         },
+         BodyItemNode::Disjunction(_) => panic!("unrecognized BodyItemNode variant")
       }
    }
    rule

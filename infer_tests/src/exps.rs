@@ -8,6 +8,12 @@ fn types_eq<T1, T2>() -> bool{
    todo!()
 }
 
+macro_rules! run_combined{
+   ($($b:tt)*) => {
+      
+   };
+}
+
 // trait TypesEq<TOther> {
 //    const ARE_EQUAL : bool;
 // }
@@ -56,8 +62,4 @@ fn exp_rel_traits(){
 }
 const fn mangle(input: &str) -> u64{
    const_fnv1a_hash::fnv1a_hash_str_64(input)
-}
-
-macro run_combined($($b:tt)*) {
-
 }

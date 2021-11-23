@@ -3,9 +3,9 @@ use std::{collections::{HashMap, HashSet}, ops::Index, rc::Rc};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
-use syn::{Attribute, Error, Expr, Type, parse2, spanned::Spanned};
+use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned};
 
-use crate::{InferProgram, infer_syntax::{Declaration, rule_node_summary}, utils::{expr_to_ident, into_set, pattern_get_vars, tuple, tuple_type}};
+use crate::{InferProgram, infer_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, pattern_get_vars, tuple, tuple_type}};
 use crate::infer_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
 
 #[derive(Clone)]
@@ -62,7 +62,19 @@ pub(crate) struct IrHeadClause{
 pub(crate) enum IrBodyItem {
    Clause(IrBodyClause),
    Generator(GeneratorNode),
-   Cond(CondClause)
+   Cond(CondClause),
+   Agg(IrAggClause)
+}
+
+impl IrBodyItem {
+   pub(crate) fn rel(&self) -> Option<&IrRelation> {
+      match self {
+         IrBodyItem::Clause(bcl) => Some(&bcl.rel),
+         IrBodyItem::Agg(agg) => Some(&agg.rel),
+         IrBodyItem::Generator(_) |
+         IrBodyItem::Cond(_) => None,
+      }
+   }
 }
 
 #[derive(Clone)]
@@ -78,6 +90,16 @@ impl IrBodyClause {
    pub fn selected_args(&self) -> Vec<Expr> {
       self.rel.indices.iter().map(|&i| self.args[i].clone()).collect()
    }
+}
+
+#[derive(Clone)]
+pub(crate) struct IrAggClause {
+   pub span: Span,
+   pub pat: Pat,
+   pub aggregator: Expr,
+   pub bound_args: Vec<Ident>,
+   pub rel: IrRelation,
+   pub rel_args: Vec<Expr>
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
@@ -142,10 +164,15 @@ pub(crate) fn compile_infer_program_to_hir(prog: &InferProgram) -> syn::Result<I
       // relations_no_indices.insert(rel_identity, rel_no_index);
    }
    for (ir_rule, extra_relations) in ir_rules.iter(){
-      for bcl in ir_rule.body_items.iter(){
-         if let IrBodyItem::Clause(ref bcl) = bcl {
-            let relation = &bcl.rel.relation;
-            relations_ir_relations.entry(relation.clone()).or_default().insert(bcl.rel.clone());
+      for bitem in ir_rule.body_items.iter(){
+         let rel = match bitem {
+            IrBodyItem::Clause(bcl) => Some(&bcl.rel),
+            IrBodyItem::Agg(agg) => Some(&agg.rel),
+            _ => None
+         };
+         if let Some(rel) = rel {
+            let relation = &rel.relation;
+            relations_ir_relations.entry(relation.clone()).or_default().insert(rel.clone());
          }
       }
       for extra_rel in extra_relations.iter(){
@@ -194,12 +221,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
                }
             }
             let ir_name = ir_name_for_rel_indices(&bcl.rel, &indices);
-            let relation = prog.relations.iter().filter(|r| r.name.to_string() == bcl.rel.to_string()).next();
-            
-            let relation = match relation {
-                Some(rel) => rel,
-                None => return Err(Error::new(bcl.rel.span(), format!("relation {} not defined", bcl.rel))),
-            };
+            let relation = prog_get_relation(prog, &bcl.rel, bcl.args.len())?;
             if relation.is_lattice {
                first_two_items_simple_clauses = false;
             }
@@ -228,13 +250,43 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
             grounded_vars.extend(pattern_get_vars(&gen.pattern));
             body_items.push(IrBodyItem::Generator(gen.clone()));
          },
-         &BodyItemNode::Cond(ref cl) => {
+         BodyItemNode::Cond(ref cl) => {
             body_items.push(IrBodyItem::Cond(cl.clone()));
             if bitem_ind <= 1 {
                first_two_items_simple_clauses = false;
             }
             grounded_vars.extend(cl.bound_vars());
-         }
+         },
+         BodyItemNode::Agg(ref agg) => {
+            if bitem_ind <= 1 {
+               first_two_items_simple_clauses = false;
+            }
+            grounded_vars.extend(pattern_get_vars(&agg.pat));
+            let mut indices = (0..agg.rel_args.len()).collect_vec();
+            for (i, expr) in agg.rel_args.iter().enumerate() {
+               if let Some(ident) = expr_to_ident(expr) {
+                  if agg.bound_args.iter().contains(&ident) {
+                     indices.remove(i);
+                  }
+               }
+            }
+            let relation = prog_get_relation(prog, &agg.rel, agg.rel_args.len())?;
+            
+            let ir_rel = IrRelation {
+               relation: relation.into(),
+               indices,
+            };
+            let agg_name = &agg.agg;
+            let ir_agg_clause = IrAggClause {
+               span: agg.agg_kw.span,
+               pat: agg.pat.clone(),
+               aggregator: parse2(quote_spanned! {agg_name.span()=> #agg_name}).unwrap(), // TODO fix this when grammar is fixed
+               bound_args: agg.bound_args.iter().cloned().collect_vec(),
+               rel: ir_rel,
+               rel_args: agg.rel_args.iter().cloned().collect_vec(),
+            };
+            body_items.push(IrBodyItem::Agg(ir_agg_clause));
+         },
          _ => panic!("unrecognized body item")
       }
       
@@ -260,7 +312,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
    let simple_join_ir_relations = if is_simple_join {
       let (bcl1, bcl2) = match (&body_items[0], &body_items[1]) {
          (IrBodyItem::Clause(bcl1), IrBodyItem::Clause(bcl2)) => (bcl1, bcl2),
-          _ => unreachable!()
+          _ => panic!("incorrect simple join handling in infer_hir")
       };  
       let bcl2_vars = bcl2.args.iter().filter_map(expr_to_ident).collect_vec();
       let indices = get_indices_given_grounded_variables(&bcl1.args, &bcl2_vars);
@@ -307,4 +359,18 @@ pub fn get_indices_given_grounded_variables(args: &[Expr], vars: &[Ident]) -> Ve
       }  
    }
    res
+}
+
+pub(crate) fn prog_get_relation<'a>(prog: &'a InferProgram, name: &Ident, arity: usize) -> syn::Result<&'a RelationNode> {
+   let relation = prog.relations.iter().filter(|r| r.name.to_string() == name.to_string()).next();
+   match relation {
+      Some(rel) => {
+         if rel.field_types.len() != arity {
+            Err(Error::new(name.span(), format!("Wrong arity for relation {}. Actual arity: {}", name, rel.field_types.len())))
+         } else {
+            Ok(rel)
+         }
+      },
+      None => Err(Error::new(name.span(), format!("Relation {} not defined", name))),
+   }
 }

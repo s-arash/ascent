@@ -493,10 +493,13 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             fn bitem_vars(bitem : &MirBodyItem) -> Vec<Ident> {
                match bitem {
                   MirBodyItem::Clause(cl) => cl.args.iter().filter_map(expr_to_ident).collect(),
+
+                  // TODO these look wrong ...
                   MirBodyItem::Generator(gen) => pat_to_ident(&gen.pattern).into_iter().collect(),
                   MirBodyItem::Cond(CondClause::IfLet(if_let)) => pat_to_ident(&if_let.pattern).into_iter().collect(),
                   MirBodyItem::Cond(CondClause::Let(let_cl)) => pat_to_ident(&let_cl.pattern).into_iter().collect(),
-                  MirBodyItem::Cond(CondClause::If(_)) => vec![]
+                  MirBodyItem::Cond(CondClause::If(_)) => vec![],
+                  MirBodyItem::Agg(agg) => pat_to_ident(&agg.pat).into_iter().collect(),
                }
             }
 
@@ -536,14 +539,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             }
             let cloning_needed = true;
             let row_maybe_clone = maybe_clone(cloning_needed, bclause.rel_args_span);
-
-            fn dot_iter_for_rel_index(rel: &MirRelation, var_name: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-               if rel.is_full_index {
-                  quote_spanned! {var_name.span()=> [#var_name]}
-               } else {
-                  quote_spanned!{var_name.span()=> #var_name.iter()}
-               }
-            }
+            
             let matching_dot_iter = dot_iter_for_rel_index(&bclause.rel, quote_spanned!{bclause.rel_args_span=> matching});
 
             // TODO cleanup
@@ -642,7 +638,45 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                }
             }
          }
-        MirBodyItem::Cond(cond) => compile_cond_clause(cond, next_loop),
+         MirBodyItem::Cond(cond) => compile_cond_clause(cond, next_loop),
+         MirBodyItem::Agg(agg) => {
+            
+            let pat = &agg.pat;
+            let rel_name = &agg.rel.relation.name;
+            let mir_relation = MirRelation::from(agg.rel.clone(), Total);
+            let rel_version_var_name = mir_relation.var_name();
+            let selected_args = mir_relation.indices.iter().map(|&i| &agg.rel_args[i]);
+            let selected_args_cloned = selected_args.map(exp_cloned).collect_vec();
+            let selected_args_tuple = tuple_spanned(&selected_args_cloned, agg.span);
+            let agg_args_tuple_indices = 
+               agg.bound_args.iter()
+               .map(|arg| (agg.rel_args.iter()
+                        .find_position(|rel_arg| expr_to_ident(rel_arg) == Some(arg.clone())).unwrap().0, arg));
+            let agg_args_tuple = agg_args_tuple_indices.map(|(ind, arg)| {
+               let tuple_ind = syn::Index::from(ind);
+               parse2(quote_spanned! {arg.span()=> &row.#tuple_ind}).unwrap()
+            }).collect_vec();
+            let agg_args_tuple = tuple_spanned(&agg_args_tuple, agg.span);
+            let agg_func = &agg.aggregator;
+            let matching_dot_iter = dot_iter_for_rel_index(&mir_relation, quote_spanned!{agg.span => __matching});
+            quote_spanned! {agg.span=>
+               let __no_match_def;
+               let __matching = match #rel_version_var_name.get( &#selected_args_tuple) {
+                  std::option::Option::Some(m) => m,
+                  std::option::Option::None => {__no_match_def = Default::default(); &__no_match_def}
+               };
+               // let matching = #rel_version_var_name.get( &#selected_args_tuple).unwrap_or_default();
+               let __agg_args = #matching_dot_iter
+                     .map(|&ind| {
+                              let row = &_self.#rel_name[ind];
+                              #agg_args_tuple
+                     });
+               for #pat in #agg_func(__agg_args) {
+                  #next_loop
+               }
+               
+            }
+         }
       }
    } else {
       let mut add_rows = vec![];
@@ -750,5 +784,13 @@ fn convert_head_arg(arg: Expr) -> Expr {
       parse2(quote_spanned!{arg.span()=> infer::internal::Convert::convert(#var)}).unwrap()
    } else {
       arg
+   }
+}
+
+fn dot_iter_for_rel_index(rel: &MirRelation, var_name: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+   if rel.is_full_index {
+      quote_spanned! {var_name.span()=> [#var_name]}
+   } else {
+      quote_spanned!{var_name.span()=> #var_name.iter()}
    }
 }

@@ -1,5 +1,5 @@
 // #![allow(warnings)]
-#![feature(decl_macro)]
+// #![feature(decl_macro)]
 #![allow(unused_imports)]
 
 mod tests;

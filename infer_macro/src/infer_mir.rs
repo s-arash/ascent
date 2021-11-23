@@ -5,7 +5,7 @@ use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap:
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
-use crate::{infer_hir::{InferConfig, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices}, infer_mir::MirRelationVersion::*, infer_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
+use crate::{infer_hir::{InferConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices}, infer_mir::MirRelationVersion::*, infer_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
 use crate::infer_syntax::{CondClause, GeneratorNode, RelationIdentity};
 use crate::{infer_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, InferIr}};
 
@@ -55,7 +55,8 @@ pub(crate) fn mir_rule_summary(rule: &MirRule) -> String {
       match bitem {
          MirBodyItem::Clause(bcl) => format!("{}_{}", bcl.rel.ir_name, bcl.rel.version.to_string()),
          MirBodyItem::Generator(gen) => format!("for_{}", pat_to_ident(&gen.pattern).map(|x| x.to_string()).unwrap_or_default()),
-        MirBodyItem::Cond(cl) => format!("if_"),
+         MirBodyItem::Cond(cl) => format!("if_"),
+         MirBodyItem::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
       }
    }
    format!("{} <-- {}{}",
@@ -68,7 +69,8 @@ pub(crate) fn mir_rule_summary(rule: &MirRule) -> String {
 pub(crate) enum MirBodyItem {
    Clause(MirBodyClause),
    Generator(GeneratorNode),
-   Cond(CondClause)
+   Cond(CondClause),
+   Agg(IrAggClause)
 }
 
 impl MirBodyItem {
@@ -172,9 +174,9 @@ fn get_hir_dep_graph(hir: &InferIr) -> Vec<(usize,usize)> {
    let mut edges = vec![];
    for (i, rule) in hir.rules.iter().enumerate() {
       for bitem in rule.body_items.iter() {
-         if let IrBodyItem::Clause(bcl) = bitem {
-            let body_rel = &bcl.rel.relation;
-            if let Some(set) = relations_to_rules_in_head.get(body_rel){
+         if let Some(body_rel) = bitem.rel() {
+            let body_rel_identity = &body_rel.relation;
+            if let Some(set) = relations_to_rules_in_head.get(body_rel_identity){
                for &rule_with_rel_in_head in set.iter(){
                   edges.push((rule_with_rel_in_head, i));
                }
@@ -203,8 +205,7 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
       for &rule_ind in scc.iter(){
          let rule = &hir.rules[rule_ind];
          for bitem in rule.body_items.iter() {
-            if let IrBodyItem::Clause(bcl) = bitem {
-               let rel = &bcl.rel;
+            if let Some(rel) = bitem.rel(){
                body_only_relations.entry(rel.relation.clone()).or_default().insert(rel.clone());
                if rule.is_simple_join {
                   // body_only_relations.entry(rel.relation.clone()).or_default().insert(hir.relations_full_indices[&rel.relation].clone());
@@ -280,9 +281,10 @@ fn compile_hir_simple_join_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &
 
       let rest_body_items = rule.body_items[2..].iter().map(|item|
          match item {
-            IrBodyItem::Clause(_) => unreachable!(),
+            IrBodyItem::Clause(_) => panic!("infer_mir: wrong simple join!"),
             IrBodyItem::Generator(gen) => MirBodyItem::Generator(gen.clone()),
             IrBodyItem::Cond(cond) => MirBodyItem::Cond(cond.clone()),
+            IrBodyItem::Agg(agg) => MirBodyItem::Agg(agg.clone())
          }).collect_vec();
 
       let cl2_variables = cl2.args.iter().filter_map(expr_to_ident).collect_vec();
@@ -373,6 +375,9 @@ fn compile_hir_arbitrary_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &Ha
          }
          IrBodyItem::Generator(gen) => {
             vec![MirBodyItem::Generator(gen.clone())]
+         },
+         IrBodyItem::Agg(agg) => {
+            vec![MirBodyItem::Agg(agg.clone())]
          }
       }
       

@@ -690,7 +690,7 @@ fn test_infer_simple_join(){
       bar(2, 1);
 
       baz(*x, *z) <-- foo(x, y), bar(y, z), if x != z;
-      foo(*x, *y), bar(*x, *y) <-- baz(x, y);
+      foo(*x, *y), bar(*x, y) <-- baz(x, y);
    };
    println!("baz: {:?}", res.baz);
    assert!(rels_equal([(1, 3)], res.baz));
@@ -713,6 +713,31 @@ fn test_infer_simple_join2(){
    };
    println!("baz: {:?}", res.baz);
    assert!(rels_equal([(1, 3)], res.baz));
+}
+
+fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
+   inp.map(|tuple| tuple.0).min().cloned().into_iter()
+}
+
+#[test]
+fn test_infer_agg(){
+   let res = infer_run!{
+      relation foo(i32, i32);
+      relation bar(i32, i32, i32);
+      relation baz(i32, i32, i32);
+
+      foo(1, 2);
+      foo(2, 3);
+      bar(1, 2, 10);
+      bar(1, 2, 100);
+
+      baz(x, y, min_z) <--
+         foo(x, y),
+         agg min_z = min(z) in bar(x, y, z);
+   };
+   println!("{}", res.summary());
+   println!("baz: {:?}", res.baz);
+   assert!(rels_equal([(1, 2, 10)], res.baz));
 }
 
 #[test]
