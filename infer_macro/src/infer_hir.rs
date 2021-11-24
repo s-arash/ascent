@@ -5,7 +5,7 @@ use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned};
 
-use crate::{InferProgram, infer_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, pattern_get_vars, tuple, tuple_type}};
+use crate::{InferProgram, infer_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, is_wild_card, pattern_get_vars, tuple, tuple_type}};
 use crate::infer_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
 
 #[derive(Clone)]
@@ -262,25 +262,26 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &InferProgram) -> syn::Result<
                first_two_items_simple_clauses = false;
             }
             grounded_vars.extend(pattern_get_vars(&agg.pat));
-            let mut indices = (0..agg.rel_args.len()).collect_vec();
-            for (i, expr) in agg.rel_args.iter().enumerate() {
-               if let Some(ident) = expr_to_ident(expr) {
+            let indices = agg.rel_args.iter().enumerate().filter(|(i, expr)| {
+               if is_wild_card(expr) {
+                  return false;
+               } else if let Some(ident) = expr_to_ident(expr) {
                   if agg.bound_args.iter().contains(&ident) {
-                     indices.remove(i);
+                     return false;
                   }
                }
-            }
+               true
+            }).map(|(i, expr)| i).collect_vec();
             let relation = prog_get_relation(prog, &agg.rel, agg.rel_args.len())?;
             
             let ir_rel = IrRelation {
                relation: relation.into(),
                indices,
             };
-            let agg_name = &agg.agg;
             let ir_agg_clause = IrAggClause {
                span: agg.agg_kw.span,
                pat: agg.pat.clone(),
-               aggregator: parse2(quote_spanned! {agg_name.span()=> #agg_name}).unwrap(), // TODO fix this when grammar is fixed
+               aggregator: agg.aggregator.get_expr(),
                bound_args: agg.bound_args.iter().cloned().collect_vec(),
                rel: ir_rel,
                rel_args: agg.rel_args.iter().cloned().collect_vec(),

@@ -3,6 +3,7 @@
 // #![feature(adt_const_params)]
 
 pub mod internal;
+pub mod aggregators;
 
 pub use infer_macro::infer;
 pub use infer_macro::infer_run;

@@ -10,15 +10,18 @@ use crate::{infer_impl};
 #[test]
 fn test_macro() {
    let inp = quote!{
-      //#![include_rule_times]
-      struct TC;
-      relation edge(i32, i32) = vec![(1, 2)];
-      relation path(i32, i32);
-   
-      path(*x, *y) <-- edge(x,y);
-      // path(*x, *z) <-- edge(x,y), path(y, z);
-      //path(*x, *z) <-- path(y, z), edge(x, y);
-      path(*x, *z) <-- path(x, y), path(y, z);
+      relation foo(i32, i32, i32);
+      relation bar(i32, i32);
+      relation baz(i32);
+
+      foo(1, 2, 3);
+      foo(2, 3, 4);
+      bar(1, 2);
+      bar(1, 2);
+
+      baz(x) <--
+         foo(x, _, _),
+         bar(_, x);
    };
    write_to_scratchpad(inp);
 }

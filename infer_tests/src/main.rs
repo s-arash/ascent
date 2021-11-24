@@ -1,12 +1,14 @@
 // #![allow(warnings)]
 // #![feature(decl_macro)]
 #![allow(unused_imports)]
+#![allow(confusable_idents)]
 
 mod tests;
 pub mod utils;
 mod se;
 mod exps;
 mod analysis_exp;
+mod agg_tests;
 
 use std::{any::Any, cmp::max, rc::Rc};
 use stopwatch::Stopwatch;

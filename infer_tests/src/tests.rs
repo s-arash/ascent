@@ -715,6 +715,27 @@ fn test_infer_simple_join2(){
    assert!(rels_equal([(1, 3)], res.baz));
 }
 
+#[test]
+fn test_infer_wildcards(){
+   let res = infer_run!{
+      relation foo(i32, i32, i32);
+      relation bar(i32, i32);
+      relation baz(i32);
+
+      foo(1, 2, 3);
+      foo(2, 3, 4);
+      bar(1, 1);
+      bar(1, 2);
+      bar(1, 3);
+
+      baz(x) <--
+         foo(x, _, _),
+         bar(_, x);
+   };
+   println!("baz: {:?}", res.baz);
+   assert!(rels_equal([(1,), (2,)], res.baz));
+}
+
 fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
    inp.map(|tuple| tuple.0).min().cloned().into_iter()
 }

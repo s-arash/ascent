@@ -1,13 +1,13 @@
 extern crate proc_macro;
 use proc_macro2::{Span, TokenStream};
-use syn::{Attribute, Expr, GenericParam, Generics, Ident, Pat, Result, Token, Type, Visibility, WhereClause, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned, token::{Comma, Gt, Lt}};
+use syn::{Attribute, Expr, ExprPath, GenericParam, Generics, Ident, Pat, Result, Token, Type, Visibility, WhereClause, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned, token::{Comma, Gt, Lt}};
 use std::{collections::{HashMap}, sync::Mutex};
 
 use quote::{ToTokens};
 use itertools::{Itertools};
 use derive_syn_parse::Parse;
 
-use crate::utils::{expr_get_vars, expr_to_ident, pat_to_ident, pattern_get_vars};
+use crate::utils::{expr_get_vars, expr_to_ident, is_wild_card, pat_to_ident, pattern_get_vars};
 
 
 // resources:
@@ -271,7 +271,7 @@ pub struct AggClauseNode {
    pub agg_kw: kw::agg,
    pub pat: Pat,
    pub eq_token: Token![=],
-   pub agg: Ident,
+   pub aggregator: AggregatorNode,
    #[paren]
    pub agg_arg_paren: syn::token::Paren,
    #[inside(agg_arg_paren)]
@@ -284,6 +284,32 @@ pub struct AggClauseNode {
    #[inside(rel_arg_paren)]
    #[call(Punctuated::parse_terminated)]
    pub rel_args : Punctuated<Expr, Token![,]>
+}
+
+#[derive(Clone)]
+pub enum AggregatorNode {
+   Ident(Ident),
+   Expr(Expr)
+}
+
+impl Parse for AggregatorNode {
+   fn parse(input: ParseStream) -> Result<Self> {
+      if input.peek(syn::token::Paren) {
+         let inside_parens;
+         parenthesized!(inside_parens in input);
+         Ok(AggregatorNode::Expr(inside_parens.parse()?))
+      } else {
+         Ok(AggregatorNode::Ident(input.parse()?))
+      }
+   }
+}
+impl AggregatorNode {
+   pub fn get_expr(&self) -> Expr {
+      match self {
+         AggregatorNode::Ident(ident) => parse2(quote!{#ident}).unwrap(),
+         AggregatorNode::Expr(expr) => expr.clone(),
+      }
+   }
 }
 
 pub struct RuleNode {
@@ -522,11 +548,34 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
    rule
 }
 
+fn rule_desugar_wildcards(mut rule: RuleNode) -> RuleNode {
+   for bi in &mut rule.body_items[..] {
+      match bi {
+         BodyItemNode::Clause(bcl) => {
+            for arg in &mut bcl.args.iter_mut() {
+               match arg {
+                  BodyClauseArg::Expr(expr) => {
+                     if is_wild_card(&expr) {
+                        let new_ident = fresh_ident("_", expr.span());
+                        *expr = parse2(quote! {#new_ident}).unwrap();
+                     }
+                  },
+                  BodyClauseArg::Pat(_) => (),
+               }
+            }
+         },
+         _ => ()
+      }
+   }
+   rule
+}
+
 pub(crate) fn desugar_infer_program(mut prog: InferProgram) -> InferProgram {
    prog.rules = 
       prog.rules.into_iter()
       .flat_map(rule_desugar_disjunction_nodes)
       .map(rule_desugar_pattern_args)
+      .map(rule_desugar_wildcards)
       .map(rule_desugar_repeated_vars)
       .collect_vec();
    prog

@@ -314,7 +314,7 @@ fn test_expr_get_vars(){
 
 pub fn expr_to_ident(expr: &Expr) -> Option<Ident> {
    match expr {
-      Expr::Path(p) if p.path.get_ident().is_some() => p.path.get_ident().cloned(),
+      Expr::Path(p) => p.path.get_ident().cloned(),
       _ => None
    }
 }
@@ -323,5 +323,12 @@ pub fn pat_to_ident(pat: &Pat) -> Option<Ident> {
    match pat {
       Pat::Ident(ident) => Some(ident.ident.clone()),
       _ => None
+   }
+}
+
+pub fn is_wild_card(expr: &Expr) -> bool {
+   match expr {
+      Expr::Verbatim(ts) => ts.to_string() == "_",
+      _ => false
    }
 }
