@@ -75,12 +75,14 @@ impl Parse for RelationNode {
 
 #[derive(Parse, Clone)]
 pub enum BodyItemNode {
-   #[peek(Token![for], name = "GeneratorNode")]
+   #[peek(Token![for], name = "generative clause")]
    Generator(GeneratorNode),
-   #[peek(kw::agg, name = "GeneratorNode")]
+   #[peek(kw::agg, name = "aggregate clause")]
    Agg(AggClauseNode),
-   #[peek(Ident, name = "BodyClauseNode")]
+   #[peek(Ident, name = "body clause")]
    Clause(BodyClauseNode),
+   #[peek(Token![!], name = "negation clause")]
+   Negation(NegationClauseNode),
    #[peek(syn::token::Paren, name = "Dsjunction node")]
    Disjunction(DisjunctionNode),
    #[peek_with(peek_if_or_let, name = "if condition")]
@@ -244,6 +246,17 @@ impl Parse for BodyClauseNode{
    }
 }
 
+#[derive(Parse, Clone)]
+pub struct NegationClauseNode {
+   neg_token: Token![!],
+   pub rel : Ident,
+   #[paren]
+   rel_arg_paren: syn::token::Paren,
+   #[inside(rel_arg_paren)]
+   #[call(Punctuated::parse_terminated)]
+   pub args : Punctuated<Expr, Token![,]>,
+}
+
 #[derive(Clone)]
 pub struct HeadClauseNode {
    pub rel : Ident,
@@ -288,7 +301,7 @@ pub struct AggClauseNode {
 
 #[derive(Clone)]
 pub enum AggregatorNode {
-   Ident(Ident),
+   Path(syn::Path),
    Expr(Expr)
 }
 
@@ -299,14 +312,14 @@ impl Parse for AggregatorNode {
          parenthesized!(inside_parens in input);
          Ok(AggregatorNode::Expr(inside_parens.parse()?))
       } else {
-         Ok(AggregatorNode::Ident(input.parse()?))
+         Ok(AggregatorNode::Path(input.parse()?))
       }
    }
 }
 impl AggregatorNode {
    pub fn get_expr(&self) -> Expr {
       match self {
-         AggregatorNode::Ident(ident) => parse2(quote!{#ident}).unwrap(),
+         AggregatorNode::Path(path) => parse2(quote!{#path}).unwrap(),
          AggregatorNode::Expr(expr) => expr.clone(),
       }
    }
@@ -363,7 +376,8 @@ pub(crate) fn rule_node_summary(rule: &RuleNode) -> String {
          BodyItemNode::Clause(bcl) => format!("{}", bcl.rel.to_string()),
          BodyItemNode::Disjunction(_) => todo!(),
          BodyItemNode::Cond(cl) => format!("if_"),
-         BodyItemNode::Agg(agg) => format!("agg {}", agg.rel)
+         BodyItemNode::Agg(agg) => format!("agg {}", agg.rel),
+         BodyItemNode::Negation(neg) => format!("! {}", neg.rel),
       }
    }
    format!("{} <-- {}",
@@ -421,7 +435,8 @@ fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
          BodyItemNode::Generator(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Clause(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Cond(_) => vec![vec![bitem.clone()]],
-         &BodyItemNode::Agg(_) => vec![vec![bitem.clone()]],
+         BodyItemNode::Agg(_) => vec![vec![bitem.clone()]],
+         BodyItemNode::Negation(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Disjunction(d) => {
             let mut res = vec![];
             for disjunt in d.disjuncts.iter() {
@@ -542,6 +557,7 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
                grounded_vars.entry(ident).or_insert(i);
             }
          },
+         BodyItemNode::Negation(_) => (),
          BodyItemNode::Disjunction(_) => panic!("unrecognized BodyItemNode variant")
       }
    }
@@ -570,12 +586,31 @@ fn rule_desugar_wildcards(mut rule: RuleNode) -> RuleNode {
    rule
 }
 
+fn rule_desugar_negation(mut rule: RuleNode) -> RuleNode {
+   for bi in &mut rule.body_items[..] {
+      match bi {
+         BodyItemNode::Negation(neg) => {
+            let rel = &neg.rel;
+            let args = &neg.args;
+            let replacement = quote_spanned! {neg.neg_token.span=> 
+               agg () = ::infer::aggregators::not() in #rel(#args)
+            };
+            let replacement: AggClauseNode = parse2(replacement).unwrap();
+            *bi = BodyItemNode::Agg(replacement);
+         },
+         _ => ()
+      }      
+   }
+   rule
+}
+
 pub(crate) fn desugar_infer_program(mut prog: InferProgram) -> InferProgram {
    prog.rules = 
       prog.rules.into_iter()
       .flat_map(rule_desugar_disjunction_nodes)
       .map(rule_desugar_pattern_args)
       .map(rule_desugar_wildcards)
+      .map(rule_desugar_negation)
       .map(rule_desugar_repeated_vars)
       .collect_vec();
    prog

@@ -14,14 +14,9 @@ fn test_macro() {
       relation bar(i32, i32);
       relation baz(i32);
 
-      foo(1, 2, 3);
-      foo(2, 3, 4);
-      bar(1, 2);
-      bar(1, 2);
-
       baz(x) <--
          foo(x, _, _),
-         bar(_, x);
+         !bar(_, x);
    };
    write_to_scratchpad(inp);
 }

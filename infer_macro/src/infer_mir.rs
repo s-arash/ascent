@@ -187,7 +187,7 @@ fn get_hir_dep_graph(hir: &InferIr) -> Vec<(usize,usize)> {
    edges
 }
 
-pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
+pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> syn::Result<InferMir>{
 
    let dep_graph = get_hir_dep_graph(hir);
    let mut dep_graph = DiGraphMap::<_,()>::from_edges(&dep_graph);
@@ -242,6 +242,16 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
                   .flat_map(|&ind| compile_hir_rule_to_mir_rules(&hir.rules[ind as usize], &dynamic_relations_set))
                   .collect_vec(); 
 
+      for rule in rules.iter() {
+         for bi in rule.body_items.iter() {
+            if let MirBodyItem::Agg(agg) = bi {
+               if dynamic_relations.contains_key(&agg.rel.relation) {
+                  return Err(syn::Error::new(agg.span, 
+                     format!("use of aggregated relation {} cannot be stratified.", &agg.rel.relation.name)));
+               }
+            }
+         }
+      }
       let mir_scc = MirScc{
          rules,
          dynamic_relations,
@@ -259,7 +269,7 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
       sccs_dep_graph.insert(sccs_nodes_count - n.index() - 1, sccs.neighbors(n).map(|n| sccs_nodes_count - n.index() - 1).collect());
    }
 
-   InferMir {
+   Ok(InferMir {
       sccs: mir_sccs,
       deps: sccs_dep_graph,
       relations_ir_relations: hir.relations_ir_relations.clone(),
@@ -269,7 +279,7 @@ pub(crate) fn compile_hir_to_mir(hir: &InferIr) -> InferMir{
       relations_initializations: hir.relations_initializations.clone(),
       declaration: hir.declaration.clone(),
       config: hir.config.clone()
-   }
+   })
 }
 
 // TODO redundant?

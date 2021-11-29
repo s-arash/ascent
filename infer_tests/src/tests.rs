@@ -760,11 +760,3 @@ fn test_infer_agg(){
    println!("baz: {:?}", res.baz);
    assert!(rels_equal([(1, 2, 10)], res.baz));
 }
-
-#[test]
-fn exp_vec_capacity(){
-   let mut vec = Vec::<usize>::default();
-   println!("new vec capacity: {}", vec.capacity());
-   vec.push(42);
-   println!("after 1 insertion capacity: {}", vec.capacity());
-}

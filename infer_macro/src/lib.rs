@@ -7,6 +7,7 @@ mod infer_hir;
 mod scratchpad;
 mod infer_codegen;
 mod infer_syntax;
+mod test_errors;
 
 #[macro_use]
 extern crate quote;
@@ -76,7 +77,7 @@ pub fn infer_run(input: TokenStream) -> TokenStream {
    }
 }
 
-fn infer_impl(input: proc_macro2::TokenStream, is_infer_run: bool) -> Result<proc_macro2::TokenStream> {
+pub(crate) fn infer_impl(input: proc_macro2::TokenStream, is_infer_run: bool) -> Result<proc_macro2::TokenStream> {
    let prog: InferProgram = syn::parse2(input)?;
    // println!("prog relations: {}", prog.relations.len());
    // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
@@ -86,7 +87,7 @@ fn infer_impl(input: proc_macro2::TokenStream, is_infer_run: bool) -> Result<pro
    let hir = compile_infer_program_to_hir(&prog)?;
    // println!("hir relations: {}", hir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
 
-   let mir = compile_hir_to_mir(&hir);
+   let mir = compile_hir_to_mir(&hir)?;
 
    // println!("mir relations: {}", mir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
 

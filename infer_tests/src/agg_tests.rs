@@ -65,12 +65,14 @@ fn test_infer_agg4(){
 }
 
 #[test]
-fn test_infer_agg_not(){
+fn test_infer_negation(){
    use infer::aggregators::*;
    let res = infer_run!{
       relation foo(i32, i32);
       relation bar(i32, i32, i32);
       relation baz(i32, i32);
+      relation baz2(i32, i32);
+
       foo(0, 1);
       foo(1, 2);
       foo(10, 11);
@@ -82,22 +84,45 @@ fn test_infer_agg_not(){
 
       baz(x, y) <--
          foo(x, y),
-         agg () = not() in bar(x, y, _);
+         !bar(x, y, _);
 
+      // equivalent to:
+      baz2(x, y) <--
+         foo(x, y),
+         agg () = not() in bar(x, y, _);
    };
    // println!("{}", res.summary());
    println!("baz: {:?}", res.baz);
    assert!(rels_equal([(0, 1), (100, 101)], res.baz));
+   assert!(rels_equal([(0, 1), (100, 101)], res.baz2));
 }
 
 #[test]
 fn test_infer_agg_simple(){
    use infer::aggregators::*;
    let res = infer_run!{
-     relation foo(i32);
-     foo(0); foo(10);
-     relation bar(i32);
-     bar(m as i32) <-- agg m = mean(x) in foo(x);   
+      relation foo(i32);
+      foo(0); foo(10);
+      relation bar(i32);
+      bar(m as i32) <-- agg m = mean(x) in foo(x);   
    };
    assert!(rels_equal([(5,)], res.bar));
 }
+
+// Must fail to compile:
+// #[test]
+// fn test_infer_agg_not_stratifiable(){
+//    use infer::aggregators::*;
+//    let res = infer_run!{
+//       relation foo(i32, i32, i32);
+//       relation bar(i32, i32);
+//       relation baz(i32);
+
+//       baz(x) <--
+//          foo(x, _, _),
+//          !bar(_, x);
+         
+//       bar(x, x + 1) <-- baz(x); 
+//    };
+//    assert!(rels_equal([(5,)], res.bar));
+// }

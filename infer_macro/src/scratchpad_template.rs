@@ -49,9 +49,9 @@ fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
 }
 
 #[warn(warnings)]
-#[warn(unused_imports)]
+#[allow(unused_imports)]
 #[cfg(test)]
-fn test() {
+fn _test() {
    use infer::lattice::set::Set;
 
    todo!("here");
