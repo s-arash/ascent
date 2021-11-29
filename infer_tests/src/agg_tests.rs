@@ -98,11 +98,45 @@ fn test_infer_negation(){
 }
 
 #[test]
+fn test_infer_negation2(){
+   use infer::aggregators::*;
+   let res = infer_run!{
+      relation foo(i32, i32);
+      relation bar(i32, i32);
+      relation baz(i32, i32);
+      relation baz2(i32, i32);
+
+      foo(0, 1);
+      foo(1, 2);
+      foo(10, 11);
+      foo(100, 101);
+
+      bar(1, 2); 
+      bar(10, 11);
+      bar(10, 11);
+
+      baz(x, y) <--
+         foo(x, y),
+         !bar(x, y);
+
+      // equivalent to:
+      baz2(x, y) <--
+         foo(x, y),
+         agg () = not() in bar(x, y);
+   };
+   // println!("{}", res.summary());
+   println!("baz: {:?}", res.baz);
+   assert!(rels_equal([(0, 1), (100, 101)], res.baz2));
+   assert!(rels_equal([(0, 1), (100, 101)], res.baz));
+}
+
+#[test]
 fn test_infer_agg_simple(){
    use infer::aggregators::*;
    let res = infer_run!{
       relation foo(i32);
       foo(0); foo(10);
+
       relation bar(i32);
       bar(m as i32) <-- agg m = mean(x) in foo(x);   
    };

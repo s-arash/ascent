@@ -2,7 +2,6 @@
 use std::{clone, cmp::max, rc::Rc};
 use std::ops::Deref;
 
-
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum LambdaCalcExpr{
    Ref(&'static str),
@@ -52,6 +51,7 @@ fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
 #[allow(unused_imports)]
 #[cfg(test)]
 fn _test() {
+   use infer::aggregators::*;
    use infer::lattice::set::Set;
 
    todo!("here");

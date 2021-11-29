@@ -63,9 +63,11 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
       let scc_time_field_name = scc_time_field_name(i);
       sccs_compiled.push(quote!{
          infer::internal::comment(#msg);
-         let _scc_start_time = ::std::time::Instant::now();
-         #scc_compiled
-         _self.#scc_time_field_name += _scc_start_time.elapsed();
+         {
+            let _scc_start_time = ::std::time::Instant::now();
+            #scc_compiled
+            _self.#scc_time_field_name += _scc_start_time.elapsed();
+         }
          // TODO remove this:
          // eprintln!("scc {} done.", #i);
       });
@@ -659,16 +661,13 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             let agg_args_tuple = tuple_spanned(&agg_args_tuple, agg.span);
             let agg_func = &agg.aggregator;
             let matching_dot_iter = dot_iter_for_rel_index(&mir_relation, quote_spanned!{agg.span => __matching});
+            let to_iter_func = ind_val_option_to_iter_func_name_for_rel(&mir_relation);
             quote_spanned! {agg.span=>
-               let __no_match_def;
-               let __matching = match #rel_version_var_name.get( &#selected_args_tuple) {
-                  std::option::Option::Some(m) => m,
-                  std::option::Option::None => {__no_match_def = Default::default(); &__no_match_def}
-               };
-               // let matching = #rel_version_var_name.get( &#selected_args_tuple).unwrap_or_default();
-               let __agg_args = #matching_dot_iter
+               let __matching = #rel_version_var_name.get( &#selected_args_tuple);
+               let __agregated_rel = &_self.#rel_name;
+               let __agg_args = #to_iter_func(__matching)
                      .map(|&ind| {
-                              let row = &_self.#rel_name[ind];
+                              let row = &__agregated_rel[ind];
                               #agg_args_tuple
                      });
                for #pat in #agg_func(__agg_args) {
@@ -794,3 +793,14 @@ fn dot_iter_for_rel_index(rel: &MirRelation, var_name: proc_macro2::TokenStream)
       quote_spanned!{var_name.span()=> #var_name.iter()}
    }
 }
+
+fn ind_val_option_to_iter_func_name_for_rel(rel: &MirRelation) -> proc_macro2::TokenStream {
+   if rel.is_full_index {
+      quote! {infer::internal::rel_full_ind_val_option_to_iter}
+   } else if !rel.relation.is_lattice {
+      quote! {infer::internal::rel_ind_val_option_to_iter}
+   } else {
+      quote! {infer::internal::lat_ind_val_option_to_iter}
+   }
+}
+

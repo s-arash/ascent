@@ -10,15 +10,24 @@ use crate::{infer_impl};
 #[test]
 fn test_macro() {
    let inp = quote!{
-      relation foo(i32, i32, i32);
-      relation bar(i32, i32);
-      relation baz(i32);
+      relation subset(i32, i32, i32);
+      relation subset_error(i32, i32, i32);
+      relation placeholder_origin(i32);
+      relation known_placeholder_subset(i32, i32) = vec![(2, 3), (3, 4)];
 
-      baz(x) <--
-         foo(x, _, _),
-         !bar(_, x);
+      subset(o1, o2, 42) <--
+         placeholder_origin(o1),
+         placeholder_origin(o2),
+         known_placeholder_subset(o1, o2);
+
+      subset_error(*origin1, *origin2, *point) <--
+         subset(origin1, origin2, point),
+         placeholder_origin(origin1),
+         placeholder_origin(origin2),
+         !known_placeholder_subset(origin1, origin2),
+         if origin1 != origin2;
    };
-   write_to_scratchpad(inp);
+   write_infer_run_to_scratchpad(inp);
 }
 #[test]
 fn test_macro1() {

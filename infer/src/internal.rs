@@ -187,3 +187,31 @@ impl<T: Clone> Convert<&Rc<T>> for T {
       source.as_ref().clone()
    }
 }
+
+#[inline]
+pub fn rel_ind_val_option_to_iter<'a>(val_option: Option<&'a Vec<usize>>) -> std::slice::Iter<'a, usize> {
+   match val_option {
+      Some(v) => v.iter(),
+      None => [].iter()
+   }
+}
+
+#[inline(always)]
+pub fn rel_full_ind_val_option_to_iter<'a>(val_option: Option<&'a usize>) -> std::option::IntoIter<&'a usize>  {
+   val_option.into_iter()
+}
+
+static mut EMPTY_LAT_IND_VAL: Option<HashSet<usize, BuildNoHashHasher<usize>>> = None;
+pub fn lat_ind_val_option_to_iter<'a>(
+   val_option: Option<&'a HashSet<usize, BuildNoHashHasher<usize>>>,
+) -> std::collections::hash_set::Iter<'_, usize> {
+   match val_option {
+      Some(v) => v.iter(),
+      None => unsafe {
+         if EMPTY_LAT_IND_VAL.is_none() {
+            EMPTY_LAT_IND_VAL = Some(HashSet::default());
+         }
+         EMPTY_LAT_IND_VAL.as_ref().unwrap().iter()
+      },
+   }
+}
