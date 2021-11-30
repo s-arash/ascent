@@ -128,7 +128,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
    let run_code = if !is_infer_run {quote!{}} else {
       quote! {
          use core::cmp::PartialEq;
-         let _self = &mut res;
+         let _self = &mut __run_res;
          #(#relation_initializations)*
          #(#sccs_compiled)*
       }
@@ -191,13 +191,13 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
       quote! {
          {
             #res
-            let mut res: #struct_name #ty_generics = #struct_name::default();
+            let mut __run_res: #struct_name #ty_generics = #struct_name::default();
             #[allow(unused_imports)]
             {
                infer::internal::comment("running...");
                #run_code
             }
-            res
+            __run_res
          }
       }
    }
@@ -287,7 +287,7 @@ fn compile_mir_scc(mir: &InferMir, scc_ind: usize) -> proc_macro2::TokenStream {
    let evaluate_rules_loop = if scc.is_looping { quote! {
       #[allow(unused_assignments, unused_variables)]
       loop {
-         let mut changed = false;
+         let mut __changed = false;
          // evaluate rules
          #(#evaluate_rules)*
 
@@ -295,12 +295,12 @@ fn compile_mir_scc(mir: &InferMir, scc_ind: usize) -> proc_macro2::TokenStream {
          //    append delta to total.
          //    move new to delta
          #(#shift_delta_to_total_new_to_delta)*
-         if !changed {break;}
+         if !__changed {break;}
       }
    }} else {quote! {
       #[allow(unused_assignments, unused_variables)]
       {
-         let mut changed = false;
+         let mut __changed = false;
          #(#evaluate_rules)*
          #(#shift_delta_to_total_new_to_delta)*
          #(#shift_delta_to_total_new_to_delta)*
@@ -519,7 +519,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             for (i,var) in clause_vars.iter(){
                if common_vars_no_indices.contains(var) {continue;}
                let i_ind = syn::Index{index: *i as u32, span: var.span()};
-               new_vars_assignmnets.push(quote_spanned! {var.span()=> let #var = &row.#i_ind;});
+               new_vars_assignmnets.push(quote_spanned! {var.span()=> let #var = &__row.#i_ind;});
             }
 
             let selected_args_cloned = selected_args.iter().map(exp_cloned).collect_vec();
@@ -542,7 +542,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             let cloning_needed = true;
             let row_maybe_clone = maybe_clone(cloning_needed, bclause.rel_args_span);
             
-            let matching_dot_iter = dot_iter_for_rel_index(&bclause.rel, quote_spanned!{bclause.rel_args_span=> matching});
+            let matching_dot_iter = dot_iter_for_rel_index(&bclause.rel, quote_spanned!{bclause.rel_args_span=> __matching});
 
             // TODO cleanup
             // The special case where the first clause has indices, but there are no expressions
@@ -558,28 +558,28 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                for (tuple_ind, &i) in cl1.rel.indices.iter().enumerate() {
                   let var = expr_to_ident(&cl1.args[i]).unwrap();
                   let tuple_ind = syn::Index{index: tuple_ind as u32, span: var.span()};
-                  cl1_join_vars_assignments.push(quote_spanned! {var.span()=> let #var = &cl1_joined_columns.#tuple_ind;});
+                  cl1_join_vars_assignments.push(quote_spanned! {var.span()=> let #var = &__cl1_joined_columns.#tuple_ind;});
                }
                let cl2_vars = cl2.args.iter().filter_map(expr_to_ident).collect_vec();
                for (i,var) in cl1_vars.iter(){
                   let i_ind = syn::Index{index: *i as u32, span: var.span()};
                   if cl1.rel.indices.contains(i) {continue;}
-                  cl1_vars_assignments.push(quote_spanned! {var.span()=> let #var = &row.#i_ind;});
+                  cl1_vars_assignments.push(quote_spanned! {var.span()=> let #var = &__row.#i_ind;});
                }
                let joined_args_for_cl2_cloned = cl2.selected_args().iter().map(exp_cloned).collect_vec();
                let joined_args_tuple_for_cl2 = tuple_spanned(&joined_args_for_cl2_cloned, cl2.args_span);
                
                let cl1_rel_name = &cl1.rel.relation.name;
                let cl2_rel_name = &cl2.rel.relation.name;
-               let cl1_tuple_indices_dot_iter = dot_iter_for_rel_index(&cl1.rel, quote_spanned!(cl1.rel_args_span=> cl1_tuple_indices));
+               let cl1_tuple_indices_dot_iter = dot_iter_for_rel_index(&cl1.rel, quote_spanned!(cl1.rel_args_span=> __cl1_tuple_indices));
 
                let cl1_cloning_needed = true;
                let cl1_row_maybe_clone = maybe_clone(cl1_cloning_needed, cl1.rel_args_span);
 
                let mut cl1_conds_then_rest = quote! {
-                  for &ind in #matching_dot_iter {
+                  for &__ind in #matching_dot_iter {
                      // TODO we may be doing excessive cloning
-                     let row = &_self.#cl2_rel_name[ind] #row_maybe_clone;
+                     let __row = &_self.#cl2_rel_name[__ind] #row_maybe_clone;
                      #(#new_vars_assignmnets)*
                      #conds_then_next_loop
                   }
@@ -588,11 +588,11 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                   cl1_conds_then_rest = compile_cond_clause(cond, cl1_conds_then_rest);
                }
                quote_spanned! {cl1.rel_args_span=>
-                  for (cl1_joined_columns, cl1_tuple_indices) in #cl1_var_name.iter() {
+                  for (__cl1_joined_columns, __cl1_tuple_indices) in #cl1_var_name.iter() {
                      #(#cl1_join_vars_assignments)*
-                     if let Some(matching) = #cl2_var_name.get(&#joined_args_tuple_for_cl2) {
+                     if let Some(__matching) = #cl2_var_name.get(&#joined_args_tuple_for_cl2) {
                         for &cl1_ind in #cl1_tuple_indices_dot_iter{
-                           let row = &_self.#cl1_rel_name[cl1_ind] #cl1_row_maybe_clone;
+                           let __row = &_self.#cl1_rel_name[cl1_ind] #cl1_row_maybe_clone;
                            #(#cl1_vars_assignments)*
                            #cl1_conds_then_rest
                         }
@@ -606,10 +606,10 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                // let bclause_rel_no_ind = &mir.relations_no_indices[&bclause.rel.relation];
                // let rel_no_ind_version_var_name = ir_relation_version_var_name(&bclause_rel_no_ind.ir_name(), bclause.rel.version);
                // quote_spanned! {bclause.rel_args_span=>
-               //    if let Some(matching) = #rel_no_ind_version_var_name.get(&()) {
-               //       for &ind in matching.iter() {
+               //    if let Some(__matching) = #rel_no_ind_version_var_name.get(&()) {
+               //       for &__ind in __matching.iter() {
                //          // TODO we may be doing excessive cloning
-               //          let row = &_self.#bclause_rel_name[ind] #row_maybe_clone;
+               //          let __row = &_self.#bclause_rel_name[__ind] #row_maybe_clone;
                //          #(#new_vars_assignmnets)*
                //          #conds_then_next_loop
                //       }
@@ -618,10 +618,10 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                unreachable!()
             } else {
                quote_spanned! {bclause.rel_args_span=>
-                  if let Some(matching) = #rel_version_var_name.get( &#selected_args_tuple) {
-                     for &ind in #matching_dot_iter {
+                  if let Some(__matching) = #rel_version_var_name.get( &#selected_args_tuple) {
+                     for &__ind in #matching_dot_iter {
                         // TODO we may be doing excessive cloning
-                        let row = &_self.#bclause_rel_name[ind] #row_maybe_clone;
+                        let __row = &_self.#bclause_rel_name[__ind] #row_maybe_clone;
                         #(#new_vars_assignmnets)*
                         #conds_then_next_loop
                      }
@@ -656,7 +656,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                         .find_position(|rel_arg| expr_to_ident(rel_arg) == Some(arg.clone())).unwrap().0, arg));
             let agg_args_tuple = agg_args_tuple_indices.map(|(ind, arg)| {
                let tuple_ind = syn::Index::from(ind);
-               parse2(quote_spanned! {arg.span()=> &row.#tuple_ind}).unwrap()
+               parse2(quote_spanned! {arg.span()=> &__row.#tuple_ind}).unwrap()
             }).collect_vec();
             let agg_args_tuple = tuple_spanned(&agg_args_tuple, agg.span);
             let agg_func = &agg.aggregator;
@@ -666,8 +666,8 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                let __matching = #rel_version_var_name.get( &#selected_args_tuple);
                let __agregated_rel = &_self.#rel_name;
                let __agg_args = #to_iter_func(__matching)
-                     .map(|&ind| {
-                              let row = &__agregated_rel[ind];
+                     .map(|&__ind| {
+                              let __row = &__agregated_rel[__ind];
                               #agg_args_tuple
                      });
                for #pat in #agg_func(__agg_args) {
@@ -697,11 +697,11 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
                let var_name = ir_relation_version_var_name(&rel_ind.ir_name(), New);
                let args_tuple : Vec<Expr> = rel_ind.indices.iter().map(|&i| {
                   let i_ind = syn::Index::from(i);
-                  syn::parse2(quote_spanned!{head_rel_name.span()=> new_row.#i_ind.clone()}).unwrap()
+                  syn::parse2(quote_spanned!{head_rel_name.span()=> __new_row.#i_ind.clone()}).unwrap()
                }).collect();
                let args_tuple = tuple(&args_tuple);
                update_indices.push(quote_spanned! {hcl.span=>
-                  infer::internal::RelIndexTrait::index_insert(&mut #var_name, #args_tuple, new_row_ind);
+                  infer::internal::RelIndexTrait::index_insert(&mut #var_name, #args_tuple, __new_row_ind);
                });
             }
          }
@@ -715,25 +715,25 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             let head_rel_name_string = head_rel_name.to_string();
             let add_row = quote_spanned!{hcl.span=>
                // comment("check if the tuple already exists");
-               let new_row: #row_type = #new_row_tuple;
-               // if !(#head_rel_full_index_var_name_new.contains_key(&new_row) ||
-               //    #head_rel_full_index_var_name_delta.contains_key(&new_row) ||
-               //    #head_rel_full_index_var_name_total.contains_key(&new_row))
+               let __new_row: #row_type = #new_row_tuple;
+               // if !(#head_rel_full_index_var_name_new.contains_key(&__new_row) ||
+               //    #head_rel_full_index_var_name_delta.contains_key(&__new_row) ||
+               //    #head_rel_full_index_var_name_total.contains_key(&__new_row))
                // {
-               //    let new_row_ind = _self.#head_rel_name.len();
+               //    let __new_row_ind = _self.#head_rel_name.len();
                //    #(#update_indices)*
-               //    _self.#head_rel_name.push(new_row);
-               //    changed = true;
+               //    _self.#head_rel_name.push(__new_row);
+               //    __changed = true;
                // }
 
-               let new_row_ind = _self.#head_rel_name.len();
-               if !(#head_rel_full_index_var_name_total.contains_key(&new_row) ||
-                    #head_rel_full_index_var_name_delta.contains_key(&new_row)){
+               let __new_row_ind = _self.#head_rel_name.len();
+               if !(#head_rel_full_index_var_name_total.contains_key(&__new_row) ||
+                    #head_rel_full_index_var_name_delta.contains_key(&__new_row)){
                   if infer::internal::full_index_insert_if_not_present(&mut #head_rel_full_index_var_name_new, 
-                                                                       &new_row, new_row_ind){
+                                                                       &__new_row, __new_row_ind){
                      #(#update_indices)*
-                     _self.#head_rel_name.push(new_row);
-                     changed = true;
+                     _self.#head_rel_name.push(__new_row);
+                     __changed = true;
                   }
                }
             };
@@ -748,25 +748,25 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             let lattice_key_tuple = tuple(&lattice_key_args);
 
             let add_row = quote! {
-               let new_row: #row_type = #new_row_tuple;
-               let lattice_key = #lattice_key_tuple;
-               if let Some(existing_ind) = #head_lat_full_index_var_name_new.get(&lattice_key)
-                  .or_else(|| #head_lat_full_index_var_name_delta.get(&lattice_key))
-                  .or_else(|| #head_lat_full_index_var_name_full.get(&lattice_key)) 
+               let __new_row: #row_type = #new_row_tuple;
+               let __lattice_key = #lattice_key_tuple;
+               if let Some(__existing_ind) = #head_lat_full_index_var_name_new.get(&__lattice_key)
+                  .or_else(|| #head_lat_full_index_var_name_delta.get(&__lattice_key))
+                  .or_else(|| #head_lat_full_index_var_name_full.get(&__lattice_key)) 
                {
-                  let existing_ind = *existing_ind.iter().next().unwrap();
+                  let __existing_ind = *__existing_ind.iter().next().unwrap();
                   // TODO possible excessive cloning here?
-                  let lat_changed = ::infer::Lattice::join_mut(&mut _self.#head_rel_name[existing_ind].#tuple_lat_index, new_row.#tuple_lat_index.clone());
-                  if lat_changed {
-                     let new_row_ind = existing_ind;
+                  let __lat_changed = ::infer::Lattice::join_mut(&mut _self.#head_rel_name[__existing_ind].#tuple_lat_index, __new_row.#tuple_lat_index.clone());
+                  if __lat_changed {
+                     let __new_row_ind = __existing_ind;
                      #(#update_indices)*
-                     changed = true;
+                     __changed = true;
                   }
                } else {
-                  let new_row_ind = _self.#head_rel_name.len();
+                  let __new_row_ind = _self.#head_rel_name.len();
                   #(#update_indices)*
-                  _self.#head_rel_name.push(new_row);
-                  changed = true;
+                  _self.#head_rel_name.push(__new_row);
+                  __changed = true;
                }
             };
             add_rows.push(add_row);
