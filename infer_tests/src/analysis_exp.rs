@@ -243,9 +243,12 @@ fn Y() -> Expr{
    let uprime = lam("x", app(Ref("f"), lam("v", let_("xx", app(Ref("x"), Ref("x")), app(Ref("xx"), Ref("v"))))));
    lam("f", let_("u'", uprime, app(Ref("u'"), Ref("u'"))))
 }
+
+// #[test]
 pub fn analysis_exp(){
    use infer::lattice::constant_propagation::ConstPropagation::*;
-
+   // println!("CESK summary:\n{}", CESK::summary());
+   
    // term = (λx. 42 + x) 58
    // let term = app(lam("x", binop(Op::Add, Lit(Constant(42)), Ref("x"))),
    //                Lit(Constant(58)));

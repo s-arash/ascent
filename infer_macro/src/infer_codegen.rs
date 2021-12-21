@@ -803,4 +803,3 @@ fn ind_val_option_to_iter_func_name_for_rel(rel: &MirRelation) -> proc_macro2::T
       quote! {infer::internal::lat_ind_val_option_to_iter}
    }
 }
-

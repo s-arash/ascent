@@ -131,6 +131,31 @@ fn test_infer_negation2(){
 }
 
 #[test]
+fn test_infer_negation3(){
+   use infer::aggregators::*;
+   let res = infer_run!{
+      relation foo(i32, i32);
+      relation bar(i32, i32, i32);
+      relation baz(i32, i32);
+
+      foo(0, 1);
+      foo(1, 2);
+      foo(10, 11);
+      foo(100, 101);
+
+      bar(1, 2, 3); 
+      bar(10, 11, 13);
+
+      baz(x, y) <--
+         foo(x, y),
+         !bar(x, y, y + 1);
+   };
+   // println!("{}", res.summary());
+   println!("baz: {:?}", res.baz);
+   assert!(rels_equal([(0, 1), (10, 11), (100, 101)], res.baz));
+}
+
+#[test]
 fn test_infer_agg_simple(){
    use infer::aggregators::*;
    let res = infer_run!{

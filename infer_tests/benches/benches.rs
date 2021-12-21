@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
 use stopwatch::Stopwatch;
-use infer::infer;
+use infer::{infer, infer_run};
 use infer::lattice::Dual;
 
 mod tc {
