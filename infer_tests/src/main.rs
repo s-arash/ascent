@@ -32,7 +32,6 @@ fn _run_tc_bench(){
    for i in 0..1000 {
       tc.edge.push((i, i + 1));
    }
-   tc.update_indices();
 
    let mut stopwatch = Stopwatch::start_new();
    tc.run();

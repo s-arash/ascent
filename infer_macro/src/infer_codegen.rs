@@ -110,7 +110,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
    }
    if mir.relations_initializations.len() > 0 {
       relation_initializations.push(quote! {
-         _self.update_indices();
+         _self.update_indices_priv();
       })
    }
 
@@ -120,6 +120,7 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
          #[allow(unused_imports)]
          pub fn run(&mut self) {
             use core::cmp::PartialEq;
+            self.update_indices_priv();
             let _self = self;
             #(#sccs_compiled)*
          }
@@ -159,8 +160,14 @@ pub(crate) fn compile_mir(mir: &InferMir, is_infer_run: bool) -> proc_macro2::To
       }
       impl #impl_generics #struct_name #ty_generics #where_clause {
          #run_func
-         pub fn update_indices(&mut self) {
+         // TODO remove pub update_indices at some point
+         fn update_indices_priv(&mut self) {
             #update_indices_body
+         }
+
+         #[deprecated = "Explicit call to update_indices not required anymore."]
+         pub fn update_indices(&mut self) {
+            self.update_indices_priv();
          }
          #[allow(unused_imports)]
          fn type_constaints() {

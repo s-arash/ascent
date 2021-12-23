@@ -1,7 +1,7 @@
 # Logic programming in Rust
 [![Rust](https://github.com/s-arash/infer/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/infer/actions/workflows/rust.yml)
 
-Infer is a logic programming language (similar to Datalog) embedded in Rust using macros.
+Infer is a logic programming language (similar to Datalog) embedded in Rust via macros.
 
 ## Examples
 
@@ -61,7 +61,6 @@ Notice the `lattice` keyword. Infer works with arbitrary lattices (any type that
    fn main() {
       let mut prog = InferProgram::default();
       prog.edge = vec![(1,2), (2, 3)];
-      prog.update_indices();
       prog.run();
       println!("path: {:?}", prog.path);
    }

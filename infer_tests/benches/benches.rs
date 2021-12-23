@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
 use stopwatch::Stopwatch;
-use infer::{infer, infer_run};
+use infer::{infer};
 use infer::lattice::Dual;
 
 mod tc {
@@ -48,9 +48,9 @@ fn bench_tc(nodes_count: i32) {
    for i in 0..nodes_count {
       tc.edge.push((i, i + 1));
    }
-   tc.update_indices();
 
    let mut stopwatch = Stopwatch::start_new();
+   tc.update_indices();
    tc.run();
    stopwatch.stop();
 
@@ -109,7 +109,6 @@ fn bench_tc_path_join_path(nodes_count: i32) {
    for i in 0..nodes_count {
       tc.edge.push((i, i + 1));
    }
-   tc.update_indices();
 
    let mut stopwatch = Stopwatch::start_new();
    tc.run();
@@ -146,7 +145,6 @@ fn bench_tc_for_graph(graph: Vec<(i32, i32)>, name: &str) {
    let before = Instant::now();
    let mut tc = tc::InferProgram::default();
    tc.edge = graph;
-   tc.update_indices();
    tc.run();
    let elapsed = before.elapsed();
    println!("tc for {} took {:?}", name, elapsed);

@@ -258,7 +258,6 @@ pub fn analysis_exp(){
    let term = app(f, Lit(Constant(0)));
    let mut cesk = CESK::default();
    cesk.input = vec![(term,)];
-   cesk.update_indices();
    cesk.run();
    // println!("ς: \n{}", cesk.ς.iter().map(|x| format!("{:?}", x)).join("\n"));
    // println!("σ: \n{}", cesk.σ.iter().map(|x| format!("{:?}", x)).join("\n"));

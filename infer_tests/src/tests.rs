@@ -235,7 +235,6 @@ fn test_dl2(){
       (20, 0),
    ];
    prog.foo2 = foo2;
-   prog.update_indices();
 
    prog.run();
 
@@ -567,7 +566,6 @@ fn test_infer_tc_generic(){
    }
    let mut prog = TC::default();
    prog.r = vec![(1,2), (2,3)];
-   prog.update_indices();
    prog.run();
    assert!(rels_equal([(1,2), (2, 3), (1, 3)], prog.tc));
 }
@@ -611,7 +609,6 @@ fn test_infer_explicit_decl(){
    }
    let mut prog = TC::default();
    prog.edge = vec![(Node(1),Node(2)), (Node(2), Node(3))];
-   prog.update_indices();
    prog.run();
    println!("path: {:?}", prog.path);
    assert!(rels_equal([(Node(1),Node(2)), (Node(2),Node(3)), (Node(1),Node(3))], prog.path));
