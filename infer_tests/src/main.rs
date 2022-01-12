@@ -9,10 +9,11 @@ mod se;
 mod exps;
 mod analysis_exp;
 mod agg_tests;
+mod example_tests;
 
-use std::{any::Any, cmp::max, rc::Rc};
+use std::{any::Any, cmp::max, rc::Rc, collections::HashSet};
 use stopwatch::Stopwatch;
-use infer::infer;
+use infer::{infer};
 
 
 infer!{
