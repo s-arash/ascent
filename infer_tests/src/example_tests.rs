@@ -3,7 +3,7 @@ use infer::infer;
 use std::rc::Rc;
 use infer::aggregators::mean;
 use crate::utils::rels_equal;
-
+use std::hash::Hash;
 
 #[test]
 fn test_generators_conditions_example() {
@@ -44,3 +44,40 @@ fn test_agg_example() {
    assert!(rels_equal(&prog.avg_grade, &[(1, 70), (2, 80)]));
 }
 
+#[test]
+fn test_tc_example() {
+   fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
+      infer_run!{
+         relation r(i32, i32) = r;
+         relation tc(i32, i32);
+         tc(x, y) <-- r(x, y);
+         tc(x, z) <-- r(x, y), tc(y, z);
+         tc(x, x), tc(y, y) <-- if reflexive, r(x, y);
+      }.tc
+   }
+   let r = vec![(1, 2), (2, 4), (3, 1)];
+   println!("tc: {:?}", tc(r.clone(), true));
+   println!("reflexive tc: {:?}", tc(r.clone(), true));
+   assert!(rels_equal(tc(r.clone(), true), 
+          vec![(1,1), (2,2), (3,3), (4,4), (1, 2), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4)]));
+}
+
+
+#[test]
+fn test_generic_tc_example() {
+   fn tc<N>(r: Vec<(N, N)>, reflexive: bool) -> Vec<(N, N)> where N: Clone + Hash + Eq{
+      infer_run!{
+         struct TC<N: Clone + Hash + Eq>;
+         relation r(N, N) = r;
+         relation tc(N, N);
+         tc(x, y) <-- r(x, y);
+         tc(x, z) <-- r(x, y), tc(y, z);
+         tc(x, x), tc(y, y) <-- if reflexive, r(x, y);
+      }.tc
+   }
+   let r = vec![(1, 2), (2, 4), (3, 1)];
+   println!("tc: {:?}", tc(r.clone(), true));
+   println!("reflexive tc: {:?}", tc(r.clone(), true));
+   assert!(rels_equal(tc(r.clone(), true), 
+          vec![(1,1), (2,2), (3,3), (4,4), (1, 2), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4)]));
+}

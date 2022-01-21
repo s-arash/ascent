@@ -24,7 +24,7 @@ infer!{
    path(*x, *y) <-- edge(x,y);
    // path(*x, *z) <-- edge(x,y), path(y, z);
    //path(*x, *z) <-- path(y, z), edge(x, y);
-   path(*x, *z) <-- path(x, y), path(y, z);
+   path(*x, *z) <-- edge(x, y), path(y, z);
 }
 
 fn _run_tc_bench(){

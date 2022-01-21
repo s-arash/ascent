@@ -119,15 +119,17 @@ Aggregators can even be parameterized! For an example of a parameterized aggrega
 
 ### `infer_run!`
 
-In addition to `infer!`, we provide the `infer_run!` macro. Unlike `infer!`, this macro evaluates the infer program when invoked. The main advantage of `infer_run!` is that local variables are in scope inside the Infer program. For example, we can define a function for discovering triangles in a graph like so:
+In addition to `infer!`, we provide the `infer_run!` macro. Unlike `infer!`, this macro evaluates the infer program when invoked. The main advantage of `infer_run!` is that local variables are in scope inside the Infer program. For example, we can define a function for discovering the (optionally reflexive) transitive closure of a relation like so:
 
 ```Rust
-fn triangles(edges: &[(i32, i32)]) -> Vec<(i32, i32, i32)> {
+fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
    infer_run!{
-      relation edge(i32, i32) = edges.iter().cloned().collect();
-      relation triangle(i32, i32, i32);
-      triangle(x, y, z) <-- edge(x, y), edge(y, z), edge(z, x);
-   }.triangle
+      relation r(i32, i32) = r;
+      relation tc(i32, i32);
+      tc(x, y) <-- r(x, y);
+      tc(x, z) <-- r(x, y), tc(y, z);
+      tc(x, x), tc(y, y) <-- if reflexive, r(x, y);
+   }.tc
 }
 ```
-In the above example, we initialize the `edge` relation directly to shorten the program.
+In the above example, we initialize the `tc` relation directly to shorten the program.

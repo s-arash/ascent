@@ -24,7 +24,7 @@ fn loop_graph(nodes: usize) -> Vec<(i32, i32)> {
    let mut res = vec![];
    let nodes = nodes as i32;
    for x in 0..nodes {
-       res.push((x, (x + 1) % nodes));
+      res.push((x, (x + 1) % nodes));
    }
    res
 }
@@ -33,11 +33,11 @@ fn complete_graph(nodes: usize) -> Vec<(i32, i32, u32)> {
    let mut res = vec![];
    let nodes = nodes as i32;
    for x in 0..nodes {
-       for y in 0..nodes {
-           if x != y {
-               res.push((x, y, 1));
-           }
-       }
+      for y in 0..nodes {
+         if x != y {
+            res.push((x, y, 1));
+         }
+      }
    }
    res
 }
@@ -50,7 +50,6 @@ fn bench_tc(nodes_count: i32) {
    }
 
    let mut stopwatch = Stopwatch::start_new();
-   tc.update_indices();
    tc.run();
    stopwatch.stop();
 
