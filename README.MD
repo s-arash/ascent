@@ -132,4 +132,4 @@ fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
    }.tc
 }
 ```
-In the above example, we initialize the `tc` relation directly to shorten the program.
+In the above example, we initialize the relation `r` directly to shorten the program.

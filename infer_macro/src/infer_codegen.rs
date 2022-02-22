@@ -751,7 +751,10 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &InferMir, clause_ind: us
             let head_lat_full_index_var_name_delta = ir_relation_version_var_name(&head_lat_full_index.ir_name(), Delta);
             let head_lat_full_index_var_name_full = ir_relation_version_var_name(&head_lat_full_index.ir_name(), Total);
             let tuple_lat_index = syn::Index::from(hcl.rel.field_types.len() - 1);
-            let lattice_key_args = hcl.args.iter().take(hcl.args.len() - 1).map(exp_cloned).collect_vec();
+            let lattice_key_args : Vec<Expr> = (0..hcl.args.len() - 1).map(|i| {
+               let i_ind = syn::Index::from(i);
+               syn::parse2(quote_spanned!{head_rel_name.span()=> __new_row.#i_ind}).unwrap()
+            }).map(|e| exp_cloned(&e)).collect_vec();
             let lattice_key_tuple = tuple(&lattice_key_args);
 
             let add_row = quote! {

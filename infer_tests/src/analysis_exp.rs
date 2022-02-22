@@ -166,55 +166,54 @@ infer!{
    lattice σnum(Addr, Num);
    relation ς(Expr, Env, Addr, Time);
 
-   ς(v.clone(), ρ2.clone(), a.clone(), tick(e, ρ, a, t, k)) <--
+   ς(v.clone(), ρ2, a, tick(e, ρ, a, t, k)) <--
       ς(?e@Ref(x), ρ, a, t),
       (σ(ρ[x], ?Value(v, ρ2)) || 
       σnum(ρ[x], lit), let v = Lit(*lit), let ρ2 = ρ),
       σ(a, ?Kont(k));
 
    σ(b.clone(), Kont(Ar(e1.deref().clone(), ρ.clone(), a.clone()))),
-   ς(e0.deref().clone(), ρ.clone(), b, tick(e, ρ, a, t, k)) <--
+   ς(e0, ρ, b, tick(e, ρ, a, t, k)) <--
       ς(?e@App(e0, e1), ρ, a, t),
       σ(a, ?Kont(k)),
       let b = alloc(e, ρ, a, t, k);
    
    σ(b.clone(), Kont(BinopAr2(*op, e2.deref().clone(), ρ.clone(), a.clone()))),
-   ς(e1.deref().clone(), ρ.clone(), b, tick(e, ρ, a, t, k)) <--
+   ς(e1, ρ, b, tick(e, ρ, a, t, k)) <--
       ς(?e@Binop(op, e1, e2), ρ, a, t),
       σ(a, ?Kont(k)),
       let b = alloc(e, ρ, a, t, k);
 
    σ(b.clone(), Kont(Fn(v.clone(), ρ.clone(), c.clone()))),
-   ς(e.clone(), ρ2.clone(), b, tick(e, ρ, a, t, k)) <--
+   ς(e, ρ2, b, tick(e, ρ, a, t, k)) <--
       ς(?v@Lam(..), ρ, a, t),
       σ(a, ?Kont(k)),
       if let Ar(e, ρ2, c) = k,
       let b = alloc(v, ρ, a, t, k);
    
    σ(b.clone(), Kont(BinopAr1(*op, *l, c.clone()))),
-   ς(e.clone(), ρ2.clone(), b, tick(v, ρ, a, t, k)) <--
+   ς(e, ρ2, b, tick(v, ρ, a, t, k)) <--
       ς(?v@Lit(l), ρ, a, t), 
       σ(a, ?Kont(k)),
       if let BinopAr2(op, e, ρ2, c) = k,
       let b = alloc(v, ρ, a, t, k);
 
-   // TODO bug: lattice requires op_addr.clone()
-   σnum(op_addr.clone(), apply_op(*op, l1, l2)), 
-   ς(Ref("IT"), upd(ρ, "IT", op_addr) , c.clone(), tick(v2, ρ, a, t, k)) <--
+   σnum(op_addr.clone(), apply_op(*op, l1, l2)),
+   ς(Ref("IT"), upd(ρ, "IT", op_addr), c, tick(v2, ρ, a, t, k)) <--
       ς(?v2@Lit(l2), ρ, a, t), 
       σ(a, ?Kont(k)),
       if let BinopAr1(op, l1, c) = k,
       let op_addr = alloc(v2, ρ, a, t, k);
 
    σ(b.clone(), Value(v.clone(), ρ.clone())),
-   ς(e.deref().clone(), upd(&ρ2, x, b.clone()), c.clone(), tick(v, ρ, a, t, k)) <--
+   ς(e, upd(&ρ2, x, b), c, tick(v, ρ, a, t, k)) <--
       ς(?v@Lam(..), ρ, a, t),
       σ(a, ?Kont(k)),
       if let Fn(Lam(x, e), ρ2, c) = k,
       let b = alloc(v, ρ, a, t, k);
    
    σnum(b.clone(), *lit),
-   ς(e.deref().clone(), upd(&ρ2, x, b.clone()), c.clone(), tick(v, ρ, a, t, k)) <--
+   ς(e, upd(&ρ2, x, b), c.clone(), tick(v, ρ, a, t, k)) <--
       ς(?v@Lit(lit), ρ, a, t),
       σ(a, ?Kont(k)),
       if let Fn(Lam(x, e), ρ2, c) = k,
@@ -223,10 +222,10 @@ infer!{
    relation output(Expr, Env);
    relation input(Expr);
    σ((Either::Right("__a0"), Contour::default()), Storable::Kont(Continuation::Mt)),
-   ς(e.clone(), Env::default(), (Either::Right("__a0"), Contour::default()), (None, Contour::default())) <--
+   ς(e, Env::default(), (Either::Right("__a0"), Contour::default()), (None, Contour::default())) <--
       input(e);
 
-   output(e.clone(), ρ.clone()) <--
+   output(e, ρ) <--
       ς(e, ρ, a, t) if atom(e),
       σ(a, Kont(Continuation::Mt));
 }
