@@ -1,13 +1,13 @@
 # Logic programming in Rust
-[![Rust](https://github.com/s-arash/infer/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/infer/actions/workflows/rust.yml)
+[![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml)
 
-Infer is a logic programming language (similar to Datalog) embedded in Rust via macros.
+Ascent is a logic programming language (similar to Datalog) embedded in Rust via macros.
 
 ## Examples
 
 ### Computing all the connected nodes in a graph
 ```Rust
-infer!{
+ascent!{
    relation edge(i32, i32);
    relation path(i32, i32);
    
@@ -16,22 +16,22 @@ infer!{
 }
 ```
 
-## Using Infer
+## Using Ascent
 1. [Install Rust](https://www.rust-lang.org/tools/install).
 2. Make a new Rust project:
    ```bash
-   cargo new my-infer-project
-   cd my-infer-project
+   cargo new my-ascent-project
+   cd my-ascent-project
    ```
-3. Add `infer` as a dependency in `Cargo.toml`:
+3. Add `ascent` as a dependency in `Cargo.toml`:
    ```toml
    [dependencies]
-   infer = {git = "https://github.com/s-arash/infer"}
+   ascent = {git = "https://github.com/s-arash/ascent"}
    ```
-4. Write some Infer code in `main.rs`. Here is a complete example:
+4. Write some Ascent code in `main.rs`. Here is a complete example:
    ```rust
-   use infer::infer;
-   infer!{
+   use ascent::ascent;
+   ascent!{
       relation edge(i32, i32);
       relation path(i32, i32);
       
@@ -40,7 +40,7 @@ infer!{
    }
 
    fn main() {
-      let mut prog = InferProgram::default();
+      let mut prog = AscentProgram::default();
       prog.edge = vec![(1, 2), (2, 3)];
       prog.run();
       println!("path: {:?}", prog.path);
@@ -54,12 +54,12 @@ infer!{
 
 ### Lattices
 
-Infer supports computing fixed points of user-defined lattices. The `lattice` keyword defines a lattice in Infer. The type of the final column of a `lattice` must implement the `Lattice` trait. A `lattice` is like a relation, except that when a new `lattice` fact (v<sub>1</sub>, v<sub>2</sub>, ..., v<sub>(n-1)</sub>, v<sub>n</sub>) is discovered, and a fact  (v<sub>1</sub>, v<sub>2</sub>, ..., v<sub>(n-1)</sub>, v'<sub>n</sub>) is already present in the database, v<sub>n</sub> and v'<sub>n</sub> are `join`ed together to produce a single fact.
+Ascent supports computing fixed points of user-defined lattices. The `lattice` keyword defines a lattice in Ascent. The type of the final column of a `lattice` must implement the `Lattice` trait. A `lattice` is like a relation, except that when a new `lattice` fact (v<sub>1</sub>, v<sub>2</sub>, ..., v<sub>(n-1)</sub>, v<sub>n</sub>) is discovered, and a fact  (v<sub>1</sub>, v<sub>2</sub>, ..., v<sub>(n-1)</sub>, v'<sub>n</sub>) is already present in the database, v<sub>n</sub> and v'<sub>n</sub> are `join`ed together to produce a single fact.
 
 This feature enables writing programs not expressible in Datalog. For example we can use this feature to compute the lengths of shortest paths between nodes in a graph.
 
 ```Rust
-infer!{
+ascent!{
    lattice shortest_path(i32, i32, Dual<u32>);
    relation edge(i32, i32, u32);
 
@@ -77,7 +77,7 @@ In this example, `Dual<T>` is the dual of the lattice T. We use `Dual<T>` becaus
 The syntax is designed to be familiar to Rust users. In this example, `edge` is populated with non-reflexive edges from `node`. Note that any type that implements `Clone + Eq + Hash` can be used as a relation column.
 
 ```Rust
-infer! {
+ascent!{
    relation node(i32, Rc<Vec<i32>>);
    relation edge(i32, i32);
    
@@ -89,16 +89,16 @@ infer! {
 ```
 
 ### Negation and Aggregation
-Infer supports stratified negation and aggregation. Aggregators are defined in `infer::aggregators`. You can find `sum`, `min`, `max`, `count`, and `mean` there.
+Ascent supports stratified negation and aggregation. Aggregators are defined in `ascent::aggregators`. You can find `sum`, `min`, `max`, `count`, and `mean` there.
 
 In the following example, the average grade of students is stored in `avg_grade`:
 
 ```Rust
-use infer::aggregators::*;
+use ascent::aggregators::*;
 type Student = u32;
 type Course = u32;
 type Grade = u16;
-infer! {
+ascent!{
    relation student(Student);
    relation course_grade(Student, Course, Grade);
    relation avg_grade(Student, Grade);
@@ -115,15 +115,15 @@ You can define your own aggregators if the provided aggregators are not sufficie
 fn second_highest<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
    where N: Ord + Clone
 ```
-Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`infer::aggregators`](./infer/src/aggregators.rs).
+Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
 
-### `infer_run!`
+### `ascent_run!`
 
-In addition to `infer!`, we provide the `infer_run!` macro. Unlike `infer!`, this macro evaluates the infer program when invoked. The main advantage of `infer_run!` is that local variables are in scope inside the Infer program. For example, we can define a function for discovering the (optionally reflexive) transitive closure of a relation like so:
+In addition to `ascent!`, we provide the `ascent_run!` macro. Unlike `ascent!`, this macro evaluates the ascent program when invoked. The main advantage of `ascent_run!` is that local variables are in scope inside the Ascent program. For example, we can define a function for discovering the (optionally reflexive) transitive closure of a relation like so:
 
 ```Rust
 fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
-   infer_run!{
+   ascent_run!{
       relation r(i32, i32) = r;
       relation tc(i32, i32);
       tc(x, y) <-- r(x, y);

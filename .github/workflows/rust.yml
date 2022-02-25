@@ -24,15 +24,15 @@ jobs:
           toolchain: stable
     - run: cargo --version
     - name: Run tests
-      working-directory: ./infer_tests
+      working-directory: ./ascent_tests
       run: cargo test test
-    - name: Run infer_base tests
-      working-directory: ./infer_base
+    - name: Run ascent_base tests
+      working-directory: ./ascent_base
       run: cargo test
     - name: Run Benchmarks
-      working-directory: ./infer_tests
+      working-directory: ./ascent_tests
       run: cargo bench bench_tc -- --nocapture
       # macro tests should be last, because they produce scratchpad.rs, which my not compile
     - name: Run macro tests
-      working-directory: ./infer_macro
+      working-directory: ./ascent_macro
       run: cargo test test  
