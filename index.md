@@ -50,6 +50,7 @@ ascent!{
    ```bash
    cargo run
    ```
+
 ## Features
 
 ### Lattices
