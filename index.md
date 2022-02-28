@@ -116,7 +116,7 @@ You can define your own aggregators if the provided aggregators are not sufficie
 fn second_highest<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
    where N: Ord + Clone
 ```
-Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
+Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in `ascent::aggregators`.
 
 ### `ascent_run!`
 
