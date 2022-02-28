@@ -50,3 +50,5 @@ ascent!{
    ```bash
    cargo run
    ```
+## Ascent features
+Visit the [Ascent repository page](https://github.com/s-arash/ascent) for an overview of Ascent features. 
