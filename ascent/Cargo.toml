@@ -2,6 +2,13 @@
 name = "ascent"
 version = "0.1.0"
 edition = "2021"
+authors = ["Arash Sahebolamri"]
+description = "Logic programming in Rust"
+keywords = ["logic-programming", "program-analysis", "Datalog", "procedural-macro"]
+categories = ["compilers"]
+homepage = "https://s-arash.github.io/ascent/"
+repository = "https://github.com/s-arash/ascent"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

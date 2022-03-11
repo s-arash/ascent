@@ -1,0 +1,2 @@
+[workspace]
+members = ["ascent", "ascent_base", "ascent_macro"] 

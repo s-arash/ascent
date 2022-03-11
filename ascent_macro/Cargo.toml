@@ -2,6 +2,10 @@
 name = "ascent_macro"
 version = "0.1.0"
 edition = "2021"
+authors = ["Arash Sahebolamri"]
+repository = "https://github.com/s-arash/ascent"
+license = "MIT"
+description = "implementation of ascent macros"
 
 [lib]
 proc-macro = true
