@@ -5,7 +5,8 @@ use std::cmp::Ordering;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 /// A wrapper for tuple types that provides an implementation of `PartialOrd` using
-/// [product-order](https://en.wikipedia.org/wiki/Product_order) semantics. In addition, 
+/// [product-order](https://en.wikipedia.org/wiki/Product_order) semantics. 
+/// 
 /// `Lattice` and `BoundedLattice` traits are also implemented.
 /// 
 /// Difference from lexicographical ordering (the `PartialOrd` implementation for tuple types):

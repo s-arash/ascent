@@ -19,6 +19,7 @@ use syn::Result;
 use crate::{ascent_codegen::compile_mir, ascent_hir::{compile_ascent_program_to_hir}, ascent_mir::{compile_hir_to_mir}};
 
 /// The main macro of the ascent library. Allows writing logical inference rules similar to Datalog.
+/// 
 /// Example:
 /// ```
 /// # #[macro_use] extern crate ascent_macro;
@@ -27,14 +28,13 @@ use crate::{ascent_codegen::compile_mir, ascent_hir::{compile_ascent_program_to_
 ///   relation edge(i32, i32);
 ///   relation path(i32, i32);
 ///   
-///   path(*x, *y) <-- edge(x,y);
-///   path(*x, *z) <-- edge(x,y), path(y, z);
+///   path(x, y) <-- edge(x,y);
+///   path(x, z) <-- edge(x,y), path(y, z);
 /// }
 /// 
 /// fn main() {
 ///   let mut tc_comp = AscentProgram::default();
 ///   tc_comp.edge = vec![(1,2), (2,3)];
-///   tc_comp.update_indices();
 ///   tc_comp.run();
 ///   println!("{:?}", tc_comp.path);
 /// }
@@ -46,14 +46,14 @@ pub fn ascent(input: TokenStream) -> TokenStream {
    let res = ascent_impl(input.into(), false);
    
    match res {
-    Ok(res) => res.into(),
-    Err(err) => TokenStream::from(err.to_compile_error()),
+      Ok(res) => res.into(),
+      Err(err) => TokenStream::from(err.to_compile_error()),
    }
 }
 
 
-/// Like `ascent`, except that invocations of this macro evaluate to an expression containing all the relations
-/// defined inside the macro body, and evaluated to a fixed point.
+/// Like `ascent`, except that the result of an `ascent_run` invocation is a value containing all the relations
+/// defined inside the macro body, and computed to a fixed point.
 /// The advantage of `ascent_run` compared to `ascent` is the fact that `ascent_run` has access to local variables
 /// in scope:
 /// ```
@@ -62,8 +62,8 @@ pub fn ascent(input: TokenStream) -> TokenStream {
 /// let r = vec![(1,2), (2,3)];
 /// let r_tc = ascent_run!{
 ///    relation tc(i32, i32);
-///    tc(*x, *y) <-- for (x, y) in r.iter();
-///    tc(*x, *z) <-- for (x, y) in r.iter(), tc(y, z);
+///    tc(x, y) <-- for (x, y) in r.iter();
+///    tc(x, z) <-- for (x, y) in r.iter(), tc(y, z);
 /// }.tc;
 ///
 /// ```

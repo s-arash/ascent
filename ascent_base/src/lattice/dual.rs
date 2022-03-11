@@ -5,8 +5,8 @@ use crate::Lattice;
 use super::{BoundedLattice};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
-/// A wrapper that inverts `<=` and `>=` (or `partial_cmp` for `PartialOrd` types), `meet` and `join` for `ProtoLattice`s, 
-/// and `top` and `bottom` for `BoundedLattice`s.
+/// A wrapper that swaps (`<=` and `>=`), (`meet` and `join`), 
+/// and (`top` and `bottom`) for `BoundedLattice`s.
 /// 
 /// # Example 
 /// ```

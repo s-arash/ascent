@@ -1,3 +1,5 @@
+//! internal utility functions defined here
+
 /// update `reference` in-place using the provided closure
 pub fn update<T>(reference: &mut T, f: impl FnOnce(T) -> T) {
    unsafe {

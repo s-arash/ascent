@@ -15,18 +15,21 @@
 use std::ops::Add;
 use std::iter::Sum;
 
+/// computes the minimum of the input column
 pub fn min<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
 where N: Ord + Clone 
 {
    inp.map(|tuple| tuple.0).min().cloned().into_iter()
 }
 
+/// computes the maximum of the input column
 pub fn max<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
 where N: Ord + Clone 
 {
    inp.map(|tuple| tuple.0).max().cloned().into_iter()
 }
 
+/// computes the sum of the input column
 pub fn sum<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
 where N: Ord + Add + Clone + Sum<N>
 {
@@ -34,6 +37,7 @@ where N: Ord + Add + Clone + Sum<N>
    std::iter::once(sum)
 }
 
+/// returns the number of tuples
 pub fn count<'a>(inp: impl Iterator<Item = ()>) -> impl Iterator<Item = usize>
 {
    let (size_floor, size_ceiling)= inp.size_hint();
@@ -46,7 +50,7 @@ pub fn count<'a>(inp: impl Iterator<Item = ()>) -> impl Iterator<Item = usize>
    std::iter::once(count)
 }
 
-
+/// computes the average of the input column, returning an `f64`
 pub fn mean<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = f64>
 where N: Clone + Into<f64>
 {
@@ -57,6 +61,7 @@ where N: Clone + Into<f64>
    res.into_iter()
 }
 
+/// computes the value at the given percentile of the input column
 pub fn percentile<'a, TItem: 'a, TInputIter>(p: f64) -> impl Fn(TInputIter) -> std::option::IntoIter<TItem>
 where
    TInputIter: Iterator<Item = (&'a TItem,)>, TItem: Ord + Clone,
@@ -73,6 +78,7 @@ where
    }
 }
 
+/// backs negations (eg `!foo(x)`) in `ascent`
 pub fn not<'a>(mut inp: impl Iterator<Item = ()>) -> impl Iterator<Item = ()>
 {
    let any = inp.next().is_some();

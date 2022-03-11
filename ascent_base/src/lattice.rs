@@ -1,3 +1,5 @@
+//! Defines the `Lattice` trait and provides implementations for standard types
+
 pub mod constant_propagation;
 pub mod set;
 pub mod product;
@@ -8,7 +10,8 @@ use std::{ops::Deref, rc::Rc};
 mod dual;
 pub use dual::Dual;
 
-pub trait Lattice: PartialOrd + Sized{
+/// A `Lattice` is a `PartialOrd` where each pair of elements has a least upper bound (`join`) and a greates lower bound (`meet`)
+pub trait Lattice: PartialOrd + Sized {
 
    /// ensures `self` is the join of `self` and `other`
    ///
@@ -28,8 +31,12 @@ pub trait Lattice: PartialOrd + Sized{
       res
    }
 
-   fn meet(self, other: Self)-> Self;
-
+   /// the greatest lower bound of two elements. `meet(x, y)` is the largest value x
+   /// s.t. `z <= x` and `z <= y`
+   fn meet(self, other: Self) -> Self;
+   
+   /// The least upper bound of two elements. `join(x, y)` is the smallest value z
+   /// s.t. `z >= x` and `z >= y`.
    fn join(self, other: Self) -> Self;
 }
 

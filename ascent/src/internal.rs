@@ -1,3 +1,5 @@
+//! Provides definitions required for the `ascent` macro. Not intended for direct use.
+
 use std::{collections::{HashMap, HashSet}, hash::{BuildHasherDefault, Hash}, rc::Rc, time::{Duration, Instant}};
 
 use ascent_base::Lattice;
