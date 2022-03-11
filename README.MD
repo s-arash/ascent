@@ -1,5 +1,5 @@
 # Logic programming in Rust
-[![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml)
+[![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml) [![Crates.io](https://img.shields.io/crates/v/ascent?color=blue)](https://crates.io/crates/ascent)
 
 Ascent is a logic programming language (similar to Datalog) embedded in Rust via macros.
 

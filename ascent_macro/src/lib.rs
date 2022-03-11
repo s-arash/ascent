@@ -54,6 +54,7 @@ pub fn ascent(input: TokenStream) -> TokenStream {
 
 /// Like `ascent`, except that the result of an `ascent_run` invocation is a value containing all the relations
 /// defined inside the macro body, and computed to a fixed point.
+/// 
 /// The advantage of `ascent_run` compared to `ascent` is the fact that `ascent_run` has access to local variables
 /// in scope:
 /// ```

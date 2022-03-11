@@ -5,7 +5,7 @@ use crate::Lattice;
 use super::{BoundedLattice};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
-/// A wrapper that swaps (`<=` and `>=`), (`meet` and `join`), 
+/// A wrapper type that swaps (`<=` and `>=`) for `PartialOrd`s, (`meet` and `join`) for `Lattice`s, 
 /// and (`top` and `bottom`) for `BoundedLattice`s.
 /// 
 /// # Example 
