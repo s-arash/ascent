@@ -195,6 +195,15 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result
 fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result<(IrRule, Vec<IrRelation>)> {
    let mut body_items = vec![];
    let mut grounded_vars = vec![];
+   fn extend_grounded_vars(grounded_vars: &mut Vec<Ident>, new_vars: impl IntoIterator<Item = Ident>) -> syn::Result<()> {
+      for v in new_vars.into_iter() {
+         if grounded_vars.contains(&v) {
+            return Err(Error::new(v.span(), format!("variable {} shadows a variable with the same name", v)));
+         }
+         grounded_vars.push(v);
+      }
+      Ok(())
+   }
    let mut first_two_items_all_args_vars = true;
    let mut first_two_items_simple_clauses = true;
    for (bitem_ind, bitem) in rule.body_items.iter().enumerate() {
@@ -239,7 +248,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             }
 
             for cond_clause in bcl.cond_clauses.iter() {
-               grounded_vars.extend(cond_clause.bound_vars());
+               extend_grounded_vars(&mut grounded_vars, cond_clause.bound_vars())?;
             }
             
             let ir_rel = IrRelation{
@@ -259,7 +268,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             if bitem_ind <= 1 {
                first_two_items_simple_clauses = false;
             }
-            grounded_vars.extend(pattern_get_vars(&gen.pattern));
+            extend_grounded_vars(&mut grounded_vars, pattern_get_vars(&gen.pattern))?;
             body_items.push(IrBodyItem::Generator(gen.clone()));
          },
          BodyItemNode::Cond(ref cl) => {
@@ -267,13 +276,13 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             if bitem_ind <= 1 {
                first_two_items_simple_clauses = false;
             }
-            grounded_vars.extend(cl.bound_vars());
+            extend_grounded_vars(&mut grounded_vars, cl.bound_vars())?;
          },
          BodyItemNode::Agg(ref agg) => {
             if bitem_ind <= 1 {
                first_two_items_simple_clauses = false;
             }
-            grounded_vars.extend(pattern_get_vars(&agg.pat));
+            extend_grounded_vars(&mut grounded_vars, pattern_get_vars(&agg.pat))?;
             let indices = agg.rel_args.iter().enumerate().filter(|(i, expr)| {
                if is_wild_card(expr) {
                   return false;
