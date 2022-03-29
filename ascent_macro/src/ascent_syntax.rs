@@ -205,6 +205,16 @@ impl CondClause {
         CondClause::Let(cl) => pattern_get_vars(&cl.pattern),
       }
    }
+
+   /// returns the expression associated with the CondClause. 
+   /// Useful for determining clause dependencies
+   pub fn expr(&self) -> &Expr {
+         match self {
+         CondClause::IfLet(cl) => &cl.exp,
+         CondClause::If(cl) => &cl.cond,
+         CondClause::Let(cl) => &cl.exp,
+      }
+   }
 }
 impl Parse for CondClause {
    fn parse(input: ParseStream) -> Result<Self> {

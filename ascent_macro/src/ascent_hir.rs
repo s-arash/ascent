@@ -5,7 +5,7 @@ use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned};
 
-use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, is_wild_card, pattern_get_vars, tuple, tuple_type}};
+use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, is_wild_card, pattern_get_vars, tuple, tuple_type, expr_get_vars}};
 use crate::ascent_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
 
 #[derive(Clone)]
@@ -200,10 +200,22 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
    for (bitem_ind, bitem) in rule.body_items.iter().enumerate() {
       match bitem {
          BodyItemNode::Clause(ref bcl) => {
-            if (bitem_ind == 0 && bcl.cond_clauses.iter().any(|c| matches!(c, &CondClause::IfLet(_)))) ||
-               (bitem_ind == 1 && bcl.cond_clauses.len() > 0)
+            if bitem_ind == 0 && bcl.cond_clauses.iter().any(|c| matches!(c, &CondClause::IfLet(_)))
             {
                first_two_items_simple_clauses = false;
+            }
+
+            if bitem_ind == 1 && first_two_items_simple_clauses{
+               let mut self_vars = bcl.args.iter().filter_map(|arg| expr_to_ident(arg.unwrap_expr_ref())).collect::<HashSet<_>>();
+               for cond_cl in bcl.cond_clauses.iter(){
+                  let cond_expr = cond_cl.expr();
+                  let expr_idents = expr_get_vars(&cond_expr);
+                  if !expr_idents.iter().all(|v| self_vars.contains(v)){
+                     first_two_items_simple_clauses = false;
+                     break;
+                  }
+                  self_vars.extend(cond_cl.bound_vars());
+               }
             }
             let mut indices = vec![];
             for (i,arg) in bcl.args.iter().enumerate() {

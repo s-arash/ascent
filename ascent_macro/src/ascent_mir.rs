@@ -55,7 +55,9 @@ pub(crate) fn mir_rule_summary(rule: &MirRule) -> String {
       match bitem {
          MirBodyItem::Clause(bcl) => format!("{}_{}", bcl.rel.ir_name, bcl.rel.version.to_string()),
          MirBodyItem::Generator(gen) => format!("for_{}", pat_to_ident(&gen.pattern).map(|x| x.to_string()).unwrap_or_default()),
-         MirBodyItem::Cond(cl) => format!("if_"),
+         MirBodyItem::Cond(CondClause::If(..)) => format!("if ⋯"),
+         MirBodyItem::Cond(CondClause::IfLet(..)) => format!("if let ⋯"),
+         MirBodyItem::Cond(CondClause::Let(..)) => format!("let ⋯"),
          MirBodyItem::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
       }
    }
