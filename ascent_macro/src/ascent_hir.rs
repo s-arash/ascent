@@ -12,14 +12,17 @@ use crate::ascent_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNod
 pub(crate) struct AscentConfig {
    pub attrs: Vec<Attribute>,
    pub include_rule_times: bool,
+   pub generate_run_partial: bool,
 }
 
 impl AscentConfig {
-   const INCLUE_RULE_TIMES_ATTR: &'static str = "include_rule_times";
+   const MEASURE_RULE_TIMES_ATTR: &'static str = "measure_rule_times";
+   const GENERATE_RUN_TIMEOUT_ATTR: &'static str = "generate_run_timeout";
    pub fn new(attrs: Vec<Attribute>) -> syn::Result<AscentConfig> {
-      let include_rule_times = attrs.iter().any(|attr| attr.path.is_ident(Self::INCLUE_RULE_TIMES_ATTR));
+      let include_rule_times = attrs.iter().any(|attr| attr.path.is_ident(Self::MEASURE_RULE_TIMES_ATTR));
+      let generate_run_partial = attrs.iter().any(|attr| attr.path.is_ident(Self::GENERATE_RUN_TIMEOUT_ATTR));
 
-      let recognized_attrs = vec![Self::INCLUE_RULE_TIMES_ATTR];
+      let recognized_attrs = [Self::MEASURE_RULE_TIMES_ATTR, Self::GENERATE_RUN_TIMEOUT_ATTR];
       for attr in attrs.iter() {
          if !recognized_attrs.iter().any(|recognized_attr| attr.path.is_ident(recognized_attr)) {
             return Err(Error::new_spanned(attr, 
@@ -29,7 +32,8 @@ impl AscentConfig {
       }
       Ok(AscentConfig {
          attrs,
-         include_rule_times
+         include_rule_times,
+         generate_run_partial
       })
    }
 }

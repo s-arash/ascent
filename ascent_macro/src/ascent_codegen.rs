@@ -114,26 +114,51 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       })
    }
 
+   let run_usings = quote!{
+      use core::cmp::PartialEq;
+   };
+   
 
    let run_func = if is_ascent_run {quote!{}} else {
       quote! {
          #[allow(unused_imports)]
+         #[doc = "Runs the Ascent program to a fixed point."]
          pub fn run(&mut self) {
-            use core::cmp::PartialEq;
+            macro_rules! __check_return_conditions {() => {};}
+            #run_usings
             self.update_indices_priv();
             let _self = self;
             #(#sccs_compiled)*
          }
       }
    };
+   let run_timeout_func = if is_ascent_run || !mir.config.generate_run_partial {quote!{}} else {
+      quote! {
+         #[allow(unused_imports)]
+         #[doc = "Runs the Ascent program to a fixed point or until the timeout is reached. In case of a timeout returns false"]
+         pub fn run_timeout(&mut self, timout: std::time::Duration) -> bool {
+            let __start_time = std::time::Instant::now();
+            macro_rules! __check_return_conditions {() => {
+               if __start_time.elapsed() >= timout {return false;}
+            };}
+            #run_usings
+            self.update_indices_priv();
+            let _self = self;
+            #(#sccs_compiled)*
+            true
+         }
+      }
+   };
    let run_code = if !is_ascent_run {quote!{}} else {
       quote! {
-         use core::cmp::PartialEq;
+         macro_rules! __check_return_conditions {() => {};}
+         #run_usings
          let _self = &mut __run_res;
          #(#relation_initializations)*
          #(#sccs_compiled)*
       }
    };
+
    let relation_initializations_for_default_impl = 
       if is_ascent_run {vec![]} else {relation_initializations};
    let summary = mir_summary(mir);
@@ -160,6 +185,8 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       }
       impl #impl_generics #struct_name #ty_generics #where_clause {
          #run_func
+
+         #run_timeout_func
          // TODO remove pub update_indices at some point
          fn update_indices_priv(&mut self) {
             #update_indices_body
@@ -303,6 +330,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
          //    move new to delta
          #(#shift_delta_to_total_new_to_delta)*
          if !__changed {break;}
+         __check_return_conditions!();
       }
    }} else {quote! {
       #[allow(unused_assignments, unused_variables)]
@@ -311,6 +339,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
          #(#evaluate_rules)*
          #(#shift_delta_to_total_new_to_delta)*
          #(#shift_delta_to_total_new_to_delta)*
+         __check_return_conditions!();
       }
    }};
    quote! {

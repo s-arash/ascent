@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{Debug};
 use std::ops::Deref;
 use std::primitive;
+use std::time::Duration;
 use std::{cmp::max, rc::Rc};
 use ascent::Dual;
 use std::hash::Hash;
@@ -179,7 +180,7 @@ fn _test_dl_lambda2(){
 #[test]
 fn test_dl_patterns(){
    ascent!{
-      #![include_rule_times]
+      #![measure_rule_times]
       relation foo(i32, Option<i32>);
       relation bar(i32, i32);
       foo(1, None);
@@ -713,6 +714,27 @@ fn test_ascent_simple_join2(){
 }
 
 #[test]
+fn test_ascent_simple_join3(){
+   let res = ascent_run!{
+      relation bar(i32, i32);
+      relation foo(i32, i32);
+      relation baz(i32, i32);
+
+      foo(1, 2);
+      foo(10, 2);
+      bar(2, 3);
+      bar(2, 1);
+
+      baz(*x, *z) <-- foo(x, y) if *x != 10, bar(y, ?z) if *z < 4, if x != z;
+      
+      baz(*x, *z) <-- foo(x, y) if *x != 10, bar(y, z) if *z * x != 444, if x != z;
+      foo(*x, *y), bar(*x, *y) <-- baz(x, y);
+   };
+   println!("baz: {:?}", res.baz);
+   assert!(rels_equal([(1, 3)], res.baz));
+}
+
+#[test]
 fn test_ascent_wildcards(){
    let res = ascent_run!{
       relation foo(i32, i32, i32);
@@ -756,4 +778,19 @@ fn test_ascent_agg(){
    println!("{}", res.summary());
    println!("baz: {:?}", res.baz);
    assert!(rels_equal([(1, 2, 10)], res.baz));
+}
+
+#[test]
+fn test_run_timeout() {
+   ascent! {
+      #![generate_run_timeout]
+      struct Diverging;
+      relation foo(u128);
+      foo(0);
+      foo(x + 1) <-- foo(x);
+   }
+
+   let mut prog = Diverging::default();
+   let run_timout_res = prog.run_timeout(Duration::from_millis(10));
+   assert!(!run_timout_res);
 }
