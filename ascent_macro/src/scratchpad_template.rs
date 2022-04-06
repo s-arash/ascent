@@ -49,6 +49,7 @@ fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
 
 #[warn(warnings)]
 #[allow(unused_imports)]
+#[allow(redundant_semicolons)]
 #[cfg(test)]
 fn _test() {
    use ascent::aggregators::*;

@@ -14,7 +14,9 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    for (rel, rel_indices) in mir.relations_ir_relations.iter(){
       let name = &rel.name;
       let field_types = tuple_type(&rel.field_types);
+      let rel_attrs = &mir.relations_metadata[rel].attributes;
       relation_fields.push(quote! {
+         #(#rel_attrs)*
          pub #name : Vec<#field_types>,
       });
       field_defaults.push(quote! {#name : Default::default(),});
@@ -102,13 +104,15 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    }
 
    let mut relation_initializations = vec![];
-   for (rel, init) in mir.relations_initializations.iter() {
-      let rel_name = &rel.name;
-      relation_initializations.push(quote! {
-         _self.#rel_name = #init;
-      });
+   for (rel, md) in mir.relations_metadata.iter() {
+      if let Some(ref init) = md.inititialization {
+         let rel_name = &rel.name;
+         relation_initializations.push(quote! {
+            _self.#rel_name = #init;
+         });
+      }
    }
-   if mir.relations_initializations.len() > 0 {
+   if relation_initializations.len() > 0 {
       relation_initializations.push(quote! {
          _self.update_indices_priv();
       })
@@ -118,8 +122,17 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       use core::cmp::PartialEq;
    };
    
-
-   let run_func = if is_ascent_run {quote!{}} else {
+   let generate_run_timeout = !is_ascent_run && mir.config.generate_run_partial; 
+   let run_func = if is_ascent_run {quote!{}} 
+   else if generate_run_timeout {
+      quote!{
+         #[allow(unused_imports)]
+         #[doc = "Runs the Ascent program to a fixed point."]
+         pub fn run(&mut self) {
+            self.run_timeout(::std::time::Duration::MAX);
+         }
+      } 
+   } else {
       quote! {
          #[allow(unused_imports)]
          #[doc = "Runs the Ascent program to a fixed point."]
@@ -132,14 +145,14 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          }
       }
    };
-   let run_timeout_func = if is_ascent_run || !mir.config.generate_run_partial {quote!{}} else {
+   let run_timeout_func = if !generate_run_timeout {quote!{}} else {
       quote! {
          #[allow(unused_imports)]
          #[doc = "Runs the Ascent program to a fixed point or until the timeout is reached. In case of a timeout returns false"]
-         pub fn run_timeout(&mut self, timout: std::time::Duration) -> bool {
-            let __start_time = std::time::Instant::now();
+         pub fn run_timeout(&mut self, timeout: ::std::time::Duration) -> bool {
+            let __start_time = ::std::time::Instant::now();
             macro_rules! __check_return_conditions {() => {
-               if __start_time.elapsed() >= timout {return false;}
+               if timeout < ::std::time::Duration::MAX && __start_time.elapsed() >= timeout {return false;}
             };}
             #run_usings
             self.update_indices_priv();
@@ -166,6 +179,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let vis = &mir.declaration.visibility;
    let struct_name = &mir.declaration.ident;
    let generics = &mir.declaration.generics;
+   let struct_attrs = &mir.declaration.attrs;
    let summary_fn = if is_ascent_run {
       quote! {
          pub fn summary(&self) -> &'static str {#summary}
@@ -178,6 +192,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let res = quote! {
       // use std::collections::{HashMap, HashSet};
       // use ::ascent::internal::comment;
+      #(#struct_attrs)*
       #vis struct #struct_name #generics {
          #(#relation_fields)*
          #(#scc_time_fields)*
@@ -737,7 +752,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
                }).collect();
                let args_tuple = tuple(&args_tuple);
                update_indices.push(quote_spanned! {hcl.span=>
-                  ascent::internal::RelIndexTrait::index_insert(&mut #var_name, #args_tuple, __new_row_ind);
+                  ::ascent::internal::RelIndexTrait::index_insert(&mut #var_name, #args_tuple, __new_row_ind);
                });
             }
          }
@@ -763,14 +778,14 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
                // }
 
                let __new_row_ind = _self.#head_rel_name.len();
-               if !(#head_rel_full_index_var_name_total.contains_key(&__new_row) ||
-                    #head_rel_full_index_var_name_delta.contains_key(&__new_row)){
-                  if ascent::internal::full_index_insert_if_not_present(&mut #head_rel_full_index_var_name_new, 
-                                                                       &__new_row, __new_row_ind){
+               if !#head_rel_full_index_var_name_total.contains_key(&__new_row) &&
+                  !#head_rel_full_index_var_name_delta.contains_key(&__new_row) &&
+                  ::ascent::internal::full_index_insert_if_not_present(&mut #head_rel_full_index_var_name_new, 
+                                                                       &__new_row, __new_row_ind)
+               {
                      #(#update_indices)*
                      _self.#head_rel_name.push(__new_row);
                      __changed = true;
-                  }
                }
             };
             add_rows.push(add_row);

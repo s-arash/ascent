@@ -784,13 +784,16 @@ fn test_ascent_agg(){
 fn test_run_timeout() {
    ascent! {
       #![generate_run_timeout]
+      /// A diverging Ascent program
       struct Diverging;
+      /// foooooooooooo
       relation foo(u128);
       foo(0);
       foo(x + 1) <-- foo(x);
    }
 
    let mut prog = Diverging::default();
-   let run_timout_res = prog.run_timeout(Duration::from_millis(10));
+   prog.foo = vec![(1,), (2,)];
+   let run_timout_res = prog.run_timeout(Duration::from_millis(5));
    assert!(!run_timout_res);
 }

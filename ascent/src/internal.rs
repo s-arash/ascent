@@ -23,6 +23,9 @@ pub trait RelIndexTrait{
 //    type IteratorType: Iterator<Item = &'a usize>;
 //    fn iter_all(&'a self) -> Self::IteratorType;
 // }
+// use std::collections::hash_map::Values;
+// use core::slice::Iter;
+// use std::iter::FlatMap;
 // impl<'a, K: 'a> RelIndexIterAllTrait<'a> for RelIndexType<K> {
 //    type IteratorType = FlatMap<Values<'a, K, Vec<usize>>, Iter<'a, usize>, fn(& Vec<usize>) -> Iter<usize>>;
 //    // type IteratorType = Iter<'a, usize>;
@@ -30,7 +33,7 @@ pub trait RelIndexTrait{
 //       fn vec_iter(vec: &Vec<usize>) -> Iter<usize> {
 //          vec.iter()
 //       }
-//       let res = self.values().flat_map(vec_iter);
+//       let res: FlatMap<Values<K, Vec<usize>>, Iter<usize>, fn (&Vec<usize>) -> Iter<usize>> = self.values().flat_map(vec_iter);
 //       // let res = self.values().next().unwrap().iter();
 //       res
 //       // todo!()

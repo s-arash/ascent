@@ -1,6 +1,6 @@
 extern crate proc_macro;
 use proc_macro2::{Span, TokenStream};
-use syn::{Attribute, Expr, ExprPath, GenericParam, Generics, Ident, Pat, Result, Token, Type, Visibility, WhereClause, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned, token::{Comma, Gt, Lt}};
+use syn::{Attribute, Expr, ExprPath, GenericParam, Generics, Ident, Pat, Result, Token, Type, Visibility, WhereClause, braced, parenthesized, parse::{Parse, ParseStream}, parse2, punctuated::Punctuated, spanned::Spanned, token::{Comma, Gt, Lt}, Error};
 use std::{collections::{HashMap}, sync::Mutex};
 
 use quote::{ToTokens};
@@ -26,6 +26,9 @@ mod kw {
 
 #[derive(Clone, Parse)]
 pub struct Declaration {
+   // We don't actually use the Parse impl to parse attrs.
+   #[call(Attribute::parse_outer)]
+   pub attrs: Vec<Attribute>,
    pub visibility: Visibility,
    pub struct_kw: Token![struct],
    pub ident: Ident,
@@ -46,6 +49,7 @@ fn parse_generics_with_where_clause(input: ParseStream) -> Result<Generics> {
 
 // #[derive(Clone)]
 pub struct RelationNode{
+   pub attrs : Vec<Attribute>,
    pub name: Ident,
    pub field_types : Punctuated<Type, Token![,]>,
    pub initialization: Option<Expr>,
@@ -69,7 +73,7 @@ impl Parse for RelationNode {
       if is_lattice && field_types.empty_or_trailing() {
          return Err(input.error(format!("empty lattice is not allowed")));
       }
-      Ok(RelationNode{name, field_types, semi_colon, is_lattice, initialization})
+      Ok(RelationNode{attrs: vec![], name, field_types, semi_colon, is_lattice, initialization})
    }
 }
 
@@ -406,15 +410,22 @@ pub(crate) struct AscentProgram {
 impl Parse for AscentProgram {
    fn parse(input: ParseStream) -> Result<Self> {
       let attributes = Attribute::parse_inner(input)?;
+      let mut struct_attrs = Attribute::parse_outer(input)?;
       let declaration = if input.peek(Token![pub]) || input.peek(Token![struct]) {
-         Some(Declaration::parse(input)?)
+         Some(Declaration{ attrs: std::mem::take(&mut struct_attrs), .. Declaration::parse(input)?})
       } else {None};
       let mut rules = vec![];
       let mut relations = vec![];
       while !input.is_empty() {
+         let attrs = if !struct_attrs.is_empty() {std::mem::take(&mut struct_attrs)} else {Attribute::parse_outer(input)?};
          if input.peek(kw::relation) || input.peek(kw::lattice){
-            relations.push(RelationNode::parse(input)?);
+            let mut relation_node = RelationNode::parse(input)?;
+            relation_node.attrs = attrs;
+            relations.push(relation_node);
          } else {
+            if !attrs.is_empty() {
+               return Err(Error::new(attrs[0].span(), "unexpected attribute(s)"));
+            }
             rules.push(RuleNode::parse(input)?);
          }
       }

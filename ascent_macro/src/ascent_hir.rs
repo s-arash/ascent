@@ -43,10 +43,16 @@ pub(crate) struct AscentIr {
    pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
    // pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
-   pub relations_initializations: HashMap<RelationIdentity, Rc<Expr>>,
+   pub relations_metadata: HashMap<RelationIdentity, RelationMetadata>,
    pub rules: Vec<IrRule>,
    pub declaration: Declaration,
    pub config: AscentConfig,
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct RelationMetadata{
+   pub inititialization: Option<Rc<Expr>>,
+   pub attributes: Rc<Vec<Attribute>>,
 }
 
 pub(crate) struct IrRule {
@@ -133,6 +139,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result
    let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
    let mut relations_full_indices = HashMap::new();
    let mut relations_initializations = HashMap::new();
+   let mut relations_metadata = HashMap::new();
    // let mut relations_no_indices = HashMap::new();
    let mut lattices_full_indices = HashMap::new();
    for rel in prog.relations.iter(){
@@ -165,6 +172,13 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result
       if let Some(init_expr) = &rel.initialization {
          relations_initializations.insert(rel_identity.clone(), Rc::new(init_expr.clone()));
       }
+      relations_metadata.insert(
+         rel_identity.clone(),
+         RelationMetadata {
+            inititialization: rel.initialization.clone().map(|i| Rc::new(i)),
+            attributes: Rc::new(rel.attrs.clone())
+         }
+      );
       // relations_no_indices.insert(rel_identity, rel_no_index);
    }
    for (ir_rule, extra_relations) in ir_rules.iter(){
@@ -189,7 +203,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result
       relations_ir_relations,
       relations_full_indices,
       lattices_full_indices,
-      relations_initializations,
+      relations_metadata: relations_metadata,
       // relations_no_indices,
       declaration,
       config: AscentConfig::new(prog.attributes.clone())?

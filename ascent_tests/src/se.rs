@@ -43,7 +43,7 @@ ascent! {
       trace(pc, time),
       for (&val, &eval) in instr_vals(instr).into_iter().filter_map(|v| match v {Val::Lit(l) => Some((v,l)), Val::Ref(r) => None});
    
-   aeval(time.clone(), val, *eval) <--
+   aeval(time.clone(), val, eval) <--
       source(pc, instr),
       trace(pc, time),
       for (&val, &reg) in instr_vals(instr).into_iter().filter_map(|v| match v {Val::Lit(x) => None, Val::Ref(r) => Some((v, r))}),

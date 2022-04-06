@@ -213,7 +213,7 @@ ascent!{
       let b = alloc(v, ρ, a, t, k);
    
    σnum(b.clone(), lit),
-   ς(e, upd(&ρ2, x, b), c, tick(v, ρ, a, t, k)) <--
+   ς(e, upd(ρ2, x, b), c, tick(v, ρ, a, t, k)) <--
       ς(?v@Lit(lit), ρ, a, t),
       σ(a, ?Kont(k)),
       if let Fn(Lam(x, e), ρ2, c) = k,
