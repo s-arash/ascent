@@ -216,7 +216,12 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
    fn extend_grounded_vars(grounded_vars: &mut Vec<Ident>, new_vars: impl IntoIterator<Item = Ident>) -> syn::Result<()> {
       for v in new_vars.into_iter() {
          if grounded_vars.contains(&v) {
-            return Err(Error::new(v.span(), format!("variable {} shadows a variable with the same name", v)));
+            // TODO may someday this will work
+            // let other_var = grounded_vars.iter().find(|&x| x == &v).unwrap();
+            // let other_err = Error::new(other_var.span(), "");
+            let err = Error::new(v.span(), format!("'{}' shadows another variable with the same name", v));
+            // err.combine(other_err);
+            return Err(err);
          }
          grounded_vars.push(v);
       }

@@ -510,7 +510,8 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
          //    rule_cp1_compiled
          // };
 
-         return if (&bcl1.rel.relation, bcl1.rel.version) == (&bcl2.rel.relation, bcl2.rel.version) {
+         // TODO remove if branch:
+         return if false && (&bcl1.rel.relation, bcl1.rel.version) == (&bcl2.rel.relation, bcl2.rel.version) {
             rule_cp1_compiled
          } else {
             quote_spanned!{bcl1.rel_args_span=>
@@ -780,8 +781,8 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
                let __new_row_ind = _self.#head_rel_name.len();
                if !#head_rel_full_index_var_name_total.contains_key(&__new_row) &&
                   !#head_rel_full_index_var_name_delta.contains_key(&__new_row) &&
-                  ::ascent::internal::full_index_insert_if_not_present(&mut #head_rel_full_index_var_name_new, 
-                                                                       &__new_row, __new_row_ind)
+                  ::ascent::internal::RelFullIndexTrait::insert_if_not_present(&mut #head_rel_full_index_var_name_new, 
+                                                                               &__new_row, __new_row_ind)
                {
                      #(#update_indices)*
                      _self.#head_rel_name.push(__new_row);

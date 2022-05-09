@@ -22,16 +22,25 @@ jobs:
       with:
           override: true
           toolchain: stable
+    
     - run: cargo --version
-    - name: Run tests
+
+    - name: Run ascent_tests tests
       working-directory: ./ascent_tests
-      run: cargo test test
+      run: cargo test
+
+    - name: Run ./ascent tests
+      working-directory: ./ascent
+      run: cargo test
+    
     - name: Run ascent_base tests
       working-directory: ./ascent_base
       run: cargo test
+    
     - name: Run Benchmarks
       working-directory: ./ascent_tests
       run: cargo bench bench_tc -- --nocapture
+    
       # macro tests should be last, because they produce scratchpad.rs, which my not compile
     - name: Run macro tests
       working-directory: ./ascent_macro

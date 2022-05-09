@@ -4,6 +4,7 @@ pub mod constant_propagation;
 pub mod set;
 pub mod product;
 pub mod ord_lattice;
+pub mod bounded_set;
 pub use product::Product;
 pub mod tuple;
 use std::{ops::Deref, rc::Rc};

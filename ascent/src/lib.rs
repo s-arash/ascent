@@ -4,6 +4,7 @@
 
 pub mod internal;
 pub mod aggregators;
+mod convert;
 
 pub use ascent_macro::ascent;
 pub use ascent_macro::ascent_run;

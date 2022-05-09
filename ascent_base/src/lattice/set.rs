@@ -5,15 +5,22 @@ use std::ops::Deref;
 
 use super::Lattice;
 
+/// A set type that implements the `Lattice` trait
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Set<T: PartialEq + Eq + Hash + Ord>(pub BTreeSet<T>);
 
 impl<T: PartialEq + Eq + Hash + Ord> Set<T> {
+
+   /// Creates a `Set` containing only `item`
    pub fn singleton(item: T) -> Self {
       let mut set = BTreeSet::new();
       set.insert(item);
       Set(set)
    }
+}
+
+impl<T: PartialEq + Eq + Hash + Ord> Default for Set<T> {
+   fn default() -> Self {Self(Default::default())}
 }
 
 impl<T: PartialEq + Eq + Hash + Ord> Deref for Set<T>{
@@ -38,7 +45,7 @@ impl<T: Eq + Hash + Ord> PartialOrd for Set<T> {
    }
 }
 
-impl<T: Eq + Hash + Clone + Ord> Lattice for Set<T> {
+impl<T: Eq + Hash + Ord> Lattice for Set<T> {
    fn meet_mut(&mut self, mut other: Self) -> bool {
       let self_len = self.0.len();
       let mut old_self = BTreeSet::new();
