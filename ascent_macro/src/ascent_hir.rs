@@ -238,7 +238,12 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             }
 
             if bitem_ind == 1 && first_two_items_simple_clauses{
-               let mut self_vars = bcl.args.iter().filter_map(|arg| expr_to_ident(arg.unwrap_expr_ref())).collect::<HashSet<_>>();
+               let mut self_vars = HashSet::new();
+               for var in bcl.args.iter().filter_map(|arg| expr_to_ident(arg.unwrap_expr_ref())) {
+                  if !self_vars.insert(var) {
+                     first_two_items_simple_clauses = false;
+                  }
+               }
                for cond_cl in bcl.cond_clauses.iter(){
                   let cond_expr = cond_cl.expr();
                   let expr_idents = expr_get_vars(&cond_expr);

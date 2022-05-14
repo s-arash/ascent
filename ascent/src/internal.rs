@@ -1,4 +1,4 @@
-//! Provides definitions required for the `ascent` macro. Not intended for direct use.
+// Provides definitions required for the `ascent` macro. Not intended for direct use.
 #![doc(hidden)]
 
 pub use crate::convert::*;

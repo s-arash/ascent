@@ -265,6 +265,25 @@ fn test_ascent_expressions_and_inits(){
 }
 
 #[test]
+fn test_dl_cross_join(){
+   ascent!{
+      relation foo(i32, i32);
+      relation bar(i32, i32);
+      relation baz(i32, i32, i32, i32);
+      foo(x, x + 1) <-- for x in 0..5;
+
+      bar(11, 12);
+      bar(12, 13);
+
+      baz(a, b, c, d) <-- foo(a, b), bar(c , d);
+   }
+   let mut prog = AscentProgram::default();
+   prog.run();
+   println!("baz: {:?}", prog.baz);
+   assert_eq!(prog.baz.len(), prog.foo.len() * prog.bar.len());
+}
+
+#[test]
 fn test_dl_vars_bound_in_patterns(){
    ascent!{
       relation foo(i32, Option<i32>);
@@ -796,4 +815,74 @@ fn test_run_timeout() {
    prog.foo = vec![(1,), (2,)];
    let run_timout_res = prog.run_timeout(Duration::from_millis(5));
    assert!(!run_timout_res);
+}
+
+#[test]
+fn test_ascent_bounded_set() {
+   use ascent::lattice::bounded_set::BoundedSet;
+   ascent! { struct AscentProgram<const N: usize>;
+
+      lattice num_store(BoundedSet<N, i32>);
+      relation init(i32);
+
+      init(x) <-- for x in 0..20;
+      num_store(BoundedSet::singleton(*x)) <--
+         init(x);
+   }
+
+   let mut prog = AscentProgram::<10>::default();
+   prog.run();
+   let store = &prog.num_store[0].0;
+   for (x, ) in prog.init.iter() {
+      assert!(store.contains(x));
+   }
+}
+
+#[test]
+fn test_issue3() {
+
+   ascent!{
+      relation a__(i32, i32);
+      relation c__(i32, i32, i32);
+      relation e__(i32);
+      relation h__(i32, i32, i32);
+   
+      e__(a) <-- a__(b, a);
+      h__(e, e, e) <-- a__(d, e), c__(e, f, e), e__(e);
+   
+   }
+
+   let mut prog = AscentProgram::default();
+   prog.a__ = vec![(88,5), (37,24), (11,91)];
+	prog.c__ = vec![(32,83,88), (2,8,5)];
+	prog.e__ = vec![(44,), (83,)];
+	prog.h__ = vec![(38,88,18), (76,18,65), (86,73,91), (98,26,91), (76,10,14)];
+
+   prog.run();
+
+   println!("h__: {:?}", prog.h__);
+
+   assert!(rels_equal(prog.h__, [(38, 88, 18), (76, 18, 65), (86, 73, 91), (98, 26, 91), (76, 10, 14)]))
+}
+
+#[test]
+fn test_repeated_vars_simple_joins() {
+   ascent! {
+      relation foo1(i32, i32);
+      relation foo2(i32, i32);
+      relation bar(i32, i32);
+
+      // filler:
+      foo2(100, 100), foo2(101, 101), foo2(102, 102);
+      
+      foo1(1, 1), foo2(1, 2), foo1(10, 11), foo2(11, 12);
+      
+      bar(x, y) <-- foo2(x, y), foo1(x, x);
+   }
+   let mut prog = AscentProgram::default();
+   prog.run();
+
+   println!("bar: {:?}", prog.bar);
+   assert!(rels_equal(prog.bar, [(1, 2)]));
+
 }
