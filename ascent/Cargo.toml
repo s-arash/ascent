@@ -1,6 +1,6 @@
 [package]
 name = "ascent"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Arash Sahebolamri"]
 description = "Logic programming in Rust"
@@ -15,8 +15,8 @@ readme = "../README.MD"
 
 [dependencies]
 
-ascent_macro = {version = "0.2", path = "../ascent_macro"}
-ascent_base = {version = "0.2", path = "../ascent_base"}
+ascent_macro = {version = "0.2.1", path = "../ascent_macro"}
+ascent_base = {version = "0.2.1", path = "../ascent_base"}
 rustc-hash = "1.1"
 nohash-hasher = "0.2.0"
 hashbrown = "0.12"
