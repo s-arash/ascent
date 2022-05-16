@@ -17,11 +17,12 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - run: cargo --version
-    - name: Install latest Rust # should be removed once 1.56 becomes default
+    
+    - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
           override: true
-          toolchain: stable
+          toolchain: 1.59
     
     - run: cargo --version
 
