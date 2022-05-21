@@ -840,6 +840,7 @@ fn test_ascent_bounded_set() {
 
 #[test]
 fn test_issue3() {
+   #![allow(non_snake_case)]
 
    ascent!{
       relation a__(i32, i32);
@@ -849,19 +850,15 @@ fn test_issue3() {
    
       e__(a) <-- a__(b, a);
       h__(e, e, e) <-- a__(d, e), c__(e, f, e), e__(e);
-   
    }
-
    let mut prog = AscentProgram::default();
    prog.a__ = vec![(88,5), (37,24), (11,91)];
-	prog.c__ = vec![(32,83,88), (2,8,5)];
-	prog.e__ = vec![(44,), (83,)];
-	prog.h__ = vec![(38,88,18), (76,18,65), (86,73,91), (98,26,91), (76,10,14)];
+   prog.c__ = vec![(32,83,88), (2,8,5)];
+   prog.e__ = vec![(44,), (83,)];
+   prog.h__ = vec![(38,88,18), (76,18,65), (86,73,91), (98,26,91), (76,10,14)];
 
    prog.run();
-
    println!("h__: {:?}", prog.h__);
-
    assert!(rels_equal(prog.h__, [(38, 88, 18), (76, 18, 65), (86, 73, 91), (98, 26, 91), (76, 10, 14)]))
 }
 
@@ -884,5 +881,4 @@ fn test_repeated_vars_simple_joins() {
 
    println!("bar: {:?}", prog.bar);
    assert!(rels_equal(prog.bar, [(1, 2)]));
-
 }

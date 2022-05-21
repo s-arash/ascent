@@ -81,3 +81,30 @@ fn test_generic_tc_example() {
    assert!(rels_equal(tc(r.clone(), true), 
           vec![(1,1), (2,2), (3,3), (4,4), (1, 2), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4)]));
 }
+
+#[test]
+fn test_borrowed_strings() {
+   ascent! {
+      struct Ancestory<'a>;
+      relation parent(&'a str, &'a str);
+      relation ancestor(&'a str,&'a str);
+
+      ancestor(p, c) <-- parent(p, c);
+
+      ancestor(p, gc) <--
+         parent(p, c), ancestor(c, gc);
+   }
+
+   let james = "James".to_string();
+   let harry = "Harry".to_string();
+   let albus = "Albus".to_string();
+
+   let parent_rel = vec![(james.clone(), harry.clone()), (harry.clone(), albus.clone())];
+
+   let mut prog = Ancestory::default();
+   // prog.parent = vec![(&zal[..], &rostam[..]), (&rostam[..], &sohrab[..])];
+   prog.parent = parent_rel.iter().map(|(p, c)| (&p[..], &c[..])).collect();
+   prog.run();
+   println!("ancestors: {:?}", prog.ancestor);
+   assert_eq!(prog.ancestor.len(), 3);
+}
