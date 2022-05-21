@@ -5,7 +5,7 @@ use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned};
 
-use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, is_wild_card, pattern_get_vars, tuple, tuple_type, expr_get_vars}};
+use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, is_wild_card, tuple, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
 use crate::ascent_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
 
 #[derive(Clone)]
@@ -343,6 +343,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
    }
    let mut head_clauses = vec![];
    for hcl_node in rule.head_clauses.iter(){
+      let hcl_node = hcl_node.clause();
       let rel = prog.relations.iter().filter(|r| r.name.to_string() == hcl_node.rel.to_string()).next();
       let rel = match rel {
          Some(rel) => rel,

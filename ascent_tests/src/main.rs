@@ -10,6 +10,7 @@ mod exps;
 mod analysis_exp;
 mod agg_tests;
 mod example_tests;
+mod macros_tests;
 
 use std::{any::Any, cmp::max, rc::Rc, collections::HashSet};
 use stopwatch::Stopwatch;

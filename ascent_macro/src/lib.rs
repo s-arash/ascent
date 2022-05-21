@@ -8,6 +8,7 @@ mod scratchpad;
 mod ascent_codegen;
 mod ascent_syntax;
 mod test_errors;
+mod syn_utils;
 
 #[macro_use]
 extern crate quote;
@@ -83,7 +84,7 @@ pub(crate) fn ascent_impl(input: proc_macro2::TokenStream, is_ascent_run: bool) 
    // println!("prog relations: {}", prog.relations.len());
    // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
 
-   let prog = desugar_ascent_program(prog);
+   let prog = desugar_ascent_program(prog)?;
    
    let hir = compile_ascent_program_to_hir(&prog)?;
    // println!("hir relations: {}", hir.relations_ir_relations.keys().map(|r| &r.name).join(", "));

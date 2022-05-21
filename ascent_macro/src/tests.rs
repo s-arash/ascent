@@ -2,9 +2,10 @@
 use std::{clone, cmp::max, rc::Rc};
 
 use petgraph::dot::{Config, Dot};
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, TokenTree, Group, Span};
+use syn::{Ident, parse2};
 
-use crate::{ascent_impl};
+use crate::{ascent_impl, utils::token_stream_replace_macro_ident};
 
 
 #[test]
@@ -207,7 +208,7 @@ fn exp_items_in_fn(){
 
 fn write_to_scratchpad_base(tokens: TokenStream, is_ascent_run: bool) -> TokenStream {
    let code = ascent_impl(tokens, is_ascent_run);
-   let code = code.expect("code is not ok!");
+   let code = code.unwrap();
    let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
    let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
    std::fs::write("src/scratchpad.rs", code_in_template).unwrap();
@@ -252,4 +253,101 @@ fn test_macro_lambda_calc(){
          eval(sub(fb, fx, ea), final_res);
    };
    write_to_scratchpad(inp);
+}
+
+#[test]
+fn test_macro_in_macro() {
+   let inp = quote!{
+      relation foo(i32, i32);
+      relation bar(i32, i32);
+
+      macro foo_($x: expr, $y: expr) {
+         foo($x, $y)
+      }
+
+      macro foo($x: expr, $y: expr) {
+         let _x = $x, let _y = $y, foo_!(_x, _y)
+      }
+
+      foo(0, 1);
+      foo(1, 2);
+      foo(2, 3);
+      foo(3, 4);
+
+      bar(x, y) <-- foo(x, y), foo!(x + 1, y + 1), foo!(x + 2, y + 2), foo!(x + 3, y + 3);
+      
+   };
+
+   write_to_scratchpad(inp);
+}
+
+#[test]
+fn test_token_stream_replace_macro_ident() {
+   let macro_def: syn::ItemMacro2 = syn::parse_quote!{
+      macro foo($i: ident) {
+         println!("{}", $i);
+      }
+   };
+
+   fn tt_print_idents(tt: &TokenTree) {
+      match tt {
+         proc_macro2::TokenTree::Group(grp) => {
+            ts_print_idents(&grp.stream());
+         },
+         proc_macro2::TokenTree::Ident(ident) => println!("{}", ident),
+         proc_macro2::TokenTree::Punct(punct) => println!("punct {}", punct),
+         proc_macro2::TokenTree::Literal(_) => (),
+      }
+   }
+
+   fn ts_print_idents(ts: &TokenStream) {
+      for tt in ts.clone() {
+         tt_print_idents(&tt);
+      }
+   }
+
+   let ts = quote! {
+      println!("{}", $i);
+   };
+
+   fn ident(name: &str) -> Ident {Ident::new("i", Span::call_site())}
+
+   let test_cases = [
+      (quote!{{println!("{}", $i);}}, "i", quote! { "hello"}, quote!{ {println!("{}", "hello");}}),
+      (quote!{{println!("{}{}{}", $$i, $j, $$);}}, "i", quote! { "hello"}, quote!{ {println!("{}{}{}", $"hello", $j, $$);}}),
+      (quote!{ foo($$$j, $i, $$i)}, "i", quote! { "hello"}, quote!{ foo($$$j, "hello", $"hello")}),
+   ];
+
+   for (ts, var, replacement, expected) in test_cases {
+      assert_eq!(token_stream_replace_macro_ident(ts, &ident(var), &replacement).to_string(), expected.to_string());
+   }
+
+}
+
+macro_rules! hygiene_test {
+   ($e: expr) => {
+      // x = $e;
+      println!("{}", XXX);
+   };
+}
+
+const XXX: i32 = 42;
+
+fn test_macro_hygiene() {
+   let mut x = "baz";
+   hygiene_test!("foo");
+   hygiene_test!("bar");
+}
+
+#[test]
+fn test_macro_item() {
+   let def = quote! {
+      macro foo($x: expr, $y: expr) {
+         $x + $y
+      }
+   };
+
+   let parsed = parse2::<syn::ItemMacro2>(def).unwrap();
+   
+   println!("rules: {}", parsed.rules);
 }
