@@ -66,7 +66,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       sccs_compiled.push(quote!{
          ascent::internal::comment(#msg);
          {
-            let _scc_start_time = ::std::time::Instant::now();
+            let _scc_start_time = ::ascent::internal::Instant::now();
             #scc_compiled
             _self.#scc_time_field_name += _scc_start_time.elapsed();
          }
@@ -150,7 +150,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          #[allow(unused_imports)]
          #[doc = "Runs the Ascent program to a fixed point or until the timeout is reached. In case of a timeout returns false"]
          pub fn run_timeout(&mut self, timeout: ::std::time::Duration) -> bool {
-            let __start_time = ::std::time::Instant::now();
+            let __start_time = ::ascent::internal::Instant::now();
             macro_rules! __check_return_conditions {() => {
                if timeout < ::std::time::Duration::MAX && __start_time.elapsed() >= timeout {return false;}
             };}
@@ -295,7 +295,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
       });
 
       shift_delta_to_total_new_to_delta.push(quote_spanned!{rel.relation.name.span()=>
-         ascent::internal::RelIndexTrait::move_index_contents(#delta_var_name, &mut #total_var_name);
+         ::ascent::internal::RelIndexTrait::move_index_contents(#delta_var_name, &mut #total_var_name);
          // #delta_var_name.clear();
          std::mem::swap(&mut #new_var_name, #delta_var_name);
       });
@@ -322,7 +322,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
       let rule_compiled = compile_mir_rule(rule, scc, mir, 0);
       let rule_time_field = rule_time_field_name(scc_ind, i);
       let (before_rule_var, update_rule_time_field) = if mir.config.include_rule_times {
-         (quote! {let before_rule = ::std::time::Instant::now();}, 
+         (quote! {let before_rule = ::ascent::internal::Instant::now();}, 
           quote!{_self.#rule_time_field += before_rule.elapsed();})
       } else {(quote!{}, quote!{})};
       evaluate_rules.push(quote! {

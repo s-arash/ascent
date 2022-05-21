@@ -3,7 +3,9 @@
 
 pub use crate::convert::*;
 
-use std::{collections::{HashMap, HashSet}, hash::{BuildHasherDefault, Hash}, time::{Duration, Instant}};
+use std::{collections::{HashMap, HashSet}, hash::{BuildHasherDefault, Hash}, time::Duration};
+
+pub use instant::Instant;
 
 use ascent_base::{Lattice};
 use nohash_hasher::BuildNoHashHasher;

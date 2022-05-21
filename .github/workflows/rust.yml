@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ master, ci, lattices ]
+    branches: [ master, ci, lattices, wasm-support ]
   pull_request:
     branches: [ master ]
 
@@ -42,6 +42,15 @@ jobs:
       working-directory: ./ascent_tests
       run: cargo bench bench_tc -- --nocapture
     
+    - uses: jetli/wasm-pack-action@v0.3.0
+      with:
+        # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
+        version: 'latest'
+
+    - name: Run wasm tests
+      working-directory: ./wasm-tests
+      run: wasm-pack test  --headless --firefox
+
       # macro tests should be last, because they produce scratchpad.rs, which my not compile
     - name: Run macro tests
       working-directory: ./ascent_macro
