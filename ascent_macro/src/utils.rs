@@ -246,6 +246,34 @@ pub fn token_stream_replace_macro_ident(input: TokenStream, ident: &Ident, repla
 }
 
 
+pub fn punctuated_into_parts<T,P>(punctuated: Punctuated<T,P>) -> (Vec<T>, Vec<P>) {
+   let mut items = vec![];
+   let mut punctuations = vec![];
+   for p in punctuated.into_pairs() {
+      match p {
+         syn::punctuated::Pair::Punctuated(t, p) => {items.push(t); punctuations.push(p)},
+         syn::punctuated::Pair::End(t) => items.push(t),
+      }
+   }
+   (items, punctuations)
+}
+
+pub fn punctuated_from_parts<T,P>(mut items: impl Iterator<Item = T>, mut punctuations: impl Iterator<Item = P>)
+-> Punctuated<T, P> {
+   let mut res = Punctuated::new();
+   for pair in items.by_ref().zip_longest(punctuations) {
+      match pair {
+         itertools::EitherOrBoth::Both(item, punct) => {res.push_value(item); res.push_punct(punct)},
+         itertools::EitherOrBoth::Left(item) => res.push_value(item),
+         itertools::EitherOrBoth::Right(_) => panic!("extra punctuations"),
+      }
+   }
+   res
+}
+
+pub fn spans_eq(span1: &Span, span2: &Span) -> bool {
+   format!("{:?}", span1) == format!("{:?}", span2)
+}
 
 // I don't know why I'm like this
 pub trait Piper : Sized {

@@ -581,6 +581,31 @@ pub fn token_stream_replace_ident(ts: TokenStream, visitor: &mut dyn FnMut(&mut 
    TokenStream::from_iter(new_tts.into_iter())
 }
 
+pub fn token_stream_visit_idents(ts: TokenStream, visitor: &mut impl FnMut(&Ident)) {
+
+   fn token_tree_visit_idents(mut tt: TokenTree, visitor: &mut impl FnMut(&Ident)) {
+      match tt {
+         TokenTree::Group(grp) => {
+            token_stream_visit_idents(grp.stream(), visitor);
+         },
+         TokenTree::Ident(ref mut ident) =>visitor(ident),
+         TokenTree::Punct(_) => (),
+         TokenTree::Literal(_) => (),
+      }
+   }
+
+   for tt in ts.into_iter() {
+      token_tree_visit_idents(tt, visitor);
+   }
+}
+
+pub fn token_stream_idents(ts: TokenStream) -> Vec<Ident> {
+   let mut res = vec![];
+   token_stream_visit_idents(ts, &mut |ident| res.push(ident.clone()));
+   res
+}
+
+// TODO remove
 // pub fn expr_visit_free_vars_mut(expr: &mut Expr, visitor: &mut dyn FnMut(&mut Ident)) {
 //    macro_rules! visit {
 //       ($e: expr) => { expr_visit_free_vars_mut($e, visitor)};

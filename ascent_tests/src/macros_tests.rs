@@ -2,6 +2,7 @@
 
 use ascent::ascent;
 
+use crate::assert_rels_eq;
 use crate::utils::rels_equal;
 
 #[test]
@@ -35,7 +36,6 @@ fn test_macro_in_macro() {
    assert!(rels_equal(prog.bar, [(1, 2), (11, 12)]));
    assert!(rels_equal(prog.quax, [(2,), (12,)]));
 }
-
 #[test]
 fn test_macro_in_macro2() {
 
@@ -94,8 +94,8 @@ fn test_macro_in_macro3() {
    }
 
    let mut prog = AscentProgram::default();
-
    prog.run();
+
    assert_eq!(prog.edge.len(), prog.edge_rev.len());
 }
 
@@ -106,19 +106,13 @@ fn test_macro_in_macro4() {
       relation foo(i32, i32);
       relation bar(i32, i32);
 
-      macro foo_($x: expr, $y: expr) {
-         foo($x, $y)
-      }
+      macro foo_($x: expr, $y: expr) { foo($x, $y) }
 
       macro foo($x: expr, $y: expr) {
          let _x = $x, let _y = $y, foo_!(_x, _y)
       }
 
-      foo(0, 1);
-      foo(1, 2);
-      foo(2, 3);
-      foo(3, 4);
-
+      foo(0, 1), foo(1, 2), foo(2, 3), foo(3, 4);
       bar(x, y) <-- foo(x, y), foo!(x + 1, y + 1), foo!(x + 2, y + 2), foo!(x + 3, y + 3);
    }
 
@@ -145,17 +139,81 @@ fn test_macro_in_macro5() {
 
       can_compile_to(a, b) <-- compiler!(a, b);
       can_compile_to(a, c) <-- compiler!(a, b), can_compile_to(b, c);
+
+      relation compiles_in_two_steps(Lang, Lang);
+      compiles_in_two_steps(a, c) <-- compiler!(a, b), compiler!(b, c);
    }
 
    let mut prog = AscentProgram::default();
-   prog.compiler = vec![("Rustc", "Rust", "X86"), ("MyRandomCompiler", "Python", "Rust"),
+   prog.compiler = vec![("Rustc", "Rust", "X86"), ("Rustc", "Rust", "WASM"), 
+                        ("MyRandomCompiler", "Python", "Rust"),
                         ("Cython", "Python", "C"), ("Clang", "C", "X86")];
    prog.bad_compiler = vec![("MyRandomCompiler",)];
-
    prog.run();
 
    println!("can_compile_to: {:?}", prog.can_compile_to);
+   println!("compiles_in_two_steps: {:?}", prog.compiles_in_two_steps);
 
    assert!(prog.can_compile_to.contains(&("Python", "X86")));
    assert!(!prog.can_compile_to.contains(&("Python", "Rust")));
+}
+
+#[test]
+fn test_macro_in_macro6() {
+
+   ascent! {
+      relation foo(i32, i32) = vec![(0, 1), (1, 2), (2, 3), (3, 4)];
+
+      macro foo_rev($y: expr, $x: expr) {
+         foo!($x, $y), let x = $x, let y = $y
+      }
+
+      macro foo_($x: expr, $y: expr) {
+         foo($x, $y)
+      }
+
+      macro foo($x: expr, $y: expr) {
+         foo_!($x, $y), let x = $x, let y = $y, foo_!(x, y)
+      }
+
+      relation baz(i32, i32);
+      relation baz_e(i32, i32);
+
+      baz(x, z) <-- foo_rev!(y, x), foo_rev!(z, y);
+      baz_e(x, z) <-- foo(x, y), foo(y, z);
+   }
+
+   let mut prog = AscentProgram::default();
+   prog.run();
+
+   println!("baz: {:?}", prog.baz);
+   println!("baz_e: {:?}", prog.baz_e);
+
+   assert_rels_eq!(prog.baz, prog.baz_e);
+}
+
+#[test]
+fn test_macro_in_macro7() {
+
+   ascent! {
+      relation foo(i32, i32) = vec![(0, 1), (1, 2), (2, 3), (3, 4)];
+      relation bar(Option<i32>, i32) = vec![(Some(1), 2), (Some(2), 3), (None, 4)];
+
+      macro foo($x: expr, $y: expr) { foo($x, $y), }
+      macro bar($x: ident, $y: expr) { bar(?Some($x), $y) }
+
+      relation baz(i32, i32);
+      relation baz_e(i32, i32);
+
+      baz(x, z) <-- bar!(x, y), foo!(y, z);
+      baz_e(x, z) <-- bar(?Some(x), y), foo(y, z);
+   }
+
+   let mut prog = AscentProgram::default();
+   prog.run();
+
+   println!("baz  : {:?}", prog.baz);
+   println!("baz_e: {:?}", prog.baz_e);
+
+   assert_rels_eq!(prog.baz, prog.baz_e);
 }
