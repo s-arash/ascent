@@ -15,7 +15,7 @@ proc-macro = true
 [dependencies]
 syn = { version = "1.0", features= ["derive", "full", "extra-traits", "visit-mut"]} 
 quote = "1.0"
-ascent_base = {version = "0.2", path= "../ascent_base"}
+ascent_base = {version = "=0.2.1", path= "../ascent_base"}
 proc-macro2 = "1.0"
 itertools = "0.10"
 petgraph = "0.6.0"

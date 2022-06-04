@@ -138,15 +138,19 @@ fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
 ```
 In the above example, we initialize the relation `r` directly to shorten the program.
 
+
+### Macro definitions
+It may be useful to define macros that expand to either body items or head items. Ascent allows you to do this.
+
+You can find more about macros in Ascent macros [here](MACROS.MD).
 ### Misc
-- `#![measure_rule_times]` causes execution times of individual rules to be measured.
- Example: 
- ```Rust
- ascent! {
-    #![measure_rule_times]
-    // ...
- }
- ```
+- `#![measure_rule_times]` causes execution times of individual rules to be measured. Example: 
+   ```Rust
+   ascent! {
+      #![measure_rule_times]
+      // ...
+   }
+   ```
 - With `#![generate_run_timeout]`, a `run_timeout` function is generated that stops after
   the given amount of time.
-- The feature `wasm-bindgen` allows Ascent programs to run in WASM environemnts.
+- The feature `wasm-bindgen` allows Ascent programs to run in WASM environments.

@@ -70,8 +70,6 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
             #scc_compiled
             _self.#scc_time_field_name += _scc_start_time.elapsed();
          }
-         // TODO remove this:
-         // eprintln!("scc {} done.", #i);
       });
    }
 
@@ -503,7 +501,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
          let rel2_var_name = bcl2.rel.var_name();
 
          
-         // TODO testting:
+         // TODO testing:
          // return if bcl1.rel.version == Total && bcl2.rel.version == Delta {
          //    rule_cp2_compiled
          // } else {

@@ -1,17 +1,28 @@
 extern crate proc_macro;
 use ascent_base::util::update;
 use proc_macro2::{Span, TokenStream};
-use syn::{Attribute, Expr, ExprPath, GenericParam, Generics, Ident, Pat, Result, Token, Type, Visibility, WhereClause, braced, parenthesized, 
-          parse::{Parse, ParseStream, ParseBuffer, Parser}, parse2, punctuated::Punctuated, spanned::Spanned, 
-          token::{Comma, Gt, Lt}, Error, ItemMacro2, ExprMacro, MacroDelimiter};
+use syn::{
+   braced, parenthesized, parse2, punctuated::Punctuated, spanned::Spanned, Attribute, Error, Expr, ExprMacro,
+   ExprPath, GenericParam, Generics, Ident, ItemMacro2, MacroDelimiter, Pat, Result, Token, Type, Visibility,
+   WhereClause,
+};
+use syn::token::{Comma, Gt, Lt};
+use syn::parse::{Parse, ParseStream, ParseBuffer, Parser};
 use std::{collections::{HashMap, HashSet}, sync::Mutex};
 
-use quote::{ToTokens};
-use itertools::{Itertools};
+use quote::ToTokens;
+use itertools::Itertools;
 use derive_syn_parse::Parse;
 
-use crate::{utils::{expr_to_ident, is_wild_card, pat_to_ident, map_punctuated, punctuated_singleton, flatten_punctuated, punctuated_try_unwrap, token_stream_replace_macro_idents, Piper, expr_to_ident_mut, punctuated_into_parts, punctuated_from_parts, spans_eq}, 
-            syn_utils::{pattern_get_vars, expr_get_vars, expr_visit_free_vars_mut, pattern_visit_vars_mut, token_stream_replace_ident, token_stream_idents}};
+use crate::utils::{
+   expr_to_ident, expr_to_ident_mut, flatten_punctuated, is_wild_card, pat_to_ident, punctuated_from_parts,
+   punctuated_into_parts, punctuated_map, punctuated_singleton, punctuated_try_map, punctuated_try_unwrap, spans_eq,
+   token_stream_replace_macro_idents, Piper,
+};
+use crate::syn_utils::{
+   expr_get_vars, expr_visit_free_vars_mut, expr_visit_idents_in_macros_mut, expr_visit_macros_mut,
+   pattern_get_vars, pattern_visit_vars_mut, token_stream_idents, token_stream_replace_ident,
+};
 
 
 // resources:
@@ -402,10 +413,6 @@ impl Parse for RuleNode {
          braced!(content in input);
          Punctuated::<HeadItemNode, Token![,]>::parse_terminated(&content)?
       } else {
-         // let mut res = Punctuated::<HeadClauseNode, Token![,]>::new();
-         // res.push(HeadClauseNode::parse(&input)?);
-         // res
-         // TODO this seems to work fine for parsing multiple head clauses...
          Punctuated::<HeadItemNode, Token![,]>::parse_separated_nonempty(&input)?
       };
 
@@ -631,36 +638,42 @@ fn body_item_visit_bound_vars_mut(bi: &mut BodyItemNode, visitor: &mut dyn FnMut
    }
 }
 
-fn body_item_visit_exprs_free_vars_mut(bi: &mut BodyItemNode, visitor: &mut dyn FnMut(&mut Ident)){
+fn body_item_visit_exprs_free_vars_mut(bi: &mut BodyItemNode, visitor: &mut dyn FnMut(&mut Ident), visit_macro_idents: bool){
+   let mut visit = |mut expr: &mut Expr| {
+      expr_visit_free_vars_mut(expr, visitor);
+      if visit_macro_idents {
+         expr_visit_idents_in_macros_mut(expr, visitor);
+      }
+   };
    match bi {
-      BodyItemNode::Generator(gen) => expr_visit_free_vars_mut(&mut gen.expr, visitor),
+      BodyItemNode::Generator(gen) => visit(&mut gen.expr),
       BodyItemNode::Agg(agg) => {
-         for arg in agg.rel_args.iter_mut() {expr_visit_free_vars_mut(arg, visitor)}
-         if let AggregatorNode::Expr(e) = &mut agg.aggregator {expr_visit_free_vars_mut(e, visitor)}
+         for arg in agg.rel_args.iter_mut() {visit(arg)}
+         if let AggregatorNode::Expr(e) = &mut agg.aggregator {visit(e)}
       },
       BodyItemNode::Clause(cl) => {
          for arg in cl.args.iter_mut() {
             if let BodyClauseArg::Expr(e) = arg {
-               expr_visit_free_vars_mut(e, visitor);
+               visit(e);
             }
          }
       },
       BodyItemNode::Negation(cl) => {
          for arg in cl.args.iter_mut() {
-            expr_visit_free_vars_mut(arg, visitor);
+            visit(arg);
          }
       },
       BodyItemNode::Disjunction(disj) => {
          for conj in disj.disjuncts.iter_mut() {
             for bi in conj.iter_mut() {
-               body_item_visit_exprs_free_vars_mut(bi, visitor);
+               body_item_visit_exprs_free_vars_mut(bi, visitor, visit_macro_idents);
             }
          }
       },
       BodyItemNode::Cond(cl) => match cl {
-         CondClause::IfLet(cl) => expr_visit_free_vars_mut(&mut cl.exp, visitor),
-         CondClause::If(cl) => expr_visit_free_vars_mut(&mut cl.cond, visitor),
-         CondClause::Let(cl) => expr_visit_free_vars_mut(&mut cl.exp, visitor),
+         CondClause::IfLet(cl) => visit(&mut cl.exp),
+         CondClause::If(cl) => visit(&mut cl.cond),
+         CondClause::Let(cl) => visit(&mut cl.exp),
       },
       BodyItemNode::MacroInvocation(m) => {
          update(&mut m.mac.tokens, |ts| token_stream_replace_ident(ts, visitor));
@@ -690,25 +703,6 @@ impl Default for GenSym {
    }
 }
 
-// TODO remove if not used
-fn body_items_rename_underlined_vars(bis: &mut [&mut BodyItemNode], gensym: &mut GenSym) {
-   enum Either<L,R>{Left(L), Right(R)}
-
-   let underlined_vars = bis.iter().flat_map(|bi| body_item_get_bound_vars(bi)).collect::<HashSet<_>>();
-   let var_mappings : HashMap<_,_> = underlined_vars.iter()
-      .filter_map(|v| if v.to_string().starts_with("_") {Some((v, gensym.next(&v.to_string())))} else {None})
-      .collect();
-   let mut visitor = |ident: &mut Ident| {
-      if let Some(replacement) = var_mappings.get(ident) {
-         *ident = Ident::new(&var_mappings[ident], ident.span())
-      }
-   };
-   for bi in bis.iter_mut() {
-      body_item_visit_bound_vars_mut(bi, &mut visitor);
-      body_item_visit_exprs_free_vars_mut(bi, &mut visitor);
-   }
-}
-
 fn body_items_rename_macro_originated_vars(bis: &mut [&mut BodyItemNode], macro_def: &MacroDefNode, gensym: &mut GenSym) {
    let bi_vars = bis.iter().flat_map(|bi| body_item_get_bound_vars(bi)).collect_vec();
    let mut mac_body_idents = token_stream_idents(macro_def.body.clone());
@@ -730,7 +724,7 @@ fn body_items_rename_macro_originated_vars(bis: &mut [&mut BodyItemNode], macro_
    };
    for bi in bis.iter_mut() {
       body_item_visit_bound_vars_mut(bi, &mut visitor);
-      body_item_visit_exprs_free_vars_mut(bi, &mut visitor);
+      body_item_visit_exprs_free_vars_mut(bi, &mut visitor, true);
    }
 }
 
@@ -744,7 +738,7 @@ fn rule_desugar_pattern_args(rule: RuleNode) -> RuleNode {
             BodyClauseArg::Expr(_) => arg,
             BodyClauseArg::Pat(pat) => {
                let pattern = pat.pattern;
-               let ident = gensym.next_ident("_arg_pattern", pattern.span());
+               let ident = gensym.next_ident("__arg_pattern", pattern.span());
                let new_cond_clause = quote!{ if let #pattern = #ident};
                let new_cond_clause = CondClause::IfLet(syn::parse2(new_cond_clause).unwrap());
                new_cond_clauses.push(new_cond_clause);
@@ -900,28 +894,31 @@ fn invoke_macro(invocation: &ExprMacro, definition: &MacroDefNode) -> Result<Tok
    Ok(replaced_body)
 }
 
-
 fn rule_expand_macro_invocations(mut rule: RuleNode, macros: &HashMap<Ident, &MacroDefNode>) -> Result<RuleNode> {
 
-   fn body_item_expand_macro_invocations(bi: BodyItemNode, macros: &HashMap<Ident, &MacroDefNode>, gensym: &mut GenSym) 
+   const RECURSIVE_MACRO_ERROR: &'static str = "recursively defined Ascent macro";
+   fn body_item_expand_macros(bi: BodyItemNode, macros: &HashMap<Ident, &MacroDefNode>, gensym: &mut GenSym, depth: i16, span: Option<Span>) 
    -> Result<Punctuated<BodyItemNode, Token![,]>> 
    {
+      if depth <= 0 {
+         return Err(Error::new(span.unwrap_or(Span::call_site()), RECURSIVE_MACRO_ERROR))
+      }
       match bi {
          BodyItemNode::MacroInvocation(m) => {
             let mac_def = macros.get(m.mac.path.get_ident().unwrap())
                          .ok_or_else(|| Error::new(m.span(), "undefined macro"))?;
             let macro_invoked = invoke_macro(&m, mac_def)?;
             let mut expanded_bis = Parser::parse2(Punctuated::<BodyItemNode, Token![,]>::parse_terminated, macro_invoked)?;
-            let mut recursively_expanded = map_punctuated(expanded_bis, |ebi| body_item_expand_macro_invocations(ebi, macros, gensym))
-               .pipe(punctuated_try_unwrap)?
+            let mut recursively_expanded = 
+               punctuated_try_map(expanded_bis, |ebi| body_item_expand_macros(ebi, macros, gensym, depth - 1, Some(m.span())))?
                .pipe(flatten_punctuated);
             body_items_rename_macro_originated_vars(&mut recursively_expanded.iter_mut().collect_vec(), &mac_def, gensym);
             Ok(recursively_expanded)
          },
          BodyItemNode::Disjunction(disj) => {
-            let new_disj: Punctuated<Result<_>, _> = map_punctuated(disj.disjuncts, |bis|{
-               let new_bis = map_punctuated(bis,|bi| {
-                  body_item_expand_macro_invocations(bi, macros, gensym)
+            let new_disj: Punctuated<Result<_>, _> = punctuated_map(disj.disjuncts, |bis|{
+               let new_bis = punctuated_map(bis,|bi| {
+                  body_item_expand_macros(bi, macros, gensym, depth - 1, Some(disj.paren.span))
                });
                Ok(flatten_punctuated(punctuated_try_unwrap(new_bis)?))
             });
@@ -932,9 +929,12 @@ fn rule_expand_macro_invocations(mut rule: RuleNode, macros: &HashMap<Ident, &Ma
       }
    }
 
-   fn head_item_expand_macro_invocations(hi: HeadItemNode, macros: &HashMap<Ident, &MacroDefNode>) 
+   fn head_item_expand_macros(hi: HeadItemNode, macros: &HashMap<Ident, &MacroDefNode>, depth: i16, span: Option<Span>) 
    -> Result<Punctuated<HeadItemNode, Token![,]>> 
    {
+      if depth <= 0 {
+         return Err(Error::new(span.unwrap_or(Span::call_site()), RECURSIVE_MACRO_ERROR))
+      }
       match hi {
          HeadItemNode::MacroInvocation(m) => {
             let mac_def = macros.get(m.mac.path.get_ident().unwrap())
@@ -942,7 +942,7 @@ fn rule_expand_macro_invocations(mut rule: RuleNode, macros: &HashMap<Ident, &Ma
             let macro_invoked = invoke_macro(&m, mac_def)?;
             let expanded_his = Parser::parse2(Punctuated::<HeadItemNode, Token![,]>::parse_terminated, macro_invoked)?;
 
-            Ok(map_punctuated(expanded_his, |ehi| head_item_expand_macro_invocations(ehi, macros))
+            Ok(punctuated_map(expanded_his, |ehi| head_item_expand_macros(ehi, macros, depth - 1, Some(m.span())))
                .pipe(punctuated_try_unwrap)?
                .pipe(flatten_punctuated))
          },
@@ -950,14 +950,14 @@ fn rule_expand_macro_invocations(mut rule: RuleNode, macros: &HashMap<Ident, &Ma
       }
    }
 
-   let mut gensym = GenSym::new(|s| format!("{}_", s));
+   let mut gensym = GenSym::new(|s| format!("__{}_", s));
 
    let new_body_items = rule.body_items.into_iter()
-                        .map(|bi| body_item_expand_macro_invocations(bi, macros, &mut gensym))
+                        .map(|bi| body_item_expand_macros(bi, macros, &mut gensym, 100, None))
                         .collect::<Result<Vec<_>>>()?
                         .into_iter().flatten().collect_vec();
 
-   let new_head_items = map_punctuated(rule.head_clauses, |hi| head_item_expand_macro_invocations(hi, macros))
+   let new_head_items = punctuated_map(rule.head_clauses, |hi| head_item_expand_macros(hi, macros, 100, None))
                         .pipe(punctuated_try_unwrap)?
                         .pipe(flatten_punctuated);
                         

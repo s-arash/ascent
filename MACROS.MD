@@ -1,8 +1,8 @@
-### macros!
+# macros!
 
 Macros can be defined inside Ascent programs to avoid having to repeat code.
 
-The syntax resembels (unstable) Rust macros 2.0.
+The syntax resembles (unstable) Rust macros 2.0.
 
 Example: Finding out what languages can be compiled to what languages *competently*.
 ```Rust

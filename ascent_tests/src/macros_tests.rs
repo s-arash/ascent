@@ -3,7 +3,6 @@
 use ascent::ascent;
 
 use crate::assert_rels_eq;
-use crate::utils::rels_equal;
 
 #[test]
 fn test_macro_in_macro() {
@@ -33,9 +32,10 @@ fn test_macro_in_macro() {
    };
    let mut prog = AscentProgram::default();
    prog.run();
-   assert!(rels_equal(prog.bar, [(1, 2), (11, 12)]));
-   assert!(rels_equal(prog.quax, [(2,), (12,)]));
+   assert_rels_eq!(prog.bar, [(1, 2), (11, 12)]);
+   assert_rels_eq!(prog.quax, [(2,), (12,)]);
 }
+
 #[test]
 fn test_macro_in_macro2() {
 
@@ -74,7 +74,7 @@ fn test_macro_in_macro2() {
    println!("res_val2: {}\n{:?}", prog.res_val2.len(), prog.res_val2);
 
    assert_eq!(prog.res_val2.len(), prog.res_val.len().pow(2));
-   assert!(rels_equal(prog.res_val, [(100, ), (1000, )]));
+   assert_rels_eq!(prog.res_val, [(100, ), (1000, )]);
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn test_macro_in_macro4() {
    let mut prog = AscentProgram::default();
    prog.run();
 
-   assert!(rels_equal(prog.bar, [(0, 1)]));
+   assert_rels_eq!(prog.bar, [(0, 1)]);
 }
 
 #[test]
@@ -196,16 +196,72 @@ fn test_macro_in_macro6() {
 fn test_macro_in_macro7() {
 
    ascent! {
-      relation foo(i32, i32) = vec![(0, 1), (1, 2), (2, 3), (3, 4)];
+      relation foo(i32, i32) = vec![(0, 1), (1, 2), (2, 3), (3, 4), (4, 6), (3, 7)];
       relation bar(Option<i32>, i32) = vec![(Some(1), 2), (Some(2), 3), (None, 4)];
 
       macro foo($x: expr, $y: expr) { foo($x, $y), }
       macro bar($x: ident, $y: expr) { bar(?Some($x), $y) }
 
+      macro foo2($x: expr, $y: expr) { 
+         foo!($x, $y), let x = $x, for x2 in [1, 2], ((foo(x, x2), let y = $y, let _ = println!("{}", y)) || if true, for y in [$y, $y]), 
+         foo!(x + 0, y - 0), foo(x, y), foo!(x, y),
+         let z = |x: i32| {x}, foo(z(*x), z(*y))
+      }
+
       relation baz(i32, i32);
+      macro baz($x: expr, $y: expr) {baz($x, $y)}
       relation baz_e(i32, i32);
 
+      baz!(x, z) <-- bar!(x, y), foo!(y, z);
+      baz!(a, c) <-- bar!(a, b), foo!(b, c);
+      baz_e(x, z) <-- bar(?Some(x), y), foo(y, z);
+      
+      relation quax(i32, i32);
+      relation quax_e(i32, i32);
+
+      quax(x, z) <-- foo2!(x, y), foo2!(y, z);
+      quax_e(x, z) <-- foo(x, y), foo(y, z);
+   }
+
+   let mut prog = AscentProgram::default();
+   prog.run();
+
+   println!("baz  : {:?}", prog.baz);
+   assert_rels_eq!(prog.baz, prog.baz_e);
+   
+   println!("quax: {:?}", prog.quax);
+   assert_rels_eq!(prog.quax, prog.quax_e);
+
+}
+
+#[test]
+fn test_macro_in_macro8() {
+
+   macro_rules! id {
+      ($($inp: tt)*) => { $($inp)* };
+   }
+
+   ascent! {
+      relation foo(i32, i32) = vec![(0, 1), (1, 2), (2, 3), (3, 4), (4, 6), (3, 7)];
+      relation bar(Option<i32>, i32) = vec![(Some(1), 2), (Some(2), 3), (None, 4)];
+
+      macro foo2($x: expr, $y: expr) { foo($x, $y), }
+      macro bar($x: ident, $y: expr) { bar(?Some($x), $y) }
+
+      macro foo($xx: expr, $yy: expr) { 
+         foo2!($xx, $yy), let x = id!($xx), let y = id!($yy), for x2 in [1, 2],
+         let _ = assert!(x == $xx && y == $yy),
+         foo2!(id!(id!(x) + 0), id!(y - 0)), foo(x, y), foo2!(x, y),
+         let z = id!(|x: i32| {x}), foo(z(*x), z(*y))
+      }
+
+      relation baz(i32, i32);
+      relation baz_e(i32, i32);
       baz(x, z) <-- bar!(x, y), foo!(y, z);
+      
+      relation baz2(i32, i32);
+      baz2(a, c) <-- bar!(a, b), foo!(b, c);
+
       baz_e(x, z) <-- bar(?Some(x), y), foo(y, z);
    }
 
@@ -213,7 +269,6 @@ fn test_macro_in_macro7() {
    prog.run();
 
    println!("baz  : {:?}", prog.baz);
-   println!("baz_e: {:?}", prog.baz_e);
-
-   assert_rels_eq!(prog.baz, prog.baz_e);
+   assert_rels_eq!(&prog.baz, &prog.baz_e);
+   assert_rels_eq!(prog.baz2, prog.baz_e);
 }
