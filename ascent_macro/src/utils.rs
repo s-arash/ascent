@@ -114,21 +114,6 @@ pub fn punctuated_singleton<T, P>(item: T) -> Punctuated<T, P> {
    res
 }
 
-
-pub fn replace_free_vars(expr: &Expr, subs: &HashMap<Ident, Ident>) -> Expr {
-   struct Visitor<'a> {
-      subs: &'a HashMap<Ident, Ident>
-   }
-
-   impl <'a> syn::visit_mut::VisitMut for Visitor<'a> {
-      fn visit_expr_path_mut(&mut self, i: &mut syn::ExprPath) {
-         syn::visit_mut::visit_expr_path_mut(self, i);
-      }
-   }
-   todo!()
-}
-
-
 pub fn expr_to_ident(expr: &Expr) -> Option<Ident> {
    match expr {
       Expr::Path(p) => p.path.get_ident().cloned(),

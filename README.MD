@@ -28,7 +28,7 @@ ascent!{
 3. Add `ascent` as a dependency in `Cargo.toml`:
    ```toml
    [dependencies]
-   ascent = "0.2"
+   ascent = "0.3"
    # or:
    # ascent = {git = "https://github.com/s-arash/ascent"} 
    ```

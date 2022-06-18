@@ -1,6 +1,6 @@
 [package]
 name = "ascent"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.59" # the CI (../.github/workflows/rust.yml) toolchain version must match this
 authors = ["Arash Sahebolamri"]
@@ -16,8 +16,8 @@ readme = "../README.MD"
 
 [dependencies]
 
-ascent_macro = {version = "=0.2.1", path = "../ascent_macro"}
-ascent_base = {version = "=0.2.1", path = "../ascent_base"}
+ascent_macro = { version = "=0.3.0", path = "../ascent_macro" }
+ascent_base = { version = "=0.3.0", path = "../ascent_base" }
 rustc-hash = "1.1"
 nohash-hasher = "0.2.0"
 hashbrown = {version = "0.12", features = ["raw"]}
