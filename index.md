@@ -1,9 +1,9 @@
 # Logic programming in Rust
-[![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml)
+[![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml) [![Crates.io](https://img.shields.io/crates/v/ascent?color=blue)](https://crates.io/crates/ascent)
 
 Ascent is a logic programming language (similar to Datalog) embedded in Rust via macros.
 
-For more information, check out [this paper](https://s-arash.github.io/ascent/cc22main-p95-seamless-deductive-inference-via-macros.pdf) on Ascent.
+For more information, check out [the CC paper](https://s-arash.github.io/ascent/cc22main-p95-seamless-deductive-inference-via-macros.pdf) on Ascent.
 
 ## Examples
 
@@ -28,7 +28,9 @@ ascent!{
 3. Add `ascent` as a dependency in `Cargo.toml`:
    ```toml
    [dependencies]
-   ascent = {git = "https://github.com/s-arash/ascent"}
+   ascent = "0.3"
+   # or:
+   # ascent = {git = "https://github.com/s-arash/ascent"} 
    ```
 4. Write some Ascent code in `main.rs`. Here is a complete example:
    ```rust
@@ -52,7 +54,6 @@ ascent!{
    ```bash
    cargo run
    ```
-
 ## Features
 
 ### Lattices
@@ -118,7 +119,7 @@ You can define your own aggregators if the provided aggregators are not sufficie
 fn second_highest<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
    where N: Ord + Clone
 ```
-Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in `ascent::aggregators`.
+Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
 
 ### `ascent_run!`
 
@@ -136,3 +137,20 @@ fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
 }
 ```
 In the above example, we initialize the relation `r` directly to shorten the program.
+
+
+### Macro definitions
+It may be useful to define macros that expand to either body items or head items. Ascent allows you to do this.
+
+You can find more about macros in Ascent macros [here](MACROS.MD).
+### Misc
+- `#![measure_rule_times]` causes execution times of individual rules to be measured. Example: 
+   ```Rust
+   ascent! {
+      #![measure_rule_times]
+      // ...
+   }
+   ```
+- With `#![generate_run_timeout]`, a `run_timeout` function is generated that stops after
+  the given amount of time.
+- The feature `wasm-bindgen` allows Ascent programs to run in WASM environments.
