@@ -3,7 +3,9 @@
 
 pub use crate::convert::*;
 
-use std::{collections::{HashMap, HashSet}, hash::{BuildHasherDefault, Hash}, time::Duration};
+use std::{time::Duration};
+use std::hash::{BuildHasherDefault, Hash};
+use std::collections::{HashMap, HashSet};
 
 pub use instant::Instant;
 
@@ -11,8 +13,13 @@ use ascent_base::{Lattice};
 use nohash_hasher::BuildNoHashHasher;
 use rustc_hash::FxHasher;
 
-// pub use hashbrown;
-pub type RelIndexType<K> = HashMap<K, Vec<usize>, BuildHasherDefault<FxHasher>>;
+pub use crate::rel_index_read::RelIndexCombined;
+pub use crate::rel_index_read::RelIndexRead;
+pub use crate::rel_index_read::RelIndexReadAll;
+
+pub type RelIndexType<K> = RelIndexType1<K>;
+// pub type RelIndexType<K> = crate::experimental_rel_index2::RelIndexType2<K>;
+
 pub type LatticeIndexType<K> = HashMap<K, HashSet<usize, BuildNoHashHasher<usize>>, BuildHasherDefault<FxHasher>>;
 // pub type RelFullIndexType<K> = HashMap<K, usize, BuildHasherDefault<FxHasher>>;
 pub(crate) type HashBrownRelFullIndexType<K> = hashbrown::HashMap<K, usize, BuildHasherDefault<FxHasher>>;
@@ -20,27 +27,33 @@ pub type RelFullIndexType<K> = HashBrownRelFullIndexType<K>;
 
 pub type RelNoIndexType = Vec<usize>;
 
-pub trait RelIndexTrait{
+pub trait RelIndexWrite{
    type Key;
    fn move_index_contents(from: &mut Self, to: &mut Self);
    fn index_insert(ind: &mut Self, key: Self::Key, tuple_index: usize);
 }
 
-pub trait RelFullIndexTrait : Default {
+pub trait RelFullIndexRead {
+   type Key;
+   fn contains_key(&self, key: &Self::Key) -> bool;
+}
+
+pub trait RelFullIndexWrite: Default {
    type Key: Clone;
-   /// if an entry for `key` does not exsit, inserts `v` for it and returns true.
+   /// if an entry for `key` does not exist, inserts `v` for it and returns true.
    fn insert_if_not_present(&mut self, key: &Self::Key, v: usize) -> bool;
 }
 
 
+pub(crate) type RelIndexType1<K> = HashMap<K, Vec<usize>, BuildHasherDefault<FxHasher>>;
+
 pub static mut MOVE_REL_INDEX_CONTENTS_TOTAL_TIME : Duration = Duration::ZERO;
 pub static mut INDEX_INSERT_TOTAL_TIME : Duration = Duration::ZERO;
 
-impl<K: Eq + Hash> RelIndexTrait for RelIndexType<K>{
+impl<K: Eq + Hash> RelIndexWrite for RelIndexType1<K>{
    type Key = K;
 
-   #[inline(always)]
-   fn move_index_contents(from: &mut RelIndexType<K>, to: &mut RelIndexType<K>) {
+   fn move_index_contents(from: &mut RelIndexType1<K>, to: &mut RelIndexType1<K>) {
       let before = Instant::now();
       if from.len() > to.len() {
          std::mem::swap(from, to);
@@ -65,22 +78,23 @@ impl<K: Eq + Hash> RelIndexTrait for RelIndexType<K>{
       }
    }
 
-   #[inline(always)]
-   fn index_insert(hm: &mut RelIndexType<K>, key: K, tuple_index: usize) {
+   fn index_insert(hm: &mut RelIndexType1<K>, key: K, tuple_index: usize) {
       // let before = Instant::now();
-      // hm.entry(key).or_insert_with(|| Vec::with_capacity(8)).push(tuple_index);
       use std::collections::hash_map::Entry::*;
       match hm.entry(key){
          Occupied(mut vec) => vec.get_mut().push(tuple_index),
-         Vacant(vacant) => {vacant.insert(vec![tuple_index]);},
+         Vacant(vacant) => {
+            let mut vec = Vec::with_capacity(4);
+            vec.push(tuple_index);
+            vacant.insert(vec);
+         },
       }
-      // hm.entry(key).or_default().push(tuple_index);
       // unsafe {
       //    INDEX_INSERT_TOTAL_TIME += before.elapsed();
       // }
    }
 }
-impl RelIndexTrait for RelNoIndexType {
+impl RelIndexWrite for RelNoIndexType {
    type Key = ();
 
    fn move_index_contents(ind1: &mut Self, ind2: &mut Self) {
@@ -92,7 +106,7 @@ impl RelIndexTrait for RelNoIndexType {
    }
 }
 
-impl<K: Eq + Hash> RelIndexTrait for LatticeIndexType<K>{
+impl<K: Eq + Hash> RelIndexWrite for LatticeIndexType<K>{
    type Key = K;
 
    #[inline(always)]
@@ -110,7 +124,7 @@ impl<K: Eq + Hash> RelIndexTrait for LatticeIndexType<K>{
 }
 
 pub static mut MOVE_FULL_INDEX_CONTENTS_TOTAL_TIME : Duration = Duration::ZERO;
-impl<K: Eq + Hash> RelIndexTrait for HashBrownRelFullIndexType<K>{
+impl<K: Eq + Hash> RelIndexWrite for HashBrownRelFullIndexType<K>{
     type Key = K;
 
    fn move_index_contents(from: &mut Self, to: &mut Self) {
@@ -138,7 +152,7 @@ impl<K: Eq + Hash> RelIndexTrait for HashBrownRelFullIndexType<K>{
    }
 }
 
-impl <K: Clone + Hash + Eq> RelFullIndexTrait for HashBrownRelFullIndexType<K> {
+impl <K: Clone + Hash + Eq> RelFullIndexWrite for HashBrownRelFullIndexType<K> {
    type Key = K;
    #[inline]
    fn insert_if_not_present(&mut self, key: &Self::Key, v: usize) -> bool {
@@ -146,10 +160,14 @@ impl <K: Clone + Hash + Eq> RelFullIndexTrait for HashBrownRelFullIndexType<K> {
          hashbrown::hash_map::RawEntryMut::Occupied(_) => false,
          hashbrown::hash_map::RawEntryMut::Vacant(vacant) => {vacant.insert(key.clone(), v); true},
       }
-      // match hm.entry(key) {
-      //    Occupied(_) => false,
-      //    Vacant(vacant) => {vacant.insert(v); true},
-      // }
+   }
+}
+
+impl<K: Hash + Eq> RelFullIndexRead for HashBrownRelFullIndexType<K> {
+    type Key = K;
+
+   fn contains_key(&self, key: &Self::Key) -> bool {
+      self.contains_key(key)
    }
 }
 

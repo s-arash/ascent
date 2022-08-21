@@ -2,6 +2,7 @@ use ascent::ascent_run;
 use ascent::ascent;
 use std::rc::Rc;
 use ascent::aggregators::mean;
+use crate::assert_rels_eq;
 use crate::utils::rels_equal;
 use std::hash::Hash;
 
@@ -58,8 +59,8 @@ fn test_tc_example() {
    let r = vec![(1, 2), (2, 4), (3, 1)];
    println!("tc: {:?}", tc(r.clone(), true));
    println!("reflexive tc: {:?}", tc(r.clone(), true));
-   assert!(rels_equal(tc(r.clone(), true), 
-          vec![(1,1), (2,2), (3,3), (4,4), (1, 2), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4)]));
+   assert_rels_eq!(tc(r.clone(), true), 
+                   vec![(1,1), (2,2), (3,3), (4,4), (1, 2), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4)]);
 }
 
 
@@ -78,8 +79,8 @@ fn test_generic_tc_example() {
    let r = vec![(1, 2), (2, 4), (3, 1)];
    println!("tc: {:?}", tc(r.clone(), true));
    println!("reflexive tc: {:?}", tc(r.clone(), true));
-   assert!(rels_equal(tc(r.clone(), true), 
-          vec![(1,1), (2,2), (3,3), (4,4), (1, 2), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4)]));
+   assert_rels_eq!(tc(r.clone(), true), 
+                   vec![(1,1), (2,2), (3,3), (4,4), (1, 2), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4)]);
 }
 
 #[test]

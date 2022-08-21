@@ -3,6 +3,7 @@ use ascent::ascent;
 use ascent::ascent_run;
 use itertools::Itertools;
 
+use crate::assert_rels_eq;
 use crate::utils::rels_equal;
 
 fn percentile<'a, TInputIter>(p: f32) -> impl Fn(TInputIter) -> std::option::IntoIter<i32>
@@ -126,8 +127,8 @@ fn test_ascent_negation2(){
    };
    // println!("{}", res.summary());
    println!("baz: {:?}", res.baz);
-   assert!(rels_equal([(0, 1), (100, 101)], res.baz2));
-   assert!(rels_equal([(0, 1), (100, 101)], res.baz));
+   assert_rels_eq!([(0, 1), (100, 101)], res.baz);
+   assert_rels_eq!([(0, 1), (100, 101)], res.baz2);
 }
 
 #[test]

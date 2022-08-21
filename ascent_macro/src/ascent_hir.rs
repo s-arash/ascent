@@ -61,6 +61,22 @@ pub(crate) struct IrRule {
    pub is_simple_join: bool,
 }
 
+pub(crate) fn ir_rule_summary(rule: &IrRule) -> String {
+   fn bitem_to_str(bi: &IrBodyItem) -> String {
+      match bi {
+         IrBodyItem::Clause(cl) => cl.rel.ir_name().to_string(),
+         IrBodyItem::Generator(_) => "for ⋯".into(),
+         IrBodyItem::Cond(CondClause::If(..)) => format!("if ⋯"),
+         IrBodyItem::Cond(CondClause::IfLet(..)) => format!("if let ⋯"),
+         IrBodyItem::Cond(CondClause::Let(..)) => format!("let ⋯"),
+         IrBodyItem::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
+      }
+   }
+   format!("{} <-- {}",
+            rule.head_clauses.iter().map(|hcl| hcl.rel.name.to_string()).join(", "),
+            rule.body_items.iter().map(bitem_to_str).join(", "))
+}
+
 #[derive(Clone)]
 pub(crate) struct IrHeadClause{
    pub rel : RelationIdentity,

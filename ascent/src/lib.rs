@@ -5,6 +5,7 @@
 pub mod internal;
 pub mod aggregators;
 mod convert;
+mod rel_index_read;
 
 pub use ascent_macro::ascent;
 pub use ascent_macro::ascent_run;

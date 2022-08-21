@@ -424,7 +424,7 @@ impl Parse for RuleNode {
          input.parse::<Token![<]>()?;
          input.parse::<Token![-]>()?;
          input.parse::<Token![-]>()?;
-         // TODO this does not work with quote!
+         // NOTE this does not work with quote!
          // input.parse::<kw::LongLeftArrow>()?;
 
          let body_items = Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty(input)?;
