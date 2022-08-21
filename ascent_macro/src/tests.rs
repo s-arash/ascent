@@ -9,12 +9,16 @@ use crate::{ascent_impl, utils::token_stream_replace_macro_ident};
 
 
 #[test]
-fn test_macro() {
+fn test_macro0() {
    let inp = quote!{
       relation subset(i32, i32, i32);
       relation subset_error(i32, i32, i32);
       relation placeholder_origin(i32);
       relation known_placeholder_subset(i32, i32) = vec![(2, 3), (3, 4)];
+
+      placeholder_origin(o1),
+      known_placeholder_subset(p1, p2) <--
+         subset(p1, p2, o1);
 
       subset(o1, o2, 42) <--
          placeholder_origin(o1),
@@ -69,7 +73,28 @@ fn test_macro2() {
       bar3(1,2,3);
       bar3(2,1,3);
 
-      bar3_res(*x) <-- bar3(x, x, *x + 1);
+      bar3_res(*x) <-- bar3(x, y, z), res(x), if x > y, bar3_res(y);
+
+      foo(x), bar(x, x + 1) <-- bar3_res(x), let y = x - 2, bar_refl(x);
+   };
+
+   write_to_scratchpad(input);
+}
+
+#[test]
+fn test_macro3() {
+   let input = quote! {
+      relation bar(i32, i32);
+      relation foo(i32, i32);
+      relation baz(i32, i32);
+
+      foo(1, 2);
+      foo(10, 2);
+      bar(2, 3);
+      bar(2, 1);
+
+      baz(*x, *z) <-- foo(x, y) if *x != 10, bar(y, z), if x != z;
+      foo(*x, *y), bar(*x, *y) <-- baz(x, y);
    };
 
    write_to_scratchpad(input);
@@ -94,7 +119,7 @@ fn test_macro_generator() {
    let input = quote! {
       relation edge(i32, i32);
       relation path(i32, i32);
-      edge(x, x + 1) <-- for x in (0..100);
+      edge(x, x + 1) <-- for x in 0..100;
       path(*x, *y) <-- edge(x,y);
       path(*x, *z) <-- edge(x,y), path(y, z);
    };

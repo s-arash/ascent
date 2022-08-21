@@ -13,7 +13,7 @@ use ascent::ascent;
 use ascent::ascent_run;
 
 use LambdaCalcExpr::*;
-use crate::utils::*;
+use crate::{utils::*, assert_rels_eq};
 use itertools::Itertools;
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
@@ -413,7 +413,7 @@ fn test_dl_disjunctions(){
    let mut prog = AscentProgram::default();
    prog.run();
    println!("bar: {:?}", prog.bar);
-   assert!(rels_equal([(3,30), (2, 20)], prog.bar));
+   assert_rels_eq!([(3,30), (2, 20)], prog.bar);
 }
 
 #[test]
