@@ -3,7 +3,7 @@
 
 pub use crate::convert::*;
 
-use std::{time::Duration};
+use std::time::Duration;
 use std::hash::{BuildHasherDefault, Hash};
 use std::collections::{HashMap, HashSet};
 
@@ -18,10 +18,9 @@ pub use crate::rel_index_read::RelIndexRead;
 pub use crate::rel_index_read::RelIndexReadAll;
 
 pub type RelIndexType<K> = RelIndexType1<K>;
-// pub type RelIndexType<K> = crate::experimental_rel_index2::RelIndexType2<K>;
 
 pub type LatticeIndexType<K> = HashMap<K, HashSet<usize, BuildNoHashHasher<usize>>, BuildHasherDefault<FxHasher>>;
-// pub type RelFullIndexType<K> = HashMap<K, usize, BuildHasherDefault<FxHasher>>;
+
 pub(crate) type HashBrownRelFullIndexType<K> = hashbrown::HashMap<K, usize, BuildHasherDefault<FxHasher>>;
 pub type RelFullIndexType<K> = HashBrownRelFullIndexType<K>;
 
@@ -94,6 +93,7 @@ impl<K: Eq + Hash> RelIndexWrite for RelIndexType1<K>{
       // }
    }
 }
+
 impl RelIndexWrite for RelNoIndexType {
    type Key = ();
 
@@ -134,13 +134,11 @@ impl<K: Eq + Hash> RelIndexWrite for HashBrownRelFullIndexType<K>{
       }
       to.reserve(from.len());
       for (k, v) in from.drain() {
-         // to.raw_entry_mut().from_hash(42, |x| x == &k).insert(k, v);
          to.insert(k, v); // TODO could be improved
       }
       unsafe {
          MOVE_FULL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
       }
-
    }
 
    #[inline(always)]
@@ -179,32 +177,3 @@ pub struct LatTypeConstraints<T> where T : Clone + Eq + Hash + Lattice{_t: ::cor
 
 #[inline(always)]
 pub fn comment(_: &str){}
-
-
-#[inline]
-pub fn rel_ind_val_option_to_iter<'a>(val_option: Option<&'a Vec<usize>>) -> std::slice::Iter<'a, usize> {
-   match val_option {
-      Some(v) => v.iter(),
-      None => [].iter()
-   }
-}
-
-#[inline(always)]
-pub fn rel_full_ind_val_option_to_iter<'a>(val_option: Option<&'a usize>) -> std::option::IntoIter<&'a usize>  {
-   val_option.into_iter()
-}
-
-static mut EMPTY_LAT_IND_VAL: Option<HashSet<usize, BuildNoHashHasher<usize>>> = None;
-pub fn lat_ind_val_option_to_iter<'a>(
-   val_option: Option<&'a HashSet<usize, BuildNoHashHasher<usize>>>,
-) -> std::collections::hash_set::Iter<'_, usize> {
-   match val_option {
-      Some(v) => v.iter(),
-      None => unsafe {
-         if EMPTY_LAT_IND_VAL.is_none() {
-            EMPTY_LAT_IND_VAL = Some(HashSet::default());
-         }
-         EMPTY_LAT_IND_VAL.as_ref().unwrap().iter()
-      },
-   }
-}

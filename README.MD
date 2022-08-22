@@ -9,7 +9,7 @@ For more information, check out [the CC paper](https://s-arash.github.io/ascent/
 
 ### Computing all the connected nodes in a graph
 ```Rust
-ascent!{
+ascent! {
    relation edge(i32, i32);
    relation path(i32, i32);
    
@@ -28,14 +28,14 @@ ascent!{
 3. Add `ascent` as a dependency in `Cargo.toml`:
    ```toml
    [dependencies]
-   ascent = "0.3"
+   ascent = "*"
    # or:
    # ascent = {git = "https://github.com/s-arash/ascent"} 
    ```
 4. Write some Ascent code in `main.rs`. Here is a complete example:
    ```rust
    use ascent::ascent;
-   ascent!{
+   ascent! {
       relation edge(i32, i32);
       relation path(i32, i32);
       
@@ -63,7 +63,7 @@ Ascent supports computing fixed points of user-defined lattices. The `lattice` k
 This feature enables writing programs not expressible in Datalog. For example we can use this feature to compute the lengths of shortest paths between nodes in a graph.
 
 ```Rust
-ascent!{
+ascent! {
    lattice shortest_path(i32, i32, Dual<u32>);
    relation edge(i32, i32, u32);
 
@@ -77,11 +77,11 @@ ascent!{
 
 In this example, `Dual<T>` is the dual of the lattice T. We use `Dual<T>` because we are interested in shortest paths, given two path lengths `l1` and `l2` for any given pair of nodes, we only store `min(l1, l2)`.
 
-### Conditions and Generative clauses
+### Conditions and Generative Clauses
 The syntax is designed to be familiar to Rust users. In this example, `edge` is populated with non-reflexive edges from `node`. Note that any type that implements `Clone + Eq + Hash` can be used as a relation column.
 
 ```Rust
-ascent!{
+ascent! {
    relation node(i32, Rc<Vec<i32>>);
    relation edge(i32, i32);
    
@@ -102,7 +102,7 @@ use ascent::aggregators::*;
 type Student = u32;
 type Course = u32;
 type Grade = u16;
-ascent!{
+ascent! {
    relation student(Student);
    relation course_grade(Student, Course, Grade);
    relation avg_grade(Student, Grade);
@@ -127,7 +127,7 @@ In addition to `ascent!`, we provide the `ascent_run!` macro. Unlike `ascent!`, 
 
 ```Rust
 fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
-   ascent_run!{
+   ascent_run! {
       relation r(i32, i32) = r;
       relation tc(i32, i32);
       tc(x, y) <-- r(x, y);
@@ -144,13 +144,29 @@ It may be useful to define macros that expand to either body items or head items
 
 You can find more about macros in Ascent macros [here](MACROS.MD).
 ### Misc
-- `#![measure_rule_times]` causes execution times of individual rules to be measured. Example: 
+- **`#![measure_rule_times]`** causes execution times of individual rules to be measured. Example: 
    ```Rust
    ascent! {
       #![measure_rule_times]
       // ...
    }
+   let mut prog = AscentProgram::default();
+   prog.run();
+   println!("{}", prog.scc_times_summary());
    ```
-- With `#![generate_run_timeout]`, a `run_timeout` function is generated that stops after
+   Note that **`scc_times_summary()`** is generated for all Ascent programs. With `#![measure_rule_times]` it reports execution times of individual rules too.
+
+- With **`#![generate_run_timeout]`**, a `run_timeout` function is generated that stops after
   the given amount of time.
-- The feature `wasm-bindgen` allows Ascent programs to run in WASM environments.
+
+- The feature **`wasm-bindgen`** allows Ascent programs to run in WASM environments.
+
+- **`struct`** declarations can be added to the top of `ascent!` definitions, setting the name of the generated type
+  and allowing introduction of type/lifetime parameters and constraints.
+   ```Rust
+   ascent! {
+      struct GenericTC<N: Clone + Eq + Hash>;
+      relation edge(N, N);
+      // ...
+   }
+   ```

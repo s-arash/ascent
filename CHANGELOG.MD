@@ -1,3 +1,7 @@
+## 0.4.0
+- Reduced the size of generated code for a rule with N dynamic relations from O(2^N) to O(N); 
+  dramatically improving compile times for some programs.
+
 ## 0.3.0
 - Introduced macro-in-macros!
 
