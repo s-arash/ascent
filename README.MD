@@ -29,8 +29,6 @@ ascent! {
    ```toml
    [dependencies]
    ascent = "*"
-   # or:
-   # ascent = {git = "https://github.com/s-arash/ascent"} 
    ```
 4. Write some Ascent code in `main.rs`. Here is a complete example:
    ```rust
@@ -75,7 +73,7 @@ ascent! {
 }
 ```
 
-In this example, `Dual<T>` is the dual of the lattice T. We use `Dual<T>` because we are interested in shortest paths, given two path lengths `l1` and `l2` for any given pair of nodes, we only store `min(l1, l2)`.
+In this example, `Dual<T>` is the dual of the lattice `T`. We use `Dual<T>` because we are interested in shortest paths, given two path lengths `l1` and `l2` for any given pair of nodes, we only store `min(l1, l2)`.
 
 ### Conditions and Generative Clauses
 The syntax is designed to be familiar to Rust users. In this example, `edge` is populated with non-reflexive edges from `node`. Note that any type that implements `Clone + Eq + Hash` can be used as a relation column.
@@ -117,7 +115,7 @@ You can define your own aggregators if the provided aggregators are not sufficie
 
 ```Rust
 fn second_highest<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
-   where N: Ord + Clone
+where N: Ord + Clone
 ```
 Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
 
@@ -154,15 +152,16 @@ You can find more about macros in Ascent macros [here](MACROS.MD).
    prog.run();
    println!("{}", prog.scc_times_summary());
    ```
-   Note that **`scc_times_summary()`** is generated for all Ascent programs. With `#![measure_rule_times]` it reports execution times of individual rules too.
+   Note that **`scc_times_summary()`** is generated for all Ascent programs. With `#![measure_rule_times]`
+   it reports execution times of individual rules too.
 
 - With **`#![generate_run_timeout]`**, a `run_timeout` function is generated that stops after
   the given amount of time.
 
 - The feature **`wasm-bindgen`** allows Ascent programs to run in WASM environments.
 
-- **`struct`** declarations can be added to the top of `ascent!` definitions, setting the name of the generated type
-  and allowing introduction of type/lifetime parameters and constraints.
+- **`struct`** declarations can be added to the top of `ascent!` definitions. This allows changing the
+  name of the generated type and introduction of type/lifetime parameters and constraints.
    ```Rust
    ascent! {
       struct GenericTC<N: Clone + Eq + Hash>;
