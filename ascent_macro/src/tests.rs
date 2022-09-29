@@ -34,16 +34,80 @@ fn test_macro0() {
    };
    write_ascent_run_to_scratchpad(inp);
 }
+
+
 #[test]
-fn test_macro1() {
+fn test_macro_high_arity() {
    let inp = quote!{
-      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash;
+      struct AscentProgram<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Default;
+      relation r2(TNode, TNode);
+      relation r3(TNode, TNode, TNode);
+      relation r4(TNode, TNode, TNode, TNode);
+      relation r5(TNode, TNode, TNode, TNode, TNode);
+      relation r6(TNode, TNode, TNode, TNode, TNode, TNode);
+      relation r7(TNode, TNode, TNode, TNode, TNode, TNode, TNode);
+
+
+      // r2(x, y) <-- r3(x, y, z), r4(x, _, _, _);
+      // r2(x, y) <-- r3(x, y, z), r4(x, y, _, _);
+      // r2(y, z) <-- r3(x, y, z), r4(x, y, z, _);
+
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(a, _, _, _, _, _, _);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(a, b, _, _, _, _, _);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(a, b, c, _, _, _, _);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(a, b, c, d, _, _, _);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(a, b, c, d, e, _, _);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(a, b, c, d, e, f, _);
+
+
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(_, _, _, _, _, _, g);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(_, _, _, _, _, f, g);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(_, _, _, _, e, f, g);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(_, _, _, d, e, f, g);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(_, _, c, d, e, f, g);
+      r2(a, b) <-- r6(a, b, c, d, e, f), r7(_, b, c, d, e, f, g);
+
+      r4(a, b, c, a) <-- r4(_ , a, _, _), r4(a, b, c, _), r4(b, a, _, _);
+
+
+      // r2(x, z) <-- r3(x, z, w), r4(x, _, z, w);
+
+      // r3(x, y, y), r4(x, y, x, y), r7(x, y, x, y, x, y, x), r6(x, y, x, y, x, y) <-- r2(x, y);
+   };
+
+   write_to_scratchpad(inp);
+}
+
+#[test]
+fn test_macro_tc() {
+   let inp = quote!{
+      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Default;
       relation edge(TNode, TNode);
       relation path(TNode, TNode);
 
-      path(x.clone(), y.clone()) <-- edge(x,y), path(x, y);
-      path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
-      path(x.clone(), z.clone()) <-- path(x,y), path(y, z);
+      // edge(TNode::default(), TNode::default());
+
+      path(x, y) <-- edge(x, y);
+      path(x, z) <-- edge(x, y), path(y, z);
+      // path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
+      // path(x, z, *l1 + *l2) <-- path(x, y, l1), path(y, z, l2);
+   };
+
+   write_to_scratchpad(inp);
+}
+
+#[test]
+fn test_macro1() {
+   let inp = quote!{
+      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Default;
+      relation edge(TNode, TNode, usize);
+      relation path(TNode, TNode, usize);
+
+      edge(TNode::default(), TNode::default(), 420);
+      // path(x, y, w) <-- edge(x, y, w);
+      path(x, z, *l + *w) <-- edge(x, y, l), path(y, z, w);
+      // path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
+      path(x, z, *l1 + *l2) <-- path(x, y, l1), path(y, z, l2);
    };
 
    write_to_scratchpad(inp);
@@ -101,12 +165,27 @@ fn test_macro3() {
 }
 
 #[test]
+fn test_macro_repeated_rel() {
+   let inp = quote!{
+      relation bar(i32, i32);
+      relation foo(i32, i32);
+
+      foo(x, w) <-- bar(x, y), bar(y, x), foo(x, w);
+      bar(x, y) <-- foo(x, y), if *x < 10;
+   };
+
+   write_to_scratchpad(inp);
+}
+
+#[test]
 fn test_macro_agg() {
    let inp = quote!{
       relation foo(i32, i32);
       relation bar(i32, i32, i32);
       relation baz(i32, i32, i32);
 
+      foo(x, y) <-- bar(x, y, z), foo(y, z);
+      
       baz(x, y, min_z) <--
          foo(x, y),
          agg min_z = min(z) in bar(x, y, z);
@@ -148,8 +227,10 @@ fn test_macro_lattices(){
       lattice shortest_path(i32, i32, Dual<u32>);
       relation edge(i32, i32, u32);
 
-      shortest_path(*x,*y, Dual(*w)) <-- edge(x,y,w);
-
+      shortest_path(x, y, Dual(*w)) <-- edge(x,y,w);
+      shortest_path(x, z, Dual(w + l)) <-- 
+         edge(x, y, w), 
+         shortest_path(y, z, ?Dual(l));
       // edge(1,2, 3);
       // edge(2,3, 5);
       // edge(1,3, 4);
@@ -375,4 +456,14 @@ fn test_macro_item() {
    let parsed = parse2::<syn::ItemMacro2>(def).unwrap();
    
    println!("rules: {}", parsed.rules);
+}
+
+#[test]
+fn exp_borrowing2() {
+   let mut v = vec![1, 2];
+   
+   fn as_ref<T>(x: &mut T) -> &T { x }
+
+   let x = as_ref(&mut v)[1];
+   let y = as_ref(&mut v)[0];
 }

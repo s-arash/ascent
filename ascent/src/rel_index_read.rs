@@ -128,8 +128,8 @@ impl<'a, K: Eq + std::hash::Hash + 'a> RelIndexReadAll<'a> for LatticeIndexType<
 
 
 pub struct RelIndexCombined<'a, Ind1, Ind2> {
-   ind1: &'a Ind1,
-   ind2: &'a Ind2,
+   pub ind1: &'a Ind1,
+   pub ind2: &'a Ind2,
 }
 
 impl <'a, Ind1, Ind2> RelIndexCombined<'a, Ind1, Ind2> {
@@ -139,10 +139,10 @@ impl <'a, Ind1, Ind2> RelIndexCombined<'a, Ind1, Ind2> {
 
 impl <'a, Ind1, Ind2, K> RelIndexRead<'a> for RelIndexCombined<'a, Ind1, Ind2> 
 where Ind1: RelIndexRead<'a, Key = K>,  Ind2: RelIndexRead<'a, Key = K>, {
-    type Key = K;
+   type Key = K;
 
-    type IteratorType = Chain<std::iter::Flatten<std::option::IntoIter<Ind1::IteratorType>>, 
-                              std::iter::Flatten<std::option::IntoIter<Ind2::IteratorType>>>;
+   type IteratorType = Chain<std::iter::Flatten<std::option::IntoIter<Ind1::IteratorType>>, 
+                             std::iter::Flatten<std::option::IntoIter<Ind2::IteratorType>>>;
 
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType> {
       match (self.ind1.index_get(key), self.ind2.index_get(key)) {

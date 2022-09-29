@@ -471,7 +471,7 @@ fn test_dl_lattice1(){
    println!("shortest_path ({} tuples):", prog.shortest_path.len());
    println!("\n{:?}", prog.shortest_path);
    println!("{}", AscentProgram::summary());
-   assert!(rels_equal(prog.shortest_path, [(1,2, Dual(30)), (1, 3, Dual(40)), (1,4, Dual(130)), (2,3, Dual(50)), (2, 4, Dual(100))]))
+   assert_rels_eq!(prog.shortest_path, [(1,2, Dual(30)), (1, 3, Dual(40)), (1,4, Dual(130)), (2,3, Dual(50)), (2, 4, Dual(100))]);
 }
 
 #[test]
@@ -588,6 +588,21 @@ fn test_ascent_tc_generic(){
    prog.r = vec![(1,2), (2,3)];
    prog.run();
    assert!(rels_equal([(1,2), (2, 3), (1, 3)], prog.tc));
+}
+
+#[test]
+fn test_ascent_const_generics(){
+   use std::ops::Range;
+   ascent!{
+      struct Prog<const LB: usize, const UB: usize>;
+      relation inp(usize);
+      relation out(usize);
+      out(x) <-- inp(x), if *x >= LB && *x < UB;
+   }
+   let mut prog = Prog::<0, 5>::default();
+   prog.inp = vec![(1,), (10,)];
+   prog.run();
+   assert_eq!(prog.out.len(), 1);
 }
 
 
@@ -881,4 +896,30 @@ fn test_repeated_vars_simple_joins() {
 
    println!("bar: {:?}", prog.bar);
    assert!(rels_equal(prog.bar, [(1, 2)]));
+}
+
+#[test]
+fn test_multple_dynamic_rels() {
+   const R_SIZE: usize = 5;
+   ascent! {
+      relation r(i32, i32);
+
+      relation tc1(i32, i32);
+      relation tc2(i32, i32);
+      relation tc3(i32, i32);
+
+      r(x, x + 1) <-- for x in 0..R_SIZE as i32;
+
+      tc1(x, y), tc2(x, y), tc3(x, y) <-- r(x, y);
+      tc1(x, z), tc2(x, z), tc3(x, z) <-- r(x, y), tc1(y, z), tc2(y, z), tc3(y, z);
+      // force r to be dynamic in the same scc:
+      r(x, y) <-- tc1(x, y), if false;
+   }
+   let mut prog = AscentProgram::default();
+   prog.run();
+
+   println!("r len: {}", prog.r.len());
+   println!("tc1 len: {}, tc2 len: {}, tc3 len: {}", prog.tc1.len(), prog.tc2.len(), prog.tc3.len());
+   assert!(prog.tc1.len() == prog.tc2.len() && prog.tc2.len() == prog.tc3.len());
+   assert_eq!(prog.tc1.len(), R_SIZE * (R_SIZE + 1) / 2);
 }

@@ -55,21 +55,26 @@ pub(crate) struct RelationMetadata{
    pub attributes: Rc<Vec<Attribute>>,
 }
 
-pub(crate) struct IrRule {
-   pub head_clauses: Vec<IrHeadClause>,
-   pub body_items: Vec<IrBodyItem>,
-   pub is_simple_join: bool,
+pub trait IrRelationTrait {
+   fn ir_name(&self) -> String;
 }
 
-pub(crate) fn ir_rule_summary(rule: &IrRule) -> String {
-   fn bitem_to_str(bi: &IrBodyItem) -> String {
+pub(crate) struct IrRuleGeneric<Rel> {
+   pub head_clauses: Vec<IrHeadClause>,
+   pub body_items: Vec<IrBodyItemGeneric<Rel>>,
+   pub is_simple_join: bool,
+}
+pub(crate) type IrRule = IrRuleGeneric<IrRelation>;
+
+pub(crate) fn ir_rule_summary<Rel: IrRelationTrait>(rule: &IrRuleGeneric<Rel>) -> String {
+   fn bitem_to_str<Rel: IrRelationTrait>(bi: &IrBodyItemGeneric<Rel>) -> String {
       match bi {
-         IrBodyItem::Clause(cl) => cl.rel.ir_name().to_string(),
-         IrBodyItem::Generator(_) => "for ⋯".into(),
-         IrBodyItem::Cond(CondClause::If(..)) => format!("if ⋯"),
-         IrBodyItem::Cond(CondClause::IfLet(..)) => format!("if let ⋯"),
-         IrBodyItem::Cond(CondClause::Let(..)) => format!("let ⋯"),
-         IrBodyItem::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
+         IrBodyItemGeneric::Clause(cl) => cl.rel.ir_name().to_string(),
+         IrBodyItemGeneric::Generator(_) => "for ⋯".into(),
+         IrBodyItemGeneric::Cond(CondClause::If(..)) => format!("if ⋯"),
+         IrBodyItemGeneric::Cond(CondClause::IfLet(..)) => format!("if let ⋯"),
+         IrBodyItemGeneric::Cond(CondClause::Let(..)) => format!("let ⋯"),
+         IrBodyItemGeneric::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
       }
    }
    format!("{} <-- {}",
@@ -85,32 +90,35 @@ pub(crate) struct IrHeadClause{
    pub args_span: Span,
 }
 
-pub(crate) enum IrBodyItem {
-   Clause(IrBodyClause),
+pub(crate) enum IrBodyItemGeneric<Rel> {
+   Clause(IrBodyClauseGeneric<Rel>),
    Generator(GeneratorNode),
    Cond(CondClause),
-   Agg(IrAggClause)
+   Agg(IrAggClauseGeneric<Rel>)
 }
+pub(crate) type IrBodyItem = IrBodyItemGeneric<IrRelation>;
 
-impl IrBodyItem {
-   pub(crate) fn rel(&self) -> Option<&IrRelation> {
+impl<Rel> IrBodyItemGeneric<Rel> {
+   pub(crate) fn rel(&self) -> Option<&Rel> {
       match self {
-         IrBodyItem::Clause(bcl) => Some(&bcl.rel),
-         IrBodyItem::Agg(agg) => Some(&agg.rel),
-         IrBodyItem::Generator(_) |
-         IrBodyItem::Cond(_) => None,
+         IrBodyItemGeneric::Clause(bcl) => Some(&bcl.rel),
+         IrBodyItemGeneric::Agg(agg) => Some(&agg.rel),
+         IrBodyItemGeneric::Generator(_) |
+         IrBodyItemGeneric::Cond(_) => None,
       }
    }
 }
 
 #[derive(Clone)]
-pub(crate) struct IrBodyClause {
-   pub rel : IrRelation,
+pub(crate) struct IrBodyClauseGeneric<Rel> {
+   pub rel : Rel,
    pub args : Vec<Expr>,
    pub rel_args_span: Span,
    pub args_span: Span,
    pub cond_clauses : Vec<CondClause>
 }
+
+pub(crate) type IrBodyClause = IrBodyClauseGeneric<IrRelation>;
 
 impl IrBodyClause {
    pub fn selected_args(&self) -> Vec<Expr> {
@@ -119,14 +127,15 @@ impl IrBodyClause {
 }
 
 #[derive(Clone)]
-pub(crate) struct IrAggClause {
+pub(crate) struct IrAggClauseGeneric<Rel> {
    pub span: Span,
    pub pat: Pat,
    pub aggregator: Expr,
    pub bound_args: Vec<Ident>,
-   pub rel: IrRelation,
+   pub rel: Rel,
    pub rel_args: Vec<Expr>
 }
+pub(crate) type IrAggClause = IrAggClauseGeneric<IrRelation>;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub(crate) struct IrRelation {
@@ -177,10 +186,6 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result
       let rel_full_index = IrRelation{
          relation: rel_identity.clone(),
          indices: full_indices,
-      };
-      let rel_no_index = IrRelation{
-         relation: rel_identity.clone(),
-         indices: vec![],
       };
       relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_full_index.clone());
       // relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_no_index.clone());

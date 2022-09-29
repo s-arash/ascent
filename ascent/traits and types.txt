@@ -1,0 +1,13 @@
+RelIndexRead:
+   index_get: &K -> [usize]
+
+RelIndexReadAll:
+   iter_all: [(&K, [usize])]
+
+DictRead:
+   get: &K -> Option<&V>
+   iter: [(&K, &V)]
+
+MultiDictRead:
+   get: &K -> Option<[&V]>
+   iter: [(&K, [&V])]

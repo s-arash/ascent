@@ -1,6 +1,7 @@
-
+#![allow(dead_code)]
 use std::{clone, cmp::max, rc::Rc};
 use std::ops::Deref;
+use ascent_base::Dual;
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum LambdaCalcExpr{
@@ -50,11 +51,20 @@ fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
 #[warn(warnings)]
 #[allow(unused_imports)]
 #[allow(redundant_semicolons)]
-#[cfg(test)]
-fn _test() {
+// #[cfg(test)]
+#[test]
+fn test_run_generated_prog() {
    use ascent::aggregators::*;
    use ascent::lattice::set::Set;
 
    todo!("here");
    ;
+
+   // let mut prog = AscentProgram::default();
+   // prog.run();
+
+   // println!("foo: {:?}", prog.foo);
+   // println!("bar: {:?}", prog.bar);
+   // println!("baz: {:?}", prog.baz);
+
 }

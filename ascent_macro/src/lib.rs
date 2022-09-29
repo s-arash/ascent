@@ -9,11 +9,15 @@ mod ascent_codegen;
 mod ascent_syntax;
 mod test_errors;
 mod syn_utils;
+mod index_selection;
+mod index_shape;
+mod ascent_hir2;
 
 #[macro_use]
 extern crate quote;
 
 extern crate proc_macro;
+use ascent_hir2::compile_hir_to_hir2;
 use ascent_syntax::{AscentProgram, desugar_ascent_program};
 use proc_macro::TokenStream;
 use syn::Result;
@@ -89,7 +93,9 @@ pub(crate) fn ascent_impl(input: proc_macro2::TokenStream, is_ascent_run: bool) 
    let hir = compile_ascent_program_to_hir(&prog)?;
    // println!("hir relations: {}", hir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
 
-   let mir = compile_hir_to_mir(&hir)?;
+   let hir2 = compile_hir_to_hir2(hir);
+
+   let mir = compile_hir_to_mir(&hir2)?;
 
    // println!("mir relations: {}", mir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
 

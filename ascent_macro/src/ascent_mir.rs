@@ -5,26 +5,26 @@ use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap:
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
-use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary}, ascent_mir::MirRelationVersion::*, ascent_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
+use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary}, ascent_mir::MirRelationVersion::*, ascent_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}, ascent_hir2::{IrVirtualRelation, Ir2BodyItem, Ir2AggClause, Ir2Rule, AscentIr2, IrPhysicalRelation}};
 use crate::ascent_syntax::{CondClause, GeneratorNode, RelationIdentity};
 use crate::{ascent_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, AscentIr}};
 
 pub(crate) struct AscentMir {
    pub sccs: Vec<MirScc>,
    pub deps: HashMap<usize, HashSet<usize>>,
-   pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
-   pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
+   pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrPhysicalRelation>>,
+   pub relations_full_indices: HashMap<RelationIdentity, IrPhysicalRelation>,
    // pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
    pub relations_metadata: HashMap<RelationIdentity, RelationMetadata>,
-   pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
+   pub lattices_full_indices: HashMap<RelationIdentity, IrVirtualRelation>,
    pub declaration: Declaration,
    pub config: AscentConfig
 }
 
 pub(crate) struct MirScc {
    pub rules: Vec<MirRule>,
-   pub dynamic_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
-   pub body_only_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
+   pub dynamic_relations: HashMap<RelationIdentity, HashSet<IrPhysicalRelation>>,
+   pub body_only_relations: HashMap<RelationIdentity, HashSet<IrPhysicalRelation>>,
    pub is_looping: bool
 }
 
@@ -54,12 +54,12 @@ pub(crate) struct MirRule {
 pub(crate) fn mir_rule_summary(rule: &MirRule) -> String {
    fn bitem_to_str(bitem: &MirBodyItem) -> String {
       match bitem {
-         MirBodyItem::Clause(bcl) => format!("{}_{}", bcl.rel.ir_name, bcl.rel.version.to_string()),
+         MirBodyItem::Clause(bcl) => format!("{}_{}", bcl.rel.virtual_rel.display_name(), bcl.rel.version.to_string()),
          MirBodyItem::Generator(gen) => format!("for_{}", pat_to_ident(&gen.pattern).map(|x| x.to_string()).unwrap_or_default()),
          MirBodyItem::Cond(CondClause::If(..)) => format!("if ⋯"),
          MirBodyItem::Cond(CondClause::IfLet(..)) => format!("if let ⋯"),
          MirBodyItem::Cond(CondClause::Let(..)) => format!("let ⋯"),
-         MirBodyItem::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
+         MirBodyItem::Agg(agg) => format!("agg {}", agg.rel.physical_relation.ir_name()),
       }
    }
    format!("{} <-- {}{}",
@@ -73,7 +73,7 @@ pub(crate) enum MirBodyItem {
    Clause(MirBodyClause),
    Generator(GeneratorNode),
    Cond(CondClause),
-   Agg(IrAggClause)
+   Agg(Ir2AggClause)
 }
 
 impl MirBodyItem {
@@ -95,7 +95,7 @@ pub(crate) struct MirBodyClause {
 }
 impl MirBodyClause {
    pub fn selected_args(&self) -> Vec<Expr> {
-      self.rel.indices.iter().map(|&i| self.args[i].clone()).collect()
+      self.rel.virtual_rel.tuple_shape.flatten().iter().map(|&i| self.args[i].clone()).collect()
    }
 
    /// returns a vec of (var_ind, var) of all the variables in the clause
@@ -117,12 +117,13 @@ impl MirBodyClause {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct MirRelation {
-   pub relation: RelationIdentity,
-   pub indices: Vec<usize>,
-   pub ir_name: Ident,
+   // pub relation: RelationIdentity,
+   // pub indices: Vec<usize>,
+   pub virtual_rel: IrVirtualRelation,
+   // pub ir_name: Ident,
    pub version: MirRelationVersion,
    pub is_full_index: bool,
-   pub is_no_index: bool,
+   // pub is_no_index: bool,
 }
 
 pub(crate) fn ir_relation_version_var_name(ir_name: &Ident, version : MirRelationVersion) -> Ident{
@@ -131,25 +132,30 @@ pub(crate) fn ir_relation_version_var_name(ir_name: &Ident, version : MirRelatio
 }
 
 impl MirRelation {
-   pub fn var_name(&self) -> Ident {
-      ir_relation_version_var_name(&self.ir_name, self.version)
+   pub fn physical_var_name(&self) -> Ident {
+      ir_relation_version_var_name(&self.virtual_rel.physical_relation.ir_name(), self.version)
    }
 
    // TODO this copying is not ideal
-   pub fn key_type(&self) -> Type {
-      let index_types : Vec<_> = self.indices.iter().map(|&i| self.relation.field_types[i].clone()).collect();
-      tuple_type(&index_types)
-   }
+   // pub fn key_type(&self) -> Type {
+   //    let index_types : Vec<_> = self.indices.iter().map(|&i| self.relation().field_types[i].clone()).collect();
+   //    tuple_type(&index_types)
+   // }
 
-   pub fn from(ir_relation : IrRelation, version : MirRelationVersion) -> MirRelation {
+   pub fn from(ir_relation : IrVirtualRelation, version : MirRelationVersion) -> MirRelation {
       MirRelation {
-         ir_name: ir_relation.ir_name(),
+         // ir_name: ir_relation.ir_name(),
          is_full_index: ir_relation.is_full_index(),
-         is_no_index: ir_relation.is_no_index(),
-         relation: ir_relation.relation,
-         indices: ir_relation.indices,
+         // is_no_index: ir_relation.is_no_index(),
+         virtual_rel: ir_relation,
+         // relation: ir_relation.relation,
+         // indices: ir_relation.indices,
          version,
       }
+   }
+
+   pub fn relation(&self) -> &RelationIdentity {
+      self.virtual_rel.relation()
    }
 }
 
@@ -168,7 +174,7 @@ impl MirRelationVersion {
    }
 }
 
-fn get_hir_dep_graph(hir: &AscentIr) -> Vec<(usize,usize)> {
+fn get_hir_dep_graph(hir: &AscentIr2) -> Vec<(usize,usize)> {
    let mut relations_to_rules_in_head : HashMap<&RelationIdentity, HashSet<usize>> = HashMap::new();
    for (i, rule) in hir.rules.iter().enumerate(){
       for head_rel in rule.head_clauses.iter().map(|hcl| &hcl.rel){
@@ -180,7 +186,7 @@ fn get_hir_dep_graph(hir: &AscentIr) -> Vec<(usize,usize)> {
    for (i, rule) in hir.rules.iter().enumerate() {
       for bitem in rule.body_items.iter() {
          if let Some(body_rel) = bitem.rel() {
-            let body_rel_identity = &body_rel.relation;
+            let body_rel_identity = &body_rel.relation();
             if let Some(set) = relations_to_rules_in_head.get(body_rel_identity){
                for &rule_with_rel_in_head in set.iter(){
                   edges.push((rule_with_rel_in_head, i));
@@ -192,7 +198,7 @@ fn get_hir_dep_graph(hir: &AscentIr) -> Vec<(usize,usize)> {
    edges
 }
 
-pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
+pub(crate) fn compile_hir_to_mir(hir: &AscentIr2) -> syn::Result<AscentMir>{
 
    let dep_graph = get_hir_dep_graph(hir);
    let mut dep_graph = DiGraphMap::<_,()>::from_edges(&dep_graph);
@@ -203,15 +209,15 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
 
    let mut mir_sccs = vec![];
    for scc in sccs.node_weights().collect_vec().iter().rev(){
-      let mut dynamic_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
-      let mut body_only_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
+      let mut dynamic_relations: HashMap<RelationIdentity, HashSet<IrPhysicalRelation>> = HashMap::new();
+      let mut body_only_relations: HashMap<RelationIdentity, HashSet<IrPhysicalRelation>> = HashMap::new();
 
       let mut dynamic_relations_set = HashSet::new();
       for &rule_ind in scc.iter(){
          let rule = &hir.rules[rule_ind];
          for bitem in rule.body_items.iter() {
             if let Some(rel) = bitem.rel(){
-               body_only_relations.entry(rel.relation.clone()).or_default().insert(rel.clone());
+               body_only_relations.entry(rel.relation().clone()).or_default().insert(rel.physical_relation.clone());
                if rule.is_simple_join {
                   // body_only_relations.entry(rel.relation.clone()).or_default().insert(hir.relations_full_indices[&rel.relation].clone());
                   // TODO we can use only no_index, for that codegen needs to be updated.
@@ -250,9 +256,9 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
       for rule in rules.iter() {
          for bi in rule.body_items.iter() {
             if let MirBodyItem::Agg(agg) = bi {
-               if dynamic_relations.contains_key(&agg.rel.relation) {
+               if dynamic_relations.contains_key(&agg.rel.relation()) {
                   return Err(syn::Error::new(agg.span, 
-                     format!("use of aggregated relation {} cannot be stratified.", &agg.rel.relation.name)));
+                     format!("use of aggregated relation {} cannot be stratified.", &agg.rel.relation().name)));
                }
             }
          }
@@ -287,9 +293,9 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
    })
 }
 
-fn compile_hir_rule_to_mir_rules_old(rule: &IrRule, dynamic_relations: &HashSet<RelationIdentity>) -> Vec<MirRule>{
+fn compile_hir_rule_to_mir_rules_old(rule: &Ir2Rule, dynamic_relations: &HashSet<RelationIdentity>) -> Vec<MirRule>{
    
-   fn hir_body_items_to_mir_body_items_vec(mir_body_clauses: &[IrBodyItem], dynamic_relations: &HashSet<RelationIdentity>) -> Vec<Vec<MirBodyItem>> {
+   fn hir_body_items_to_mir_body_items_vec(mir_body_clauses: &[Ir2BodyItem], dynamic_relations: &HashSet<RelationIdentity>) -> Vec<Vec<MirBodyItem>> {
       if mir_body_clauses.len() == 0 { return vec![vec![]];}
       let mut pre_res = hir_body_items_to_mir_body_items_vec(&mir_body_clauses[0..(mir_body_clauses.len() - 1)], dynamic_relations);
       let hir_bcls_for_mir_bcl = hir_body_item_to_mir_body_items(&mir_body_clauses[mir_body_clauses.len() - 1], dynamic_relations);
@@ -307,11 +313,11 @@ fn compile_hir_rule_to_mir_rules_old(rule: &IrRule, dynamic_relations: &HashSet<
       }
       pre_res
    }
-   fn hir_body_item_to_mir_body_items(hir_bitem : &IrBodyItem, dynamic_relations: &HashSet<RelationIdentity>) -> Vec<MirBodyItem>{
+   fn hir_body_item_to_mir_body_items(hir_bitem : &Ir2BodyItem, dynamic_relations: &HashSet<RelationIdentity>) -> Vec<MirBodyItem>{
       match hir_bitem{
-         IrBodyItem::Clause(hir_bcl) => {
+         Ir2BodyItem::Clause(hir_bcl) => {
             let mut res = vec![];
-            let versions = if dynamic_relations.contains(&hir_bcl.rel.relation) {vec![Total, Delta]} else {vec![Total]};
+            let versions = if dynamic_relations.contains(&hir_bcl.rel.relation()) {vec![Total, Delta]} else {vec![Total]};
             for ver in versions.into_iter(){
                let mir_relation = MirRelation::from(hir_bcl.rel.clone(), ver);
                let mir_bcl = MirBodyClause{
@@ -325,13 +331,13 @@ fn compile_hir_rule_to_mir_rules_old(rule: &IrRule, dynamic_relations: &HashSet<
             }
             res
          },
-         IrBodyItem::Cond(cl) => {
+         Ir2BodyItem::Cond(cl) => {
             vec![MirBodyItem::Cond(cl.clone())]
          }
-         IrBodyItem::Generator(gen) => {
+         Ir2BodyItem::Generator(gen) => {
             vec![MirBodyItem::Generator(gen.clone())]
          },
-         IrBodyItem::Agg(agg) => {
+         Ir2BodyItem::Agg(agg) => {
             vec![MirBodyItem::Agg(agg.clone())]
          }
       }
@@ -342,7 +348,7 @@ fn compile_hir_rule_to_mir_rules_old(rule: &IrRule, dynamic_relations: &HashSet<
    let mir_body_items = mir_body_items.into_iter().filter(|bitems|{
       // if body clauses contain dynamic relations, they can't all be total
       let mut bcls = bitems.iter().filter_map(|bi| match bi {MirBodyItem::Clause(bcl) => Some(bcl), _ => None}); 
-      let mut dynamic_bcls = bcls.filter(|bcl| dynamic_relations.contains(&bcl.rel.relation)).peekable();
+      let mut dynamic_bcls = bcls.filter(|bcl| dynamic_relations.contains(&bcl.rel.relation())).peekable();
       dynamic_bcls.peek().is_none() || !dynamic_bcls.all(|bcl| bcl.rel.version == Total)
    });
    
@@ -355,7 +361,7 @@ fn compile_hir_rule_to_mir_rules_old(rule: &IrRule, dynamic_relations: &HashSet<
       }).collect()
 }
 
-fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<RelationIdentity>) -> Vec<MirRule>{
+fn compile_hir_rule_to_mir_rules(rule: &Ir2Rule, dynamic_relations: &HashSet<RelationIdentity>) -> Vec<MirRule>{
    
    fn versions(count: usize) -> Vec<Vec<MirRelationVersion>> {
       if count == 0 {
@@ -372,13 +378,13 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
       }
    }
 
-   fn hir_body_item_to_mir_body_item(hir_bitem : &IrBodyItem, version: Option<MirRelationVersion>) -> MirBodyItem{
+   fn hir_body_item_to_mir_body_item(hir_bitem : &Ir2BodyItem, version: Option<MirRelationVersion>) -> MirBodyItem{
       match hir_bitem {
-        IrBodyItem::Clause(_) => { },
+        Ir2BodyItem::Clause(_) => { },
         _ => assert!(version.is_none())
       }
       match hir_bitem{
-         IrBodyItem::Clause(hir_bcl) => {
+         Ir2BodyItem::Clause(hir_bcl) => {
             let ver = version.unwrap_or(MirRelationVersion::Total);
             let mir_relation = MirRelation::from(hir_bcl.rel.clone(), ver);
             let mir_bcl = MirBodyClause{
@@ -390,15 +396,15 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
             };
             MirBodyItem::Clause(mir_bcl)
          },
-         IrBodyItem::Cond(cl) => MirBodyItem::Cond(cl.clone()),
-         IrBodyItem::Generator(gen) => MirBodyItem::Generator(gen.clone()),
-         IrBodyItem::Agg(agg) => MirBodyItem::Agg(agg.clone())
+         Ir2BodyItem::Cond(cl) => MirBodyItem::Cond(cl.clone()),
+         Ir2BodyItem::Generator(gen) => MirBodyItem::Generator(gen.clone()),
+         Ir2BodyItem::Agg(agg) => MirBodyItem::Agg(agg.clone())
       }
    }
 
    
    let dynamic_cls = rule.body_items.iter().enumerate().filter_map(|(i, cl)| match cl {
-      IrBodyItem::Clause(cl) if dynamic_relations.contains(&cl.rel.relation) => Some(i),
+      Ir2BodyItem::Clause(cl) if dynamic_relations.contains(&cl.rel.relation()) => Some(i),
       _ => None,
    }).collect_vec();
 

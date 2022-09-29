@@ -22,6 +22,9 @@ rustc-hash = "1.1"
 nohash-hasher = "0.2.0"
 hashbrown = {version = "0.12", features = ["raw"]}
 instant = "0.1"
+smallvec = { version = "1.9", features = ["union"] }
+bitvec = { version = "1.0" }
+paste = "1.0"
 
 [features]
 wasm-bindgen = ["instant/wasm-bindgen"]
