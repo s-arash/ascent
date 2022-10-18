@@ -136,7 +136,7 @@ where TDict: DictRead<'a, V = TDict2> + 'a, TDict2: DictRead<'a> + 'a, TDict::K:
 
    // not accurate
    fn len(&'a self) -> usize { 
-      let (sub_count, sub_len_sum) = self.0.iter().take(3).map(|(_k, v)| v.len()).fold((0, 0), |(c, s), len| (c + 1, s + len));
+      let (sub_count, sub_len_sum) = self.0.iter().take(5).fold((0, 0), |(c, s), kv| (c + 1, s + kv.1.len()));
       if sub_count != 0 {
          self.0.len() * sub_len_sum / sub_count
       } else { 0 }

@@ -129,7 +129,8 @@ fn test_dict_write_merge() {
 mod simpler {
    //! This is a simpler impl of `DictOfDictMergeAsDictMergeN` types.
    //! Unfortunately, they require Dict Values to be `'static`. Maybe GATs in Rust will
-   //! someday help get around that limitation
+   //! someday help get around that limitation.
+   //! https://sabrinajewson.org/blog/the-better-alternative-to-lifetime-gats
     use crate::experimental_dict::{DictMerge};
 
     use super::DictMerge2;

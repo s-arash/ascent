@@ -5,7 +5,7 @@ use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned};
 
-use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, is_wild_card, tuple, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
+use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary, IndexSpecNode}, utils::{expr_to_ident, into_set, is_wild_card, tuple, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
 use crate::ascent_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
 
 #[derive(Clone)]
@@ -53,6 +53,7 @@ pub(crate) struct AscentIr {
 pub(crate) struct RelationMetadata{
    pub inititialization: Option<Rc<Expr>>,
    pub attributes: Rc<Vec<Attribute>>,
+   pub demanded_indices: Rc<HashSet<Vec<Vec<usize>>>>,
 }
 
 pub trait IrRelationTrait {
@@ -193,11 +194,23 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result
       if let Some(init_expr) = &rel.initialization {
          relations_initializations.insert(rel_identity.clone(), Rc::new(init_expr.clone()));
       }
+      let mut demanded_indices = HashSet::new();
+      let mut attributes = vec![];
+      for attr in rel.attrs.iter() {
+         if attr.path.is_ident(&Ident::new("index", Span::call_site())){
+            let spec = syn::parse2::<IndexSpecNode>(attr.tokens.clone())?;
+            let index = spec.to_index_spec(rel.field_types.len())?;
+            demanded_indices.insert(index);
+         } else {
+            attributes.push(attr.clone());
+         }
+      }
       relations_metadata.insert(
          rel_identity.clone(),
          RelationMetadata {
             inititialization: rel.initialization.clone().map(|i| Rc::new(i)),
-            attributes: Rc::new(rel.attrs.clone())
+            attributes: Rc::new(attributes),
+            demanded_indices: Rc::new(demanded_indices)
          }
       );
       // relations_no_indices.insert(rel_identity, rel_no_index);

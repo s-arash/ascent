@@ -311,6 +311,7 @@ fn test_dl_vars_bound_in_patterns(){
 fn test_dl_generators(){
    ascent!{
       relation foo(i32, i32);
+      /// This is the Bar relation!
       relation bar(i32);
 
       foo(x, y) <-- for x in 0..10, for y in (x+1)..10;
@@ -632,7 +633,7 @@ fn test_ascent_negation_through_lattices(){
 
 #[test]
 fn test_ascent_explicit_decl(){
-   #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+   #[derive(Clone, PartialEq, Eq, Hash, Debug)]
    struct Node(pub i32);
    ascent!{
       struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash;
@@ -922,4 +923,44 @@ fn test_multple_dynamic_rels() {
    println!("tc1 len: {}, tc2 len: {}, tc3 len: {}", prog.tc1.len(), prog.tc2.len(), prog.tc3.len());
    assert!(prog.tc1.len() == prog.tc2.len() && prog.tc2.len() == prog.tc3.len());
    assert_eq!(prog.tc1.len(), R_SIZE * (R_SIZE + 1) / 2);
+}
+
+#[test]
+fn test_high_arity() {
+   ascent! {
+      struct AscentProgram<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Default;
+      relation r5(TNode, TNode, TNode, TNode, TNode);
+      relation r6(TNode, TNode, TNode, TNode, TNode, TNode);
+      relation r6_tc(TNode, TNode);
+      relation r6_tc2(TNode, TNode);
+
+      r5(a, b, c, d, e) <-- r5(a, b, c, d, e), r6(a, _, _, _, _, _);
+      r5(a, b, c, d, e) <-- r5(a, b, c, d, e), r6(a, b, _, _, _, _);
+      r5(a, b, c, d, e) <-- r5(a, b, c, d, e), r6(a, b, c, _, _, _);
+      r5(a, b, c, d, e) <-- r5(a, b, c, d, e), r6(a, b, c, d, _, _);
+      r5(a, b, c, d, e) <-- r5(a, b, c, d, e), r6(a, b, c, d, e, _);
+      r5(a, b, c, d, e) <-- r5(a, b, c, d, e), r6(a, b, c, d, e, f);
+
+      r6_tc(a, b) <-- r6(a, b, _, _, _, _);
+      r6_tc(a, c) <-- r6_tc(a, b), r6(b, c, _, _, _, _);
+
+      r6_tc2(a, b) <-- r6(_, _, _, _, a, b);
+      r6_tc2(a, c) <-- r6_tc2(a, b), r6(_, _, _, _, b, c);
+
+      r6(a, b, c, d, e, f) <-- r6(a, b, c, d, e, f), r6(b, c, d, e, f, g);
+   }
+   
+   let mut prog = AscentProgram::<i32>::default();
+
+   let r6 = vec![(1, 2), (2, 3), (3, 4)];
+   prog.r6 = r6.iter().cloned().map(|(a, b)| (a, b, a, b, a, b)).collect();
+   prog.r5 = r6.iter().cloned().map(|(a, b)| (a, b, a, b, a)).collect();
+
+   prog.run();
+
+   println!("r6_tc: {:?}", prog.r6_tc);
+   println!("r6_tc2: {:?}", prog.r6_tc);
+
+   assert_rels_eq!(prog.r6_tc,  [(1, 2), (2, 3), (3, 4), (1, 3), (2, 4), (1, 4)]);
+   assert_rels_eq!(prog.r6_tc2, [(1, 2), (2, 3), (3, 4), (1, 3), (2, 4), (1, 4)]);
 }

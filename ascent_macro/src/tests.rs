@@ -11,6 +11,7 @@ use crate::{ascent_impl, utils::token_stream_replace_macro_ident};
 #[test]
 fn test_macro0() {
    let inp = quote!{
+      // #[index((1,2), (0,))]
       relation subset(i32, i32, i32);
       relation subset_error(i32, i32, i32);
       relation placeholder_origin(i32);
@@ -18,18 +19,20 @@ fn test_macro0() {
 
       placeholder_origin(o1),
       known_placeholder_subset(p1, p2) <--
-         subset(p1, p2, o1);
+         subset(o1, o2, p1),
+         subset_error(p2, p1, o2);
 
       subset(o1, o2, 42) <--
          placeholder_origin(o1),
          placeholder_origin(o2),
+         subset(o1, o3, p),
          known_placeholder_subset(o1, o2);
 
       subset_error(*origin1, *origin2, *point) <--
          subset(origin1, origin2, point),
          placeholder_origin(origin1),
          placeholder_origin(origin2),
-         !known_placeholder_subset(origin1, origin2),
+         known_placeholder_subset(origin1, origin2),
          if origin1 != origin2;
    };
    write_ascent_run_to_scratchpad(inp);
@@ -37,7 +40,7 @@ fn test_macro0() {
 
 
 #[test]
-fn test_macro_high_arity() {
+fn test_macro_high_arity1() {
    let inp = quote!{
       struct AscentProgram<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Default;
       relation r2(TNode, TNode);
@@ -73,6 +76,41 @@ fn test_macro_high_arity() {
       // r2(x, z) <-- r3(x, z, w), r4(x, _, z, w);
 
       // r3(x, y, y), r4(x, y, x, y), r7(x, y, x, y, x, y, x), r6(x, y, x, y, x, y) <-- r2(x, y);
+   };
+
+   write_to_scratchpad(inp);
+}
+
+#[test]
+fn test_macro_high_arity2() {
+   let inp = quote!{
+      struct AscentProgram<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Default;
+      relation r6(TNode, TNode, TNode, TNode, TNode, TNode);
+      relation r7(TNode, TNode, TNode, TNode, TNode, TNode, TNode);
+
+      r7(a, b, c, d, e, f, g) <--
+         r7(a, b, c, d, e, f, g),
+         r7(_, _, _, d, a, b, c),
+         r7(_, _, a, b, c, _, _),
+         r7(_, a, b, _, _, _, _),
+         r7(a, _, _, b, c, _, _),
+         r7(_, _, a, b, c, d, _),
+         r7(_, _, a, b, c, d, e),
+         r7(_, _, _, _, _, a, b),
+         r7(_, a, _, _, b, c, d),
+         r7(a, _, _, _, b, c, d);
+      
+      r6(b, c, d, e, f, g) <--
+         r6(b, c, d, e, f, g),
+         r6(_, _, d, a, _, c),
+         r6(_, a, b, c, _, d),
+         r6(a, b, _, c, _, d),
+         r6(_, _, b, c, _, _),
+         r6(a, b, _, _, d, e),
+         r6(_, a, b, c, d, e),
+         r6(_, a, _, _, b, c),
+         r6(a, _, _, b, c, d),
+         r6(_, _, _, b, c, d);
    };
 
    write_to_scratchpad(inp);

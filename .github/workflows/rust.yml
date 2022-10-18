@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ master, ci, lattices, wasm-support, macro-in-macro, rel-index-trait ]
+    branches: [ master, ci, lattices, wasm-support, macro-in-macro, rel-index-trait, index-sharing ]
   pull_request:
     branches: [ master ]
 

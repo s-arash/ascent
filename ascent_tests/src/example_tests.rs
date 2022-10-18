@@ -88,7 +88,7 @@ fn test_borrowed_strings() {
    ascent! {
       struct Ancestory<'a>;
       relation parent(&'a str, &'a str);
-      relation ancestor(&'a str,&'a str);
+      relation ancestor(&'a str, &'a str);
 
       ancestor(p, c) <-- parent(p, c);
 
@@ -103,7 +103,6 @@ fn test_borrowed_strings() {
    let parent_rel = vec![(james.clone(), harry.clone()), (harry.clone(), albus.clone())];
 
    let mut prog = Ancestory::default();
-   // prog.parent = vec![(&zal[..], &rostam[..]), (&rostam[..], &sohrab[..])];
    prog.parent = parent_rel.iter().map(|(p, c)| (&p[..], &c[..])).collect();
    prog.run();
    println!("ancestors: {:?}", prog.ancestor);

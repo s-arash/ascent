@@ -18,8 +18,12 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       let name = &rel.name;
       let field_types = tuple_type(&rel.field_types);
       let rel_attrs = &mir.relations_metadata[rel].attributes;
+      let rel_indices_comment = format!("\nphysical indices:\n {}", 
+         rel_indices.iter().map(|ind| format!("{} covers {}", 
+            ind.ir_name(), mir.physical_relations_covered_indices[ind].iter().map(|s| format!("{:?}", s)).join(", "))).join("; "));
       relation_fields.push(quote! {
          #(#rel_attrs)*
+         #[doc = #rel_indices_comment]
          pub #name : Vec<#field_types>,
       });
       field_defaults.push(quote! {#name : Default::default(),});
@@ -30,7 +34,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          // let index_type = tuple_type(&index_type);
          let rel_index_type = rel_index_type(ind);
          relation_fields.push(quote!{
-            #[allow(non_snake_case)]
+            // #[allow(non_snake_case)]
             pub #name: #rel_index_type,
          });
          field_defaults.push(quote! {#name : Default::default(),});
@@ -266,14 +270,6 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
 
 fn rel_index_type(rel: &IrPhysicalRelation) -> Type {
    let ty = index_shape_to_type(&rel.index_shape, &rel);
-   // let key_type = rel.key_type();
-   // let ty = if rel.is_full_index() {quote!{
-   //    ascent::internal::RelFullIndexType<#key_type>
-   // }} else if rel.relation.is_lattice {quote! {
-   //    ascent::internal::LatticeIndexType<#key_type>
-   // }} else { quote! {
-   //    ascent::internal::RelIndexType<#key_type>
-   // }};
    syn::parse2(ty).unwrap()
 }
 
@@ -283,6 +279,8 @@ fn index_shape_to_type(index_shape: &[Vec<usize>], rel: &IrPhysicalRelation) -> 
    if index_shape.len() == 1 {
       if rel.is_full_index() {
          quote! { ascent::experimental_dict::Dict<#k_type, usize> }
+      } else if rel.relation.is_lattice {
+         quote! { ascent::experimental_dict::MultiDictDedup<#k_type, usize> }
       } else {
          quote! { ascent::experimental_dict::MultiDict<#k_type, usize> }
       }

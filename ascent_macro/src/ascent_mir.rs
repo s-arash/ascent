@@ -17,6 +17,7 @@ pub(crate) struct AscentMir {
    // pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
    pub relations_metadata: HashMap<RelationIdentity, RelationMetadata>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrVirtualRelation>,
+   pub physical_relations_covered_indices : HashMap<IrPhysicalRelation, Vec<HashSet<usize>>>,
    pub declaration: Declaration,
    pub config: AscentConfig
 }
@@ -289,7 +290,8 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr2) -> syn::Result<AscentMir>{
       // relations_no_indices: hir.relations_no_indices.clone(),
       relations_metadata: hir.relations_metadata.clone(),
       declaration: hir.declaration.clone(),
-      config: hir.config.clone()
+      config: hir.config.clone(),
+      physical_relations_covered_indices: hir.physical_relations_covered_indices.clone(),
    })
 }
 

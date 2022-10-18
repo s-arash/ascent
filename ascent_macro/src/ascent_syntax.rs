@@ -1,6 +1,7 @@
 extern crate proc_macro;
 use ascent_base::util::update;
 use proc_macro2::{Span, TokenStream};
+use syn::LitInt;
 use syn::{
    braced, parenthesized, parse2, punctuated::Punctuated, spanned::Spanned, Attribute, Error, Expr, ExprMacro,
    ExprPath, GenericParam, Generics, Ident, ItemMacro2, MacroDelimiter, Pat, Result, Token, Type, Visibility,
@@ -8,6 +9,7 @@ use syn::{
 };
 use syn::token::{Comma, Gt, Lt};
 use syn::parse::{Parse, ParseStream, ParseBuffer, Parser};
+use std::fmt::format;
 use std::{collections::{HashMap, HashSet}, sync::Mutex};
 
 use quote::ToTokens;
@@ -73,6 +75,53 @@ pub struct RelationNode{
    pub semi_colon: Token![;],
    pub is_lattice: bool,
 }
+
+#[derive(Parse)]
+pub struct IndexSpecNode {
+   #[paren]
+   paren: syn::token::Paren,
+   #[inside(paren)]
+   #[call(Punctuated::parse_terminated)]
+   pub segments : Punctuated<IndexSegment, Token![,]>,
+}
+
+#[derive(Parse)]
+pub struct IndexSegment {
+   #[paren]
+   paren: syn::token::Paren,
+   #[inside(paren)]
+   #[call(Punctuated::parse_terminated)]
+   pub columns : Punctuated<LitInt, Token![,]>,
+}
+
+impl IndexSpecNode {
+   pub fn to_index_spec(&self, rel_arity: usize) -> Result<Vec<Vec<usize>>> {
+      let mut res = vec![];
+      let mut all_indices = HashSet::new();
+      for seg in self.segments.iter() {
+         let mut res_seg = vec![];
+         for col_lit in seg.columns.iter() {
+            if col_lit.suffix() != "" {
+               return Err(Error::new_spanned(col_lit, "bad column index"));
+            }
+            let col = col_lit.base10_parse::<usize>()?;
+            if col >= rel_arity {
+               return Err(Error::new_spanned(col_lit, format!("column index must be in range 0..{}", rel_arity)));
+            }
+            if !all_indices.insert(col) {
+               return Err(Error::new_spanned(col_lit, "repeated column index"));
+            }
+            res_seg.push(col);
+         }
+         if res_seg.is_empty() && res.len() > 0 {
+            return Err(Error::new(seg.paren.span, "empty segment"));
+         }
+         res.push(res_seg);
+      }
+      Ok(res)
+   }
+}
+
 impl Parse for RelationNode {
    fn parse(input: ParseStream) -> Result<Self> {
       let is_lattice = input.peek(kw::lattice);
