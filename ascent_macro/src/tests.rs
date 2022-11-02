@@ -35,47 +35,53 @@ fn test_macro0() {
    write_ascent_run_to_scratchpad(inp);
 }
 #[test]
-fn test_macro1() {
+fn test_macro_generic_tc() {
    let inp = quote!{
-      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash;
+      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Sync + Send;
       relation edge(TNode, TNode);
       relation path(TNode, TNode);
 
-      path(x.clone(), y.clone()) <-- edge(x,y), path(x, y);
-      path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
-      path(x.clone(), z.clone()) <-- path(x,y), path(y, z);
+      path(x, z) <-- edge(x, y), path(y, z);
+      // path(x, z) <-- path(x, y), path(y, z);
    };
 
-   write_to_scratchpad(inp);
+   // write_to_scratchpad(inp);
+   write_par_to_scratchpad(inp);
+}
+
+#[test]
+fn test_macro_tc() {
+   let inp = quote!{
+      struct TC;
+      relation edge(i32, i32);
+      relation path(i32, i32);
+
+      path(x, y) <-- edge(x, y);
+      // path(x, z) <-- edge(x, y), path(y, z);
+      path(x, z) <-- path(x, y), path(y, z);
+   };
+
+   // write_to_scratchpad(inp);
+   write_par_to_scratchpad(inp);
 }
 
 #[test]
 fn test_macro2() {
    let input = quote! {
-      relation foo(i32);
+      relation foo(i32, Option<i32>);
       relation bar(i32, i32);
-      relation res(i32);
-      relation bar_refl(i32);
-      relation bar3(i32, i32, i32);
-      relation bar3_res(i32);
+      relation baz(i32, i32, i32);
+      foo(1, Some(2));
+      foo(2, None);
+      foo(3, Some(5));
+      foo(4, Some(10));
 
-      foo(3);
-      bar(2, 1);
-      bar(1, 1);
-      bar(3, 3);
 
-      bar_refl(*x) <-- bar(x, x);
+      bar(3, 6);
+      bar(5, 10);
+      bar(10, 20);
 
-      res(*x) <-- foo(x), bar(x, x);
-
-      bar3(10,10,11);
-      bar3(1,1,1);
-      bar3(1,2,3);
-      bar3(2,1,3);
-
-      bar3_res(*x) <-- bar3(x, y, z), res(x), if x > y, bar3_res(y);
-
-      foo(x), bar(x, x + 1) <-- bar3_res(x), let y = x - 2, bar_refl(x);
+      baz(*x, *y, *z) <-- foo(x, ?Some(y)), bar(y , z);
    };
 
    write_to_scratchpad(input);
@@ -143,12 +149,27 @@ fn test_macro_patterns() {
 }
 
 #[test]
+fn test_macro_sp(){
+   let input = quote!{
+      relation edge(i32, i32, u32);
+      lattice shortest_path(i32, i32, Dual<u32>);
+      
+      shortest_path(x, y, Dual(*len)) <-- edge(x, y, len);
+      shortest_path(x, z, Dual(len + plen)) <-- edge(x, y, len), shortest_path(y, z, ?Dual(plen));
+   };
+   // write_to_scratchpad(input);
+   write_par_to_scratchpad(input);
+}
+
+#[test]
 fn test_macro_lattices(){
    let input = quote!{
-      lattice shortest_path(i32, i32, Dual<u32>);
+      lattice longest_path(i32, i32, u32);
       relation edge(i32, i32, u32);
 
-      shortest_path(*x,*y, Dual(*w)) <-- edge(x,y,w);
+      longest_path(x, y, ew) <-- edge(x, y, ew);
+      longest_path(x, z, *ew + *w) <-- edge(x, y, ew), longest_path(y, z, w);
+
 
       // edge(1,2, 3);
       // edge(2,3, 5);
@@ -156,7 +177,8 @@ fn test_macro_lattices(){
       // edge(2,4, 10);
 
    };
-   write_to_scratchpad(input);
+   // write_to_scratchpad(input);
+   write_par_to_scratchpad(input);
 }
 
 #[test]
@@ -231,27 +253,82 @@ fn exp_items_in_fn(){
    println!("point is {:?}, with size {}", p, p.size());
 }
 
-fn write_to_scratchpad_base(tokens: TokenStream, is_ascent_run: bool) -> TokenStream {
-   let code = ascent_impl(tokens, is_ascent_run);
+fn write_to_scratchpad_base(tokens: TokenStream, prefix: TokenStream, is_ascent_run: bool, is_parallel: bool) -> TokenStream {
+   let code = ascent_impl(tokens, is_ascent_run, is_parallel);
    let code = code.unwrap();
    let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
    let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
+   std::fs::write("src/scratchpad.rs", prefix.to_string());
    std::fs::write("src/scratchpad.rs", code_in_template).unwrap();
    std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
    code
 }
 
 fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, false)
+   write_to_scratchpad_base(tokens, quote!{}, false, false)
+}
+
+fn write_with_prefix_to_scratchpad(tokens: TokenStream, prefix: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, prefix, false, false)
+}
+
+fn write_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, quote!{}, false, true)
 }
 
 fn write_ascent_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, true)
+   write_to_scratchpad_base(tokens, quote!{}, true, false)
 }
 
 
 #[test]
 fn test_macro_lambda_calc(){
+   let prefix = quote! {
+      #[derive(Clone, PartialEq, Eq, Debug, Hash)]
+      pub enum LambdaCalcExpr{
+         Ref(&'static str),
+         Lam(&'static str, Rc<LambdaCalcExpr>),
+         App(Rc<LambdaCalcExpr>, Rc<LambdaCalcExpr>)
+      }
+
+      use LambdaCalcExpr::*;
+
+      impl LambdaCalcExpr {
+         #[allow(dead_code)]
+         fn depth(&self) -> usize {
+            match self{
+               LambdaCalcExpr::Ref(_) => 0,
+               LambdaCalcExpr::Lam(_x,b) => 1 + b.depth(),
+               LambdaCalcExpr::App(f,e) => 1 + max(f.depth(), e.depth())
+            }
+         }
+      }
+      fn app(f: LambdaCalcExpr, a: LambdaCalcExpr) -> LambdaCalcExpr {
+         App(Rc::new(f), Rc::new(a))
+      }
+      fn lam(x: &'static str, e: LambdaCalcExpr) -> LambdaCalcExpr {
+         Lam(x, Rc::new(e))
+      }
+
+      fn sub(exp: &LambdaCalcExpr, var: &str, e: &LambdaCalcExpr) -> LambdaCalcExpr {
+         match exp {
+            Ref(x) if *x == var => e.clone(),
+            Ref(_x) => exp.clone(),
+            App(ef,ea) => app(sub(ef, var, e), sub(ea, var, e)),
+            Lam(x, _eb) if *x == var => exp.clone(),
+            Lam(x, eb) => lam(x, sub(eb, var, e))
+         }
+      }
+
+      #[allow(non_snake_case)]
+      fn U() -> LambdaCalcExpr {lam("x", app(Ref("x"), Ref("x")))}
+      #[allow(non_snake_case)]
+      fn I() -> LambdaCalcExpr {lam("x", Ref("x"))}
+
+      fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
+         inp.map(|tuple| tuple.0).min().cloned().into_iter()
+      }
+   };
    let inp = quote!{
       relation output(LambdaCalcExpr);
       relation input(LambdaCalcExpr);
@@ -277,7 +354,7 @@ fn test_macro_lambda_calc(){
          eval(ef.deref(), ?Lam(fx, fb)),
          eval(sub(fb, fx, ea), final_res);
    };
-   write_to_scratchpad(inp);
+   write_with_prefix_to_scratchpad(inp, prefix);
 }
 
 #[test]
@@ -375,4 +452,10 @@ fn test_macro_item() {
    let parsed = parse2::<syn::ItemMacro2>(def).unwrap();
    
    println!("rules: {}", parsed.rules);
+}
+
+#[test]
+fn exp_foreach() {
+   let arr = vec![1, 2, 3];
+   arr.iter().for_each(|x| println!("{}", x));
 }

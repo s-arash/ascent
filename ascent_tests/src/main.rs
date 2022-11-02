@@ -3,6 +3,7 @@
 #![allow(unused_imports)]
 #![allow(confusable_idents)]
 
+mod ascent_maybe_par;
 mod tests;
 pub mod utils;
 mod se;

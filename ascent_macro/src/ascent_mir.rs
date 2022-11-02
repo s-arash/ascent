@@ -5,7 +5,7 @@ use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap:
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
-use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary}, ascent_mir::MirRelationVersion::*, ascent_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
+use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary, IndexValType}, ascent_mir::MirRelationVersion::*, ascent_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
 use crate::ascent_syntax::{CondClause, GeneratorNode, RelationIdentity};
 use crate::{ascent_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, AscentIr}};
 
@@ -18,7 +18,8 @@ pub(crate) struct AscentMir {
    pub relations_metadata: HashMap<RelationIdentity, RelationMetadata>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub declaration: Declaration,
-   pub config: AscentConfig
+   pub config: AscentConfig,
+   pub is_parallel: bool,
 }
 
 pub(crate) struct MirScc {
@@ -123,6 +124,7 @@ pub(crate) struct MirRelation {
    pub version: MirRelationVersion,
    pub is_full_index: bool,
    pub is_no_index: bool,
+   pub val_type: IndexValType,
 }
 
 pub(crate) fn ir_relation_version_var_name(ir_name: &Ident, version : MirRelationVersion) -> Ident{
@@ -149,6 +151,7 @@ impl MirRelation {
          relation: ir_relation.relation,
          indices: ir_relation.indices,
          version,
+         val_type: ir_relation.val_type
       }
    }
 }
@@ -283,7 +286,8 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
       // relations_no_indices: hir.relations_no_indices.clone(),
       relations_metadata: hir.relations_metadata.clone(),
       declaration: hir.declaration.clone(),
-      config: hir.config.clone()
+      config: hir.config.clone(),
+      is_parallel: hir.is_parallel,
    })
 }
 

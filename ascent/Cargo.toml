@@ -22,6 +22,16 @@ rustc-hash = "1.1"
 nohash-hasher = "0.2.0"
 hashbrown = {version = "0.12", features = ["raw"]}
 instant = "0.1"
+segvec = "0.1"
+# dashmap = { version = "5.4", features = ["rayon", "raw-api"] }
+# dashmap = { path = "../../repos/dashmap", features = ["rayon", "raw-api"] }
+dashmap = { git = "https://github.com/s-arash/dashmap", features = ["rayon", "raw-api"] }
+
+rayon = "1.5"
+boxcar = "0.1.0"
+sync-unsafe-cell = "0.1.0"
+
+[dev_dependencies]
 
 [features]
 wasm-bindgen = ["instant/wasm-bindgen"]

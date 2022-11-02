@@ -19,7 +19,7 @@ fn test_agg_not_stratifiable() {
          
       bar(x, x + 1) <-- baz(x); 
    };
-   let res = ascent_impl(inp, false);
+   let res = ascent_impl(inp, false, false);
    println!("res: {:?}", res);
    assert!(res.is_err());
    assert!(res.unwrap_err().to_string().contains("bar"));

@@ -3,7 +3,7 @@ use std::{collections::{HashMap, HashSet}, ops::Index, rc::Rc};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
-use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned};
+use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned, parse_quote};
 
 use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, is_wild_card, tuple, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
 use crate::ascent_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
@@ -47,6 +47,7 @@ pub(crate) struct AscentIr {
    pub rules: Vec<IrRule>,
    pub declaration: Declaration,
    pub config: AscentConfig,
+   pub is_parallel: bool,
 }
 
 #[derive(Clone, Default)]
@@ -132,9 +133,27 @@ pub(crate) struct IrAggClause {
 pub(crate) struct IrRelation {
    pub relation: RelationIdentity,
    pub indices: Vec<usize>,
+   pub val_type: IndexValType,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum IndexValType {
+   Reference,
+   Direct(Vec<usize>)
 }
 
 impl IrRelation {
+   pub fn new(relation: RelationIdentity, indices: Vec<usize>) -> Self {
+      // TODO this is not the right place for this
+      let val_type = if relation.is_lattice //|| indices.len() == relation.field_types.len() 
+      {
+         IndexValType::Reference
+      } else {
+         IndexValType::Direct((0..relation.field_types.len()).filter(|i| !indices.contains(&i)).collect_vec())
+      };
+      IrRelation { relation, indices, val_type }
+   }
+
    pub fn key_type(&self) -> Type {
       let index_types : Vec<_> = self.indices.iter().map(|&i| self.relation.field_types[i].clone()).collect();
       tuple_type(&index_types)
@@ -148,9 +167,19 @@ impl IrRelation {
    pub fn is_no_index(&self) -> bool {
       self.indices.is_empty()
    }
+
+   pub fn value_type(&self) -> Type {
+      match &self.val_type {
+         IndexValType::Reference => parse_quote!{usize},
+         IndexValType::Direct(cols) => {
+            let index_types : Vec<_> = cols.iter().map(|&i| self.relation.field_types[i].clone()).collect();
+            tuple_type(&index_types)
+         },
+      }
+   }
 }
 
-pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result<AscentIr>{
+pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: bool) -> syn::Result<AscentIr>{
    let ir_rules : Vec<(IrRule, Vec<IrRelation>)> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
    let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
    let mut relations_full_indices = HashMap::new();
@@ -164,24 +193,16 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result
       if rel.is_lattice {
          let indices = (0 .. rel_identity.field_types.len() - 1).collect_vec();
          let ir_name = ir_name_for_rel_indices(&rel_identity.name, &indices);
-         let lat_full_index = IrRelation{
-            relation: rel_identity.clone(),
-            indices: indices,
-         };
+         let lat_full_index = IrRelation::new(rel_identity.clone(), indices);
          relations_ir_relations.entry(rel_identity.clone()).or_default().insert(lat_full_index.clone());
          lattices_full_indices.insert(rel_identity.clone(), lat_full_index);
       }
 
       let full_indices = (0 .. rel_identity.field_types.len()).collect_vec();
       let ir_name = ir_name_for_rel_indices(&rel_identity.name, &full_indices);
-      let rel_full_index = IrRelation{
-         relation: rel_identity.clone(),
-         indices: full_indices,
-      };
-      let rel_no_index = IrRelation{
-         relation: rel_identity.clone(),
-         indices: vec![],
-      };
+      let rel_full_index = IrRelation::new(rel_identity.clone(),full_indices);
+      let rel_no_index = IrRelation::new(rel_identity.clone(), vec![]);
+
       relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_full_index.clone());
       // relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_no_index.clone());
       relations_full_indices.insert(rel_identity.clone(), rel_full_index);
@@ -222,7 +243,8 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result
       relations_metadata: relations_metadata,
       // relations_no_indices,
       declaration,
-      config: AscentConfig::new(prog.attributes.clone())?
+      config: AscentConfig::new(prog.attributes.clone())?,
+      is_parallel
    })
 }
 
@@ -295,10 +317,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
                extend_grounded_vars(&mut grounded_vars, cond_clause.bound_vars())?;
             }
             
-            let ir_rel = IrRelation{
-               relation: relation.into(),
-               indices,
-            };
+            let ir_rel = IrRelation::new(relation.into(), indices);
             let ir_bcl = IrBodyClause {
                rel: ir_rel,
                args: bcl.args.iter().cloned().map(BodyClauseArg::unwrap_expr).collect(),
@@ -339,10 +358,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             }).map(|(i, expr)| i).collect_vec();
             let relation = prog_get_relation(prog, &agg.rel, agg.rel_args.len())?;
             
-            let ir_rel = IrRelation {
-               relation: relation.into(),
-               indices,
-            };
+            let ir_rel = IrRelation::new(relation.into(), indices);
             let ir_agg_clause = IrAggClause {
                span: agg.agg_kw.span,
                pat: agg.pat.clone(),
@@ -383,18 +399,13 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
       };  
       let bcl2_vars = bcl2.args.iter().filter_map(expr_to_ident).collect_vec();
       let indices = get_indices_given_grounded_variables(&bcl1.args, &bcl2_vars);
-      let new_cl1_ir_relation = IrRelation{
-         // ir_name: ir_name_for_rel_indices(&bcl1.rel.relation.name, &indices),
-         indices,
-         relation: bcl1.rel.relation.clone(),
-      };
-      let new_cl2_ir_relation = IrRelation {
-         // ir_name: ir_name_for_rel_indices(&bcl2.rel.relation.name, &[]),
-         indices: vec![],
-         relation: bcl2.rel.relation.clone(),
-      };
-      vec![new_cl1_ir_relation, new_cl2_ir_relation]
+      let new_cl1_ir_relation = IrRelation::new(bcl1.rel.relation.clone(), indices);
+      // TODO cleanup
+      // let new_cl2_ir_relation = IrRelation::new(bcl2.rel.relation.clone(), vec![]);
+
+      vec![new_cl1_ir_relation] //, new_cl2_ir_relation]
    } else {vec![]};
+
    if is_simple_join {
       if let [IrBodyItem::Clause(cl1), IrBodyItem::Clause(cl2)] = &mut body_items[0..=1] {
          cl1.rel = simple_join_ir_relations[0].clone();
@@ -409,7 +420,8 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
 }
 
 pub fn ir_name_for_rel_indices(rel: &Ident, indices: &[usize]) -> Ident {
-   let name = format!("{}_indices_{}", rel, indices.iter().join("_"));
+   let indices_str = if indices.len() == 0 {format!("none")} else {indices.iter().join("_")};
+   let name = format!("{}_indices_{}", rel, indices_str);
    Ident::new(&name, rel.span())
 }
 

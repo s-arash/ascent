@@ -22,3 +22,6 @@ rand = "0.8.4"
 [[bench]]
 name = "benches"
 harness = false
+
+[features]
+par = []

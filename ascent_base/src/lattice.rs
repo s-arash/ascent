@@ -7,6 +7,7 @@ pub mod ord_lattice;
 pub mod bounded_set;
 pub use product::Product;
 pub mod tuple;
+use std::sync::Arc;
 use std::{ops::Deref, rc::Rc};
 mod dual;
 pub use dual::Dual;
@@ -125,6 +126,24 @@ impl<T: Lattice + Clone> Lattice for Rc<T> {
       match cmp {
          Some(cmp) => if cmp.is_ge() {self.clone()} else {other.clone()},
          None => Rc::new(self.deref().clone().join(other.deref().clone())),
+      }
+   }
+}
+
+impl<T: Lattice + Clone> Lattice for Arc<T> {
+   fn meet(self, other: Self) -> Self {
+      let cmp = self.partial_cmp(&other);
+      match cmp {
+         Some(cmp) => if cmp.is_le() {self.clone()} else {other.clone()},
+         None => Arc::new(self.deref().clone().meet(other.deref().clone())),
+      }
+   }
+
+   fn join(self, other: Self) -> Self {
+      let cmp = self.partial_cmp(&other);
+      match cmp {
+         Some(cmp) => if cmp.is_ge() {self.clone()} else {other.clone()},
+         None => Arc::new(self.deref().clone().join(other.deref().clone())),
       }
    }
 }
