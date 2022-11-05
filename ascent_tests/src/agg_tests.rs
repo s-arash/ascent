@@ -169,6 +169,25 @@ fn test_ascent_agg_simple(){
    assert!(rels_equal([(5,)], res.bar));
 }
 
+#[test]
+fn test_ascent_count0(){
+   use ascent::aggregators::*;
+   let res = ascent_run!{
+      relation edge(u32, u32);
+      relation path(u32, u32);
+      relation num_paths(usize);
+      path(a, b) <-- edge(a, b);
+      path(a, c) <-- path(a, b), edge(b, c);
+
+      edge(1, 2);
+      edge(2, 3);
+      edge(3, 4);
+
+      num_paths(n) <-- agg n = count(x) in path(x, _);
+   };
+   assert!(rels_equal([(6,)], res.num_paths));
+}
+
 // Must fail to compile:
 // #[test]
 // fn test_ascent_agg_not_stratifiable(){

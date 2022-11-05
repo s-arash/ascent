@@ -38,7 +38,7 @@ where N: Ord + Add + Clone + Sum<N>
 }
 
 /// returns the number of tuples
-pub fn count<'a>(inp: impl Iterator<Item = ()>) -> impl Iterator<Item = usize>
+pub fn count<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = usize>
 {
    let (size_floor, size_ceiling)= inp.size_hint();
    let size_ceiling = size_ceiling.unwrap_or(usize::MAX);
