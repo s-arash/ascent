@@ -28,9 +28,7 @@ ascent!{
 3. Add `ascent` as a dependency in `Cargo.toml`:
    ```toml
    [dependencies]
-   ascent = "0.3"
-   # or:
-   # ascent = {git = "https://github.com/s-arash/ascent"} 
+   ascent = "0.4"
    ```
 4. Write some Ascent code in `main.rs`. Here is a complete example:
    ```rust
