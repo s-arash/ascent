@@ -38,6 +38,28 @@ where N: Ord + Add + Clone + Sum<N>
 }
 
 /// returns the number of tuples
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use ascent::ascent_run;
+/// # use ascent::aggregators::count;
+/// let res = ascent_run!{
+///    relation edge(u32, u32);
+///    relation path(u32, u32);
+///    relation num_paths(usize);
+///    path(a, b) <-- edge(a, b);
+///    path(a, c) <-- path(a, b), edge(b, c);
+/// 
+///    edge(1, 2);
+///    edge(2, 3);
+///    edge(3, 4);
+/// 
+///    num_paths(n) <-- agg n = count() in path(_, _);
+/// };
+/// // This example program is expected to produce 6 paths.
+/// assert_eq!(res.num_paths[0].0, 6);
+///```
 pub fn count<'a>(inp: impl Iterator<Item = ()>) -> impl Iterator<Item = usize>
 {
    let (size_floor, size_ceiling)= inp.size_hint();
