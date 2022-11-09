@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ master, ci, lattices, wasm-support, macro-in-macro, rel-index-trait ]
+    branches: [ master, ci, lattices, wasm-support, macro-in-macro, rel-index-trait, par ]
   pull_request:
     branches: [ master ]
 
@@ -29,6 +29,10 @@ jobs:
     - name: Run ascent_tests tests
       working-directory: ./ascent_tests
       run: cargo test
+    
+    - name: Run ascent_tests tests with `--features par`
+      working-directory: ./ascent_tests
+      run: cargo test --features par
 
     - name: Run ./ascent tests
       working-directory: ./ascent

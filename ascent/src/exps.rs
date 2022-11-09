@@ -1,15 +1,18 @@
 #![cfg(test)]
+#![allow(dead_code)]
 
-use std::sync::{Mutex, RwLock};
+use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 use std::time::Instant;
 
-use rayon::prelude::{IntoParallelIterator, ParallelIterator, IntoParallelRefIterator, ParallelBridge};
+use rayon::prelude::*;
 
 use crate::c_rel_index::CRelIndex;
-use crate::internal::CRelFullIndexWrite;
+use crate::internal::RelIndexWrite;
 use crate::rel_index_read::RelIndexRead;
+use std::sync::atomic::Ordering::Relaxed;
 
-#[test]
+// #[test]
 fn bench_aovec() {
    type AOVec<T> = boxcar::Vec<T>;
    let size = 125_000_000;
@@ -55,13 +58,50 @@ fn bench_aovec() {
    println!("parallel ao vec time: {:?}", elapsed);
 }
 
-#[test]
+// #[test]
+fn bench_atomic_changed() {
+   type AOVec<T> = boxcar::Vec<T>;
+   let size = 125_000_000;
+
+   {
+
+      let before = Instant::now();
+      let vec = AOVec::new();
+      let changed = AtomicBool::new(false);
+      (0..size).into_par_iter().for_each(|i| {
+         vec.push(i);
+         changed.store(true, Relaxed);
+      });
+      let elapsed = before.elapsed();
+      println!("changed: {}", changed.load(Relaxed));
+      assert_eq!(vec.len(), size);
+      println!("atomic changed ao vec time: {:?}", elapsed);
+   }
+
+   {
+      let before = Instant::now();
+      let vec = AOVec::new();
+      let changed = (0..size).into_par_iter().fold_with(false, |_changed, i| {
+         vec.push(i);
+         true
+      });
+      // let changed = changed.reduce(|| false, |x, y| x | y);
+      println!("changed count: {}", changed.count());
+      let elapsed = before.elapsed();
+      // println!("changed: {}", changed);
+      assert_eq!(vec.len(), size);
+      println!("therad-local changed ao vec time: {:?}", elapsed);
+   }
+}
+
+
+// #[test]
 fn bench_crel_index() {
    let mut rel_index = CRelIndex::default();
 
    let before = Instant::now();
    for i in 0..1000_000 {
-      rel_index.insert_if_not_present(&i, i);
+      RelIndexWrite::index_insert(&mut rel_index, i, i);
    }
    let elapsed = before.elapsed();
    println!("insert time: {:?}", elapsed);
@@ -80,7 +120,7 @@ fn bench_crel_index() {
    println!("freeze_unfreeze for {} iterations time: {:?}", iters, elapsed);
 }
 
-#[test]
+// #[test]
 fn bench_par_iter() {
 
    let arr = (1..1000_000).collect::<Vec<_>>();
@@ -101,4 +141,16 @@ fn bench_par_iter() {
    });
    println!("par_bridge took {:?}", before.elapsed());
 
+}
+
+#[test]
+fn exp_rayon_scope() {
+   rayon::scope(|__scope| {
+      __scope.spawn(|_| {
+
+      });
+      __scope.spawn(|_| {
+
+      });
+   });
 }

@@ -95,7 +95,7 @@ fn test_dl_lambda(){
    assert!(prog.output.len() == 1);
 }
 
-
+#[allow(dead_code)]
 fn _test_dl_lambda2(){
    type Time = u32;
    type Addr = u32;
@@ -619,26 +619,6 @@ fn test_ascent_negation_through_lattices(){
 }
 
 #[test]
-fn test_ascent_explicit_decl(){
-   #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
-   struct Node(pub i32);
-   ascent!{
-      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash;
-      relation edge(TNode, TNode);
-      relation path(TNode, TNode);
-
-      path(x.clone(), y.clone()) <-- edge(x,y);
-      path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
-   }
-   let mut prog = TC::default();
-   prog.edge = vec![(Node(1),Node(2)), (Node(2), Node(3))];
-   prog.run();
-   println!("path: {:?}", prog.path);
-   assert!(rels_equal([(Node(1),Node(2)), (Node(2),Node(3)), (Node(1),Node(3))], prog.path));
-
-}
-
-#[test]
 fn test_ascent_run_explicit_decl(){
    fn compute_tc<TNode: Clone + Eq + Hash>(edges: &[(TNode, TNode)]) -> Vec<(TNode, TNode)> {
       ascent_run!{
@@ -732,12 +712,12 @@ fn test_ascent_simple_join2(){
       foo(*x, *y), bar(*x, *y) <-- baz(x, y);
    };
    println!("baz: {:?}", res.baz);
-   assert!(rels_equal([(1, 3)], res.baz));
+   assert_rels_eq!([(1, 3)], res.baz);
 }
 
 #[test]
 fn test_ascent_simple_join3(){
-   let res = ascent_run!{
+   let res = ascent_run_m_par!{
       relation bar(i32, i32);
       relation foo(i32, i32);
       relation baz(i32, i32);
@@ -753,12 +733,12 @@ fn test_ascent_simple_join3(){
       foo(*x, *y), bar(*x, *y) <-- baz(x, y);
    };
    println!("baz: {:?}", res.baz);
-   assert!(rels_equal([(1, 3)], res.baz));
+   assert_rels_eq!([(1, 3)], res.baz);
 }
 
 #[test]
 fn test_ascent_wildcards(){
-   let res = ascent_run!{
+   let res = ascent_run_m_par!{
       relation foo(i32, i32, i32);
       relation bar(i32, i32);
       relation baz(i32);
@@ -774,7 +754,7 @@ fn test_ascent_wildcards(){
          bar(_, x);
    };
    println!("baz: {:?}", res.baz);
-   assert!(rels_equal([(1,), (2,)], res.baz));
+   assert_rels_eq!([(1,), (2,)], res.baz);
 }
 
 fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
@@ -783,7 +763,7 @@ fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
 
 #[test]
 fn test_ascent_agg(){
-   let res = ascent_run!{
+   let res = ascent_run_m_par!{
       relation foo(i32, i32);
       relation bar(i32, i32, i32);
       relation baz(i32, i32, i32);
@@ -799,7 +779,7 @@ fn test_ascent_agg(){
    };
    println!("{}", res.summary());
    println!("baz: {:?}", res.baz);
-   assert!(rels_equal([(1, 2, 10)], res.baz));
+   assert_rels_eq!([(1, 2, 10)], res.baz);
 }
 
 #[test]
@@ -823,7 +803,7 @@ fn test_run_timeout() {
 #[test]
 fn test_ascent_bounded_set() {
    use ascent::lattice::bounded_set::BoundedSet;
-   ascent! { struct AscentProgram<const N: usize>;
+   ascent_m_par! { struct AscentProgram<const N: usize>;
 
       lattice num_store(BoundedSet<N, i32>);
       relation init(i32);
@@ -835,7 +815,7 @@ fn test_ascent_bounded_set() {
 
    let mut prog = AscentProgram::<10>::default();
    prog.run();
-   let store = &prog.num_store[0].0;
+   let store = &lat_to_vec(prog.num_store)[0].0;
    for (x, ) in prog.init.iter() {
       assert!(store.contains(x));
    }
@@ -845,7 +825,7 @@ fn test_ascent_bounded_set() {
 fn test_issue3() {
    #![allow(non_snake_case)]
 
-   ascent!{
+   ascent_m_par!{
       relation a__(i32, i32);
       relation c__(i32, i32, i32);
       relation e__(i32);
@@ -855,19 +835,19 @@ fn test_issue3() {
       h__(e, e, e) <-- a__(d, e), c__(e, f, e), e__(e);
    }
    let mut prog = AscentProgram::default();
-   prog.a__ = vec![(88,5), (37,24), (11,91)];
-   prog.c__ = vec![(32,83,88), (2,8,5)];
-   prog.e__ = vec![(44,), (83,)];
-   prog.h__ = vec![(38,88,18), (76,18,65), (86,73,91), (98,26,91), (76,10,14)];
+   prog.a__ = FromIterator::from_iter(vec![(88,5), (37,24), (11,91)]);
+   prog.c__ = FromIterator::from_iter(vec![(32,83,88), (2,8,5)]);
+   prog.e__ = FromIterator::from_iter(vec![(44,), (83,)]);
+   prog.h__ = FromIterator::from_iter(vec![(38,88,18), (76,18,65), (86,73,91), (98,26,91), (76,10,14)]);
 
    prog.run();
    println!("h__: {:?}", prog.h__);
-   assert!(rels_equal(prog.h__, [(38, 88, 18), (76, 18, 65), (86, 73, 91), (98, 26, 91), (76, 10, 14)]))
+   assert_rels_eq!(prog.h__, [(38, 88, 18), (76, 18, 65), (86, 73, 91), (98, 26, 91), (76, 10, 14)]);
 }
 
 #[test]
 fn test_repeated_vars_simple_joins() {
-   ascent! {
+   ascent_m_par! {
       relation foo1(i32, i32);
       relation foo2(i32, i32);
       relation bar(i32, i32);
@@ -883,5 +863,5 @@ fn test_repeated_vars_simple_joins() {
    prog.run();
 
    println!("bar: {:?}", prog.bar);
-   assert!(rels_equal(prog.bar, [(1, 2)]));
+   assert_rels_eq!(prog.bar, [(1, 2)]);
 }

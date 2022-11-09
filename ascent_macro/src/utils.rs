@@ -282,3 +282,20 @@ impl <T> Piper for T where T: Sized {
       f(self)
    }
 }
+
+
+/// sets the span of only top-level tokens to `span`
+pub fn with_span(ts: TokenStream, span: Span) -> TokenStream {
+   ts.into_iter().map(|mut tt| {
+      tt.set_span(span);
+      tt
+   }).collect()
+}
+
+pub(crate) trait TokenStreamExtensions {
+   fn with_span(self, span: Span) -> TokenStream;
+}
+
+impl TokenStreamExtensions for TokenStream {
+   fn with_span(self, span: Span) -> TokenStream { with_span(self, span) }
+}

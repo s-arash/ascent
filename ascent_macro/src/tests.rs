@@ -11,28 +11,57 @@ use crate::{ascent_impl, utils::token_stream_replace_macro_ident};
 #[test]
 fn test_macro0() {
    let inp = quote!{
-      relation subset(i32, i32, i32);
-      relation subset_error(i32, i32, i32);
-      relation placeholder_origin(i32);
-      relation known_placeholder_subset(i32, i32) = vec![(2, 3), (3, 4)];
+      struct Polonius<T: FactTypes>;
+      relation subset(T::Origin, T::Origin, T::Point);// = ctx.subset_base.clone();
+      relation cfg_edge(T::Point, T::Point);
+      relation origin_live_on_entry(T::Origin, T::Point);
+      relation origin_contains_loan_on_entry(T::Origin, T::Loan, T::Point);
+      relation loan_live_at(T::Loan, T::Point);
+      relation loan_invalidated_at(T::Loan, T::Point);
+      relation errors(T::Loan, T::Point);
+      relation placeholder_origin(T::Origin);
+      relation subset_error(T::Origin, T::Origin, T::Point);
+      relation loan_killed_at(T::Loan, T::Point);// = loan_killed_at.iter().cloned().collect();
+      relation known_placeholder_subset(T::Origin, T::Origin);// = known_placeholder_subset.iter().cloned().collect();
 
-      placeholder_origin(o1),
-      known_placeholder_subset(p1, p2) <--
-         subset(p1, p2, o1);
+      subset(origin1, origin3, point) <--
+         subset(origin1, origin2, point),
+         subset(origin2, origin3, point),
+         if origin1 != origin3;
 
-      subset(o1, o2, 42) <--
-         placeholder_origin(o1),
-         placeholder_origin(o2),
-         known_placeholder_subset(o1, o2);
+      subset(origin1, origin2, point2) <--
+         subset(origin1, origin2, point1),
+         cfg_edge(point1, point2),
+         origin_live_on_entry(origin1, point2),
+         origin_live_on_entry(origin2, point2);
 
-      subset_error(*origin1, *origin2, *point) <--
+      origin_contains_loan_on_entry(origin2, loan, point) <--
+         origin_contains_loan_on_entry(origin1, loan, point),
+         subset(origin1, origin2, point);
+
+      origin_contains_loan_on_entry(origin, loan, point2) <--
+         origin_contains_loan_on_entry(origin, loan, point1),
+         cfg_edge(point1, point2),
+         !loan_killed_at(loan, point1),
+         origin_live_on_entry(origin, point2);
+
+      loan_live_at(loan, point) <--
+         origin_contains_loan_on_entry(origin, loan, point),
+         origin_live_on_entry(origin, point);
+
+      errors(loan, point) <--
+         loan_invalidated_at(loan, point),
+         loan_live_at(loan, point);
+
+      subset_error(origin1, origin2, point) <--
          subset(origin1, origin2, point),
          placeholder_origin(origin1),
          placeholder_origin(origin2),
          !known_placeholder_subset(origin1, origin2),
          if origin1 != origin2;
    };
-   write_ascent_run_to_scratchpad(inp);
+   // write_ascent_run_to_scratchpad(inp);
+   write_ascent_run_par_to_scratchpad(inp);
 }
 #[test]
 fn test_macro_generic_tc() {
@@ -52,6 +81,7 @@ fn test_macro_generic_tc() {
 #[test]
 fn test_macro_tc() {
    let inp = quote!{
+      #![measure_rule_times]
       struct TC;
       relation edge(i32, i32);
       relation path(i32, i32);
@@ -278,6 +308,10 @@ fn write_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
 
 fn write_ascent_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
    write_to_scratchpad_base(tokens, quote!{}, true, false)
+}
+
+fn write_ascent_run_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, quote!{}, true, true)
 }
 
 
