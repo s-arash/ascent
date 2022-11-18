@@ -10,6 +10,7 @@ mod c_rel_index;
 mod exps;
 mod c_rel_full_index;
 mod c_rel_index_combined;
+mod c_lat_index;
 
 pub use ascent_macro::ascent;
 pub use ascent_macro::ascent_run;

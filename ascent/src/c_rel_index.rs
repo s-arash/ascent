@@ -6,7 +6,7 @@ use rayon::prelude::ParallelIterator;
 use rustc_hash::FxHasher;
 use std::hash::{Hash, BuildHasherDefault, BuildHasher};
 
-use crate::internal::{RelIndexWrite, CRelIndexWrite, RelFullIndexRead, RelFullIndexWrite, CRelFullIndexWrite};
+use crate::internal::{RelIndexWrite, CRelIndexWrite};
 use crate::rel_index_read::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
 
 use rayon::iter::IntoParallelIterator;
@@ -80,7 +80,8 @@ impl<K: Clone + Hash + Eq, V> CRelIndex<K, V> {
 
 impl<K: Clone + Hash + Eq, V> Default for CRelIndex<K, V> {
    fn default() -> Self {
-      Self::Unfrozen(Default::default())
+      // Self::Unfrozen(Default::default())
+      Self::Unfrozen(DashMap::with_hasher_and_shard_amount(Default::default(), shards_count()))
    }
 }
 
@@ -125,28 +126,23 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
       let from = from.unwrap_mut_unfrozen();
       let to = to.unwrap_mut_unfrozen();
 
-      if from.len() > to.len() {
-         std::mem::swap(from, to);
-      }
-
-      let from = std::mem::take(from);
-
       use rayon::prelude::*;
       assert_eq!(from.shards().len(), to.shards().len());
-      to.shards_mut().par_iter_mut().zip(from.into_shards().into_vec().into_par_iter()).for_each(|(to, from)| {
-         let mut from = from.into_inner();
+      to.shards_mut().par_iter_mut().zip(from.shards_mut().par_iter_mut()).for_each(|(to, from)| {
+         let from = from.get_mut();
          let to = to.get_mut();
 
          if from.len() > to.len() {
-            std::mem::swap(&mut from, to);
+            std::mem::swap(from, to);
          }
 
-         for (k, mut v) in from.into_iter() {
+         for (k, mut v) in from.drain() {
             match to.entry(k) {
                hashbrown::hash_map::Entry::Occupied(mut occ) => {
                   let occ = occ.get_mut().get_mut();
-                  if v.get().len() > occ.len() {
-                     std::mem::swap(occ, v.get_mut());
+                  let v_mut = v.get_mut();
+                  if v_mut.len() > occ.len() {
+                     std::mem::swap(occ, v_mut);
                   }
                   occ.append(&mut v.into_inner());
                },
@@ -155,18 +151,6 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
          }
       
       });
-      // from.into_par_iter().for_each(|(k, mut v)| {
-      //    match to.entry(k) {
-      //       dashmap::mapref::entry::Entry::Occupied(mut occ) => {
-      //          let occ = occ.get_mut();
-      //          if occ.len() < v.len() {
-      //             std::mem::swap(occ, &mut v);
-      //          }
-      //          occ.append(&mut v);
-      //       },
-      //       dashmap::mapref::entry::Entry::Vacant(vac) => {vac.insert(v);},
-      //    }
-      // });
       unsafe {
          crate::internal::MOVE_REL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
       }
@@ -174,8 +158,17 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
    }
 
    fn index_insert(ind: &mut Self, key: Self::Key, value: Self::Value) {
-      let mut entry = ind.unwrap_unfrozen().entry(key).or_default();
-      entry.push(value);
+      let dm = ind.unwrap_mut_unfrozen();
+      // let shard = dm.determine_map(&key);
+      // let entry = dm.shards_mut()[shard].get_mut().entry(key).or_insert(SharedValue::new(Default::default()));
+      // entry.get_mut().push(value);
+
+      let hash = dm.hash_usize(&key);
+      let shard = dm.determine_shard(hash);
+      let entry = dm.shards_mut()[shard].get_mut().raw_entry_mut()
+         .from_key_hashed_nocheck(hash as u64, &key)
+         .or_insert(key, SharedValue::new(Default::default()));
+      entry.1.get_mut().push(value);
    }
 }
 
@@ -237,7 +230,6 @@ where
 
 impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: Clone + 'a + Sync + Send> CRelIndexReadAll<'a> for CRelIndex<K, V> {
    type Key = K;
-
    type Value = &'a V;
 
    type ValueIteratorType = rayon::slice::Iter<'a, V>;
@@ -260,61 +252,21 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelIndexWrite for CRelIndex<K, V> {
 
    #[inline(always)]
    fn index_insert(ind: & Self, key: Self::Key, value: Self::Value) {
-      let before = Instant::now();
+      // let before = Instant::now();
       ind.insert(key, value);
-      unsafe {
-         crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
-      }
+      // unsafe {
+      //    crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
+      // }
    }
 }
 
-
-// TODO RelFullIndexRead and CRelFullIndexWrite need a dedicated type
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelFullIndexRead for CRelIndex<K, V> {
-   type Key = K;
-
-   #[inline(always)]
-   fn contains_key(&self, key: &Self::Key) -> bool {
-      match self {
-         CRelIndex::Frozen(f) => f.contains_key(key),
-         CRelIndex::Unfrozen(_uf) => panic!("contains_key: CRelIndex object is unfrozen"),
-      }
-   }
-}
-
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelFullIndexWrite for CRelIndex<K, V> {
-   type Key = K;
-   type Value = V;
-
-   fn insert_if_not_present(&mut self, key: &Self::Key, v: Self::Value) -> bool {
-      self.unfreeze();
-      match self.unwrap_mut_unfrozen().entry(key.clone()) {
-         dashmap::mapref::entry::Entry::Occupied(_) => false,
-         dashmap::mapref::entry::Entry::Vacant(vac) => {
-            vac.insert(vec![v]);
-            true
-         },
-      }
-   }
-}
-
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelFullIndexWrite for CRelIndex<K, V> {
-   type Key = K;
-   type Value = V;
-
-   fn insert_if_not_present(&self, key: &Self::Key, v: Self::Value) -> bool {
-      let before = Instant::now();
-
-      let res = match self.unwrap_unfrozen().entry(key.clone()) {
-         dashmap::mapref::entry::Entry::Occupied(_) => false,
-         dashmap::mapref::entry::Entry::Vacant(vac) => {
-            vac.insert(vec![v]);
-            true
-         },
-      };
-      unsafe {
-         crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
-      }
+pub fn shards_count() -> usize {
+   static RES: once_cell::sync::Lazy<usize> = once_cell::sync::Lazy::new(|| {
+      let res = (rayon::current_num_threads() * 4).next_power_of_two();
+      // TODO delete
+      println!("shards count: {}", res);
       res
-   }
+      // (std::thread::available_parallelism().map_or(1, usize::from) * 4).next_power_of_two()
+   });
+   *RES
 }

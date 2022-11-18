@@ -1,10 +1,10 @@
 use ascent_base::util::update;
-use dashmap::DashMap;
+use dashmap::{DashMap, SharedValue};
 use instant::Instant;
 use rustc_hash::FxHasher;
 use std::hash::{Hash, BuildHasherDefault};
 
-use crate::c_rel_index::DashMapViewParIter;
+use crate::c_rel_index::{DashMapViewParIter, shards_count};
 use crate::internal::{RelIndexWrite, CRelIndexWrite, RelFullIndexRead, RelFullIndexWrite, CRelFullIndexWrite};
 use crate::rel_index_read::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
 
@@ -79,7 +79,8 @@ impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
 
 impl<K: Clone + Hash + Eq, V> Default for CRelFullIndex<K, V> {
    fn default() -> Self {
-      Self::Unfrozen(Default::default())
+      // Self::Unfrozen(Default::default())
+      Self::Unfrozen(DashMap::with_hasher_and_shard_amount(Default::default(), shards_count()))
    }
 }
 
@@ -145,7 +146,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelFullIndexWrite for CRelFullIndex<
    type Value = V;
 
    fn insert_if_not_present(&self, key: &Self::Key, v: Self::Value) -> bool {
-      let before = Instant::now();
+      // let before = Instant::now();
 
       let res = match self.unwrap_unfrozen().entry(key.clone()) {
          dashmap::mapref::entry::Entry::Occupied(_) => false,
@@ -154,9 +155,9 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelFullIndexWrite for CRelFullIndex<
             true
          },
       };
-      unsafe {
-         crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
-      }
+      // unsafe {
+      //    crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
+      // }
       res
    }
 }
@@ -202,23 +203,23 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
       let from = from.unwrap_mut_unfrozen();
       let to = to.unwrap_mut_unfrozen();
 
-      if from.len() > to.len() {
-         std::mem::swap(from, to);
-      }
+      // if from.len() > to.len() {
+      //    std::mem::swap(from, to);
+      // }
 
-      let from = std::mem::take(from);
+      // let from = std::mem::take(from);
 
       use rayon::prelude::*;
       assert_eq!(from.shards().len(), to.shards().len());
-      to.shards_mut().par_iter_mut().zip(from.into_shards().into_vec().into_par_iter()).for_each(|(to, from)| {
-         let mut from = from.into_inner();
+      to.shards_mut().par_iter_mut().zip(from.shards_mut().par_iter_mut()).for_each(|(to, from)| {
+         let from = from.get_mut();
          let to = to.get_mut();
 
          if from.len() > to.len() {
-            std::mem::swap(&mut from, to);
+            std::mem::swap(from, to);
          }
-
-         for (k, v) in from.into_iter() {
+         to.reserve(from.len());
+         for (k, v) in from.drain() {
             to.insert(k, v);
          }
       });
@@ -233,7 +234,16 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
    }
 
    fn index_insert(ind: &mut Self, key: Self::Key, value: Self::Value) {
-      ind.unwrap_unfrozen().insert(key, value);
+      let dm = ind.unwrap_mut_unfrozen();
+      
+      // let shard = dm.determine_map(&key);
+      // dm.shards_mut()[shard].get_mut().insert(key, SharedValue::new(value));
+      
+      let hash = dm.hash_usize(&key);
+      let shard = dm.determine_shard(hash);
+      dm.shards_mut()[shard].get_mut().raw_entry_mut()
+         .from_key_hashed_nocheck(hash as u64, &key)
+         .insert(key, SharedValue::new(value));
    }
 }
 
@@ -243,10 +253,10 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelIndexWrite for CRelFullIndex<K, V
 
    #[inline(always)]
    fn index_insert(ind: &Self, key: Self::Key, value: Self::Value) {
-      let before = Instant::now();
+      // let before = Instant::now();
       ind.insert(key, value);
-      unsafe {
-         crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
-      }
+      // unsafe {
+      //    crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
+      // }
    }
 }

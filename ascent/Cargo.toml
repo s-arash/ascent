@@ -20,7 +20,7 @@ ascent_macro = { version = "=0.4.0", path = "../ascent_macro" }
 ascent_base = { version = "=0.4.0", path = "../ascent_base" }
 rustc-hash = "1.1"
 nohash-hasher = "0.2.0"
-hashbrown = {version = "0.12", features = ["raw"]}
+hashbrown = {version = "0.12", features = ["raw", "rayon"]}
 instant = "0.1"
 segvec = "0.1"
 # dashmap = { version = "5.4", features = ["rayon", "raw-api"] }
@@ -30,6 +30,8 @@ dashmap = { git = "https://github.com/s-arash/dashmap", features = ["rayon", "ra
 rayon = "1.5"
 boxcar = "0.1.0"
 sync-unsafe-cell = "0.1.0"
+
+once_cell = "1.13.1"
 
 [dev_dependencies]
 

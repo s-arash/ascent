@@ -35,7 +35,11 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          relation_fields.push(quote! {
             pub #lattice_mutex_name: ::std::vec::Vec<std::sync::Mutex<()>>,
          });
-         field_defaults.push(quote! {#lattice_mutex_name: {let mut v = Vec::with_capacity(128); for _ in 0..128 {v.push(Default::default())}; v},})
+         field_defaults.push(quote! {#lattice_mutex_name: {
+            let len = ::ascent::internal::shards_count();
+            let mut v = Vec::with_capacity(len); for _ in 0..len {v.push(Default::default())}; 
+            v },
+         })
       }
       for ind in rel_indices.iter(){
          let name = &ind.ir_name();
@@ -94,7 +98,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let relation_sizes_body = compile_relation_sizes_body(mir);
    let scc_times_summary_body = compile_scc_times_summary_body(mir);
 
-   let mut type_constaints = vec![];
+   let mut type_constraints = vec![];
    let mut field_type_names = HashSet::<String>::new();
    let mut lat_field_type_names = HashSet::<String>::new();
 
@@ -108,14 +112,14 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
             container.insert(path.path.clone().into_token_stream().to_string())
          } else {true}; 
          if add {
-            let type_constaints_type = 
+            let type_constraints_type = 
                if is_lat {quote_spanned!(field_type.span()=>LatTypeConstraints)} 
                else {quote_spanned!(field_type.span()=>TypeConstraints)}; 
-            type_constaints.push(quote_spanned!{field_type.span()=>
-               let _type_constraints : ascent::internal::#type_constaints_type<#field_type>;
+            type_constraints.push(quote_spanned!{field_type.span()=>
+               let _type_constraints : ascent::internal::#type_constraints_type<#field_type>;
             });
             if mir.is_parallel {
-               type_constaints.push(quote_spanned!{field_type.span()=>
+               type_constraints.push(quote_spanned!{field_type.span()=>
                   let _par_constraints : ascent::internal::ParTypeConstraints<#field_type>;
                });
             }
@@ -145,7 +149,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       use ascent::internal::CRelIndexReadAll;
    }} else {quote!{}};
 
-   let run_usings = quote!{
+   let run_usings = quote! {
       use core::cmp::PartialEq;
       use ascent::internal::RelIndexRead;
       use ascent::internal::RelIndexReadAll;
@@ -155,7 +159,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let generate_run_timeout = !is_ascent_run && mir.config.generate_run_partial; 
    let run_func = if is_ascent_run {quote!{}} 
    else if generate_run_timeout {
-      quote!{
+      quote! {
          #[allow(unused_imports)]
          #[doc = "Runs the Ascent program to a fixed point."]
          pub fn run(&mut self) {
@@ -210,11 +214,9 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let struct_name = &mir.declaration.ident;
    let generics = &mir.declaration.generics;
    let struct_attrs = &mir.declaration.attrs;
-   let summary_fn = if is_ascent_run {
-      quote! {
-         pub fn summary(&self) -> &'static str {#summary}
-      }
-   } else { quote! {
+   let summary_fn = if is_ascent_run { quote! {
+      pub fn summary(&self) -> &'static str {#summary}
+   }} else { quote! {
       pub fn summary() -> &'static str {#summary}
    }};
    let rule_time_fields = if mir.config.include_rule_times {rule_time_fields} else {vec![]};
@@ -240,8 +242,8 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          pub fn update_indices(&mut self) {
             self.update_indices_priv();
          }
-         fn type_constaints() {
-            #(#type_constaints)*
+         fn type_constraints() {
+            #(#type_constraints)*
          }
          #summary_fn
          
@@ -379,7 +381,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
       }
    }
    
-   let rule_parallelism = false && mir.is_parallel;
+   let rule_parallelism = false || mir.is_parallel;
 
    let mut evaluate_rules = vec![];
 

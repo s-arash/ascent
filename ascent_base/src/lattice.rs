@@ -12,7 +12,7 @@ use std::{ops::Deref, rc::Rc};
 mod dual;
 pub use dual::Dual;
 
-/// A `Lattice` is a `PartialOrd` where each pair of elements has a least upper bound (`join`) and a greates lower bound (`meet`)
+/// A `Lattice` is a `PartialOrd` where each pair of elements has a least upper bound (`join`) and a greatest lower bound (`meet`)
 pub trait Lattice: PartialOrd + Sized {
 
    /// ensures `self` is the join of `self` and `other`
@@ -33,7 +33,7 @@ pub trait Lattice: PartialOrd + Sized {
       res
    }
 
-   /// the greatest lower bound of two elements. `meet(x, y)` is the largest value x
+   /// the greatest lower bound of two elements. `meet(x, y)` is the biggest value z
    /// s.t. `z <= x` and `z <= y`
    fn meet(self, other: Self) -> Self;
    

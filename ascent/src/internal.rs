@@ -30,6 +30,9 @@ pub type RelNoIndexType = Vec<usize>;
 
 pub use crate::c_rel_index::CRelIndex;
 pub use crate::c_rel_full_index::CRelFullIndex;
+pub use crate::c_lat_index::CLatIndex;
+
+pub use crate::c_rel_index::shards_count;
 
 pub trait RelIndexWrite{
    type Key;
