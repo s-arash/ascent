@@ -79,6 +79,23 @@ fn test_macro_generic_tc() {
 }
 
 #[test]
+fn test_macro_multiple_dynamic_clauses() {
+   let inp = quote! {
+      relation a(i32, i32);
+      relation b(i32, i32);
+      relation c(i32, i32);
+
+      a(y, z),
+      b(z, w),
+      c(x, y) <--
+         a(x, y),
+         b(y, z),
+         c(z, w);
+   };
+   write_to_scratchpad(inp);
+}
+
+#[test]
 fn test_macro_tc() {
    let inp = quote!{
       #![measure_rule_times]
@@ -460,20 +477,6 @@ fn test_token_stream_replace_macro_ident() {
 
 }
 
-macro_rules! hygiene_test {
-   ($e: expr) => {
-      // x = $e;
-      println!("{}", XXX);
-   };
-}
-
-const XXX: i32 = 42;
-
-fn test_macro_hygiene() {
-   let mut x = "baz";
-   hygiene_test!("foo");
-   hygiene_test!("bar");
-}
 
 #[test]
 fn test_macro_item() {
@@ -486,10 +489,4 @@ fn test_macro_item() {
    let parsed = parse2::<syn::ItemMacro2>(def).unwrap();
    
    println!("rules: {}", parsed.rules);
-}
-
-#[test]
-fn exp_foreach() {
-   let arr = vec![1, 2, 3];
-   arr.iter().for_each(|x| println!("{}", x));
 }

@@ -13,16 +13,20 @@ pub(crate) struct AscentConfig {
    pub attrs: Vec<Attribute>,
    pub include_rule_times: bool,
    pub generate_run_partial: bool,
+   pub inter_rule_parallelism: bool,
 }
 
 impl AscentConfig {
    const MEASURE_RULE_TIMES_ATTR: &'static str = "measure_rule_times";
    const GENERATE_RUN_TIMEOUT_ATTR: &'static str = "generate_run_timeout";
-   pub fn new(attrs: Vec<Attribute>) -> syn::Result<AscentConfig> {
+   const INTER_RULE_PARALLELISM_ATTR: &'static str = "inter_rule_parallelism";
+
+   pub fn new(attrs: Vec<Attribute>, is_parallel: bool) -> syn::Result<AscentConfig> {
       let include_rule_times = attrs.iter().any(|attr| attr.path.is_ident(Self::MEASURE_RULE_TIMES_ATTR));
       let generate_run_partial = attrs.iter().any(|attr| attr.path.is_ident(Self::GENERATE_RUN_TIMEOUT_ATTR));
+      let inter_rule_parallelism = attrs.iter().filter(|attr| attr.path.is_ident(Self::INTER_RULE_PARALLELISM_ATTR)).next();
 
-      let recognized_attrs = [Self::MEASURE_RULE_TIMES_ATTR, Self::GENERATE_RUN_TIMEOUT_ATTR];
+      let recognized_attrs = [Self::MEASURE_RULE_TIMES_ATTR, Self::GENERATE_RUN_TIMEOUT_ATTR, Self::INTER_RULE_PARALLELISM_ATTR];
       for attr in attrs.iter() {
          if !recognized_attrs.iter().any(|recognized_attr| attr.path.is_ident(recognized_attr)) {
             return Err(Error::new_spanned(attr, 
@@ -30,10 +34,16 @@ impl AscentConfig {
                                recognized_attrs.join(", "))));
          }
       }
+      if let Some(inter_rule_parallelism_attr) = inter_rule_parallelism {
+         if !is_parallel {
+            return Err(Error::new_spanned(inter_rule_parallelism, "attribute only allowed in parallel Ascent"));
+         }
+      }
       Ok(AscentConfig {
+         inter_rule_parallelism: inter_rule_parallelism.is_some(),
          attrs,
          include_rule_times,
-         generate_run_partial
+         generate_run_partial,
       })
    }
 }
@@ -243,7 +253,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       relations_metadata: relations_metadata,
       // relations_no_indices,
       declaration,
-      config: AscentConfig::new(prog.attributes.clone())?,
+      config: AscentConfig::new(prog.attributes.clone(), is_parallel)?,
       is_parallel
    })
 }
@@ -309,9 +319,9 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             }
             let ir_name = ir_name_for_rel_indices(&bcl.rel, &indices);
             let relation = prog_get_relation(prog, &bcl.rel, bcl.args.len())?;
-            if relation.is_lattice {
-               first_two_items_simple_clauses = false;
-            }
+            // if relation.is_lattice {
+            //    first_two_items_simple_clauses = false;
+            // }
 
             for cond_clause in bcl.cond_clauses.iter() {
                extend_grounded_vars(&mut grounded_vars, cond_clause.bound_vars())?;

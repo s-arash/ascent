@@ -2,7 +2,7 @@ use ascent_base::util::update;
 use dashmap::{DashMap, RwLock, SharedValue, ReadOnlyView};
 use instant::Instant;
 use rayon::iter::plumbing::UnindexedConsumer;
-use rayon::prelude::ParallelIterator;
+use rayon::prelude::{ParallelIterator, IntoParallelRefIterator};
 use rustc_hash::FxHasher;
 use std::hash::{Hash, BuildHasherDefault, BuildHasher};
 
@@ -65,10 +65,33 @@ impl<K: Clone + Hash + Eq, V> CRelIndex<K, V> {
    }
 
    #[inline]
+   #[allow(dead_code)]
+   // TODO remove if not used
    fn insert(&self, key: K, value: V) {
       match self.unwrap_unfrozen().entry(key) {
          dashmap::mapref::entry::Entry::Occupied(mut occ) => {occ.get_mut().push(value);},
-         dashmap::mapref::entry::Entry::Vacant(vac) => {vac.insert(vec![value]);},
+         dashmap::mapref::entry::Entry::Vacant(vac) => {vac.insert_quick(vec![value]);},
+      }
+   }
+
+   #[allow(dead_code)]
+   // TODO remove if not used
+   fn insert2(&self, key: K, value: V) {
+      let dm = self.unwrap_unfrozen();
+
+      let hash = dm.hash_usize(&key);
+
+      let idx = dm.determine_shard(hash);
+      use dashmap::Map;
+      let mut shard = unsafe { dm._yield_write_shard(idx) };
+
+      match shard.raw_entry_mut().from_key_hashed_nocheck(hash as u64, &key) {
+         hashbrown::hash_map::RawEntryMut::Occupied(mut occ) => {
+            occ.get_mut().get_mut().push(value);
+         },
+         hashbrown::hash_map::RawEntryMut::Vacant(vac) => {
+            vac.insert(key, SharedValue::new(vec![value]));
+         },
       }
    }
 
@@ -98,7 +121,11 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelIndexRead<'a> for CRelIndex<K, V> 
    }
 
    fn len(&self) -> usize {
-      self.unwrap_frozen().len()
+      // approximate len
+      let sample_size = 4;
+      let shards = self.unwrap_frozen().shards();
+      let (count, sum) = shards.iter().take(sample_size).fold((0, 0), |(c, s), shard| (c + 1, s + shard.read().len()));
+      sum * shards.len() / count
    }
 }
 
@@ -197,6 +224,7 @@ impl<'a, K: Eq + Hash, V, S: BuildHasher + Clone> DashMapViewParIter<'a, K, V, S
    }
 }
 
+// taken from DashMap rayon::map::Iter ParallelIterator impl
 impl<'a, K, V, S> ParallelIterator for DashMapViewParIter<'a, K, V, S>
 where
    K: Send + Sync + Eq + Hash,
@@ -211,15 +239,9 @@ where
    {
       self.shards
          .into_par_iter()
-         .flat_map_iter(|shard| {
+         .flat_map(|shard| {
                let sref = unsafe { shard.data_ptr().as_ref().unwrap() };
-               // let guard = shard.read();
-               // let sref: &'a HashMap<K, V, S> = guard; //unsafe { util::change_lifetime_const(&*guard) };
-
-               // let guard = Arc::new(guard);
-               sref.iter().map(move |(k, v)| {
-                  // let guard = Arc::clone(&guard);
-                  // unsafe { RefMulti::new(guard, k, v.get()) }
+               sref.par_iter().map(move |(k, v)| {
                   (k, v.get())
                })
          })
@@ -227,6 +249,29 @@ where
    }
 }
 
+pub struct CRelIndexReadAllParIter<'a, K, V, S> {
+   shards: &'a [RwLock<hashbrown::HashMap<K, SharedValue<VecType<V>>, S>>]
+}
+
+impl<'a, K, V, S> ParallelIterator for CRelIndexReadAllParIter<'a, K, V, S>
+where
+   K: Send + Sync + Eq + Hash,
+   V: Send + Sync,
+   S: Send + Sync + Clone + BuildHasher,
+{
+   type Item = (&'a K, rayon::slice::Iter<'a, V>);
+
+   fn drive_unindexed<C>(self, consumer: C) -> C::Result
+   where
+      C: UnindexedConsumer<Self::Item>,
+   {
+      self.shards.into_par_iter()
+         .flat_map(|shard| {
+            let sref = unsafe { shard.data_ptr().as_ref().unwrap() };
+            sref.par_iter().map(|(k, v)| (k, v.get().par_iter()))
+         }).drive_unindexed(consumer)
+   }
+}
 
 impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: Clone + 'a + Sync + Send> CRelIndexReadAll<'a> for CRelIndex<K, V> {
    type Key = K;
@@ -234,14 +279,11 @@ impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: Clone + 'a + Sync + Send> C
 
    type ValueIteratorType = rayon::slice::Iter<'a, V>;
 
-   type AllIteratorType = 
-      rayon::iter::Map<DashMapViewParIter<'a, K, Vec<V>, BuildHasherDefault<FxHasher>>, for<'aa, 'bb> fn((&'aa K, &'bb Vec<V>)) -> (&'aa K, rayon::slice::Iter<'bb, V>)>;
+   type AllIteratorType = CRelIndexReadAllParIter<'a, K, V, BuildHasherDefault<FxHasher>>;
 
+   #[inline]
    fn c_iter_all(&'a self) -> Self::AllIteratorType {
-      use rayon::prelude::*;
-      let res: rayon::iter::Map<DashMapViewParIter<'a, K, Vec<V>, BuildHasherDefault<FxHasher>>, for<'aa, 'bb> fn((&'aa K, &'bb Vec<V>)) -> (&'aa K, rayon::slice::Iter<'bb, V>)>
-         = DashMapViewParIter::new(self.unwrap_frozen()).map(|(k, v)| (k, v.par_iter()));
-      res
+      CRelIndexReadAllParIter{shards: &self.unwrap_frozen().shards()}
    }
 }
 
@@ -254,6 +296,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelIndexWrite for CRelIndex<K, V> {
    fn index_insert(ind: & Self, key: Self::Key, value: Self::Value) {
       // let before = Instant::now();
       ind.insert(key, value);
+      // ind.insert2(key, value);
       // unsafe {
       //    crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
       // }
@@ -263,8 +306,6 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelIndexWrite for CRelIndex<K, V> {
 pub fn shards_count() -> usize {
    static RES: once_cell::sync::Lazy<usize> = once_cell::sync::Lazy::new(|| {
       let res = (rayon::current_num_threads() * 4).next_power_of_two();
-      // TODO delete
-      println!("shards count: {}", res);
       res
       // (std::thread::available_parallelism().map_or(1, usize::from) * 4).next_power_of_two()
    });

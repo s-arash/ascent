@@ -75,6 +75,25 @@ impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
          CRelFullIndex::Frozen(f) => f.get(key).cloned(),
       }
    }
+
+   
+   pub fn insert_if_not_present2(&self, key: &K, value: V) -> bool {
+      let dm = self.unwrap_unfrozen();
+
+      let hash = dm.hash_usize(&key);
+
+      let idx = dm.determine_shard(hash);
+      use dashmap::Map;
+      let mut shard = unsafe { dm._yield_write_shard(idx) };
+
+      match shard.raw_entry_mut().from_key_hashed_nocheck(hash as u64, &key) {
+         hashbrown::hash_map::RawEntryMut::Occupied(_) => false,
+         hashbrown::hash_map::RawEntryMut::Vacant(vac) => {
+            vac.insert(key.clone(), SharedValue::new(value));
+            true
+         },
+      }
+   }
 }
 
 impl<K: Clone + Hash + Eq, V> Default for CRelFullIndex<K, V> {
@@ -146,18 +165,22 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelFullIndexWrite for CRelFullIndex<
    type Value = V;
 
    fn insert_if_not_present(&self, key: &Self::Key, v: Self::Value) -> bool {
+
+      // TODO decide what to do here
       // let before = Instant::now();
 
-      let res = match self.unwrap_unfrozen().entry(key.clone()) {
-         dashmap::mapref::entry::Entry::Occupied(_) => false,
-         dashmap::mapref::entry::Entry::Vacant(vac) => {
-            vac.insert(v);
-            true
-         },
-      };
+      // let res = match self.unwrap_unfrozen().entry(key.clone()) {
+      //    dashmap::mapref::entry::Entry::Occupied(_) => false,
+      //    dashmap::mapref::entry::Entry::Vacant(vac) => {
+      //       vac.insert_quick(v);
+      //       true
+      //    },
+      // };
+      let res = self.insert_if_not_present2(key, v);
       // unsafe {
       //    crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
       // }
+      
       res
    }
 }
@@ -200,14 +223,9 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
 
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
+      
       let from = from.unwrap_mut_unfrozen();
       let to = to.unwrap_mut_unfrozen();
-
-      // if from.len() > to.len() {
-      //    std::mem::swap(from, to);
-      // }
-
-      // let from = std::mem::take(from);
 
       use rayon::prelude::*;
       assert_eq!(from.shards().len(), to.shards().len());
@@ -224,11 +242,8 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
          }
       });
 
-      // for (k, v) in from.into_iter() {
-      //    to.insert(k, v);
-      // }
       unsafe {
-         crate::internal::MOVE_REL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
+         crate::internal::MOVE_FULL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
       }
 
    }

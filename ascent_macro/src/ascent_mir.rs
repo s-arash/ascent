@@ -255,7 +255,7 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
             if let MirBodyItem::Agg(agg) = bi {
                if dynamic_relations.contains_key(&agg.rel.relation) {
                   return Err(syn::Error::new(agg.span, 
-                     format!("use of aggregated relation {} cannot be stratified.", &agg.rel.relation.name)));
+                     format!("use of aggregated relation {} cannot be stratified", &agg.rel.relation.name)));
                }
             }
          }
@@ -361,11 +361,11 @@ fn compile_hir_rule_to_mir_rules_old(rule: &IrRule, dynamic_relations: &HashSet<
 
 fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<RelationIdentity>) -> Vec<MirRule>{
    
-   fn versions(count: usize) -> Vec<Vec<MirRelationVersion>> {
+   fn versions_base(count: usize) -> Vec<Vec<MirRelationVersion>> {
       if count == 0 {
          vec![]
       } else {
-         let mut res = versions(count - 1);
+         let mut res = versions_base(count - 1);
          for i in 0..res.len() {
             res[i].push(MirRelationVersion::TotalDelta);
          }
@@ -374,6 +374,34 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
          res.push(new_combination);
          res
       }
+   }
+
+   // TODO is it worth it?
+   fn versions(dynamic_cls: &[usize], is_simple_join: bool) -> Vec<Vec<MirRelationVersion>> {
+      fn remove_total_delta_at_index(ind: usize, res: &mut Vec<Vec<MirRelationVersion>>) {
+         let mut i = 0;
+         while i < res.len() {
+            if res[i].get(ind) == Some(&TotalDelta) {
+               res.insert(i + 1, res[i].clone());
+               res[i][ind] = Total;
+               res[i + 1][ind] = Delta;
+            }
+            i += 1;
+         }
+      }
+      
+      let count = dynamic_cls.len();
+      let mut res = versions_base(count);
+      let no_total_delta_at_beginning = false;
+      if no_total_delta_at_beginning {
+         if is_simple_join {
+            remove_total_delta_at_index(0, &mut res);
+            remove_total_delta_at_index(1, &mut res);
+         } else if dynamic_cls.get(0) == Some(&0) {
+            remove_total_delta_at_index(0, &mut res);
+         }
+      }
+      res
    }
 
    fn hir_body_item_to_mir_body_item(hir_bitem : &IrBodyItem, version: Option<MirRelationVersion>) -> MirBodyItem{
@@ -406,8 +434,9 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
       _ => None,
    }).collect_vec();
 
-   let version_combinations = if dynamic_cls.len() == 0 {vec![vec![]]} else {versions(dynamic_cls.len())};
+   let version_combinations = if dynamic_cls.len() == 0 {vec![vec![]]} else {versions(&dynamic_cls[..], rule.is_simple_join)};
 
+   // println!("version_combos: \n{}", version_combinations.iter().map(|combo| combo.iter().map(|v| format!("{v:?}")).join(", ")).join("\n"));
    let mut mir_body_items = Vec::new();
 
    for version_combination in version_combinations {
@@ -417,7 +446,7 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
          .collect_vec();
       mir_body_items.push(mir_bodys)
    }
-   
+
    mir_body_items.into_iter()
       .map(|bcls| MirRule {
          body_items: bcls,

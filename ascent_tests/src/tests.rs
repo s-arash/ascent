@@ -421,7 +421,7 @@ fn test_dl_disjunctions(){
 
 #[test]
 fn test_dl_repeated_vars(){
-   ascent!{
+   ascent_m_par!{
       relation foo(i32);
       relation bar(i32, i32);
       relation res(i32);

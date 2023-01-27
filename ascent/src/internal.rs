@@ -31,6 +31,7 @@ pub type RelNoIndexType = Vec<usize>;
 pub use crate::c_rel_index::CRelIndex;
 pub use crate::c_rel_full_index::CRelFullIndex;
 pub use crate::c_lat_index::CLatIndex;
+pub use crate::c_rel_no_index::CRelNoIndex;
 
 pub use crate::c_rel_index::shards_count;
 
@@ -150,6 +151,8 @@ impl<K: Eq + Hash, V: Hash + Eq> RelIndexWrite for LatticeIndexType<K, V>{
 }
 
 pub static mut MOVE_FULL_INDEX_CONTENTS_TOTAL_TIME : Duration = Duration::ZERO;
+pub static mut MOVE_NO_INDEX_CONTENTS_TOTAL_TIME : Duration = Duration::ZERO;
+
 impl<K: Eq + Hash, V> RelIndexWrite for HashBrownRelFullIndexType<K, V>{
     type Key = K;
     type Value = V;

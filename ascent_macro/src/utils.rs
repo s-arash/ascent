@@ -6,7 +6,8 @@ use itertools::Itertools;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree, Group};
 
 use quote::ToTokens;
-use syn::{Block, Stmt, ExprMacro, ItemMacro2};
+use syn::visit_mut::VisitMut;
+use syn::{Block, Stmt, ExprMacro, ItemMacro2, GenericParam, parse_quote_spanned, Lifetime};
 use syn::parse::{Parse, ParseBuffer};
 use syn::{Expr, Pat, Path, Type, parse::ParseStream, parse2, punctuated::Punctuated, spanned::Spanned};
 
@@ -298,4 +299,77 @@ pub(crate) trait TokenStreamExtensions {
 
 impl TokenStreamExtensions for TokenStream {
    fn with_span(self, span: Span) -> TokenStream { with_span(self, span) }
+}
+
+// TODO unused, probably not useful
+pub fn erase_lifetimes(ty: &mut Type){
+   struct Visitor { bound_lifetimes: Vec<Ident> };
+   impl Visitor {
+      fn transform_lt(&self, lt: &mut Lifetime) {
+         let ident = lt.ident.to_string();
+         if ident != "_" && ident != "static" && !self.bound_lifetimes.contains(&lt.ident){
+            *lt = parse_quote_spanned! {lt.span()=> '_}
+         }
+      }
+   }
+   impl syn::visit_mut::VisitMut for Visitor {
+      fn visit_generic_argument_mut(&mut self, i: &mut syn::GenericArgument) {
+         match i {
+            syn::GenericArgument::Lifetime(lt) => self.transform_lt(lt),
+            syn::GenericArgument::Type(_) => (),
+            syn::GenericArgument::Binding(_) => (),
+            syn::GenericArgument::Constraint(_) => (),
+            syn::GenericArgument::Const(_) => (),
+         }
+         syn::visit_mut::visit_generic_argument_mut(self, i);
+      }
+
+      fn visit_type_reference_mut(&mut self, i: &mut syn::TypeReference) {
+         if let Some(lt) = &mut i.lifetime {
+            self.transform_lt(lt);
+         }
+         syn::visit_mut::visit_type_reference_mut(self, i);
+      }
+
+      fn visit_type_bare_fn_mut(&mut self, i: &mut syn::TypeBareFn) {
+         if let Some(lifetimes) = &mut i.lifetimes {
+            let bound_lifetimes = lifetimes.lifetimes.iter().map(|lt| &lt.lifetime.ident).join(", ");
+            let bound_len = self.bound_lifetimes.len();
+            self.bound_lifetimes.extend(lifetimes.lifetimes.iter().map(|lt| lt.lifetime.ident.clone()));
+            syn::visit_mut::visit_type_bare_fn_mut(self, i);
+            self.bound_lifetimes.truncate(bound_len);
+         } else {
+            syn::visit_mut::visit_type_bare_fn_mut(self, i);
+         }
+      }
+   }
+
+   Visitor{ bound_lifetimes: vec![] }.visit_type_mut(ty);
+
+   type T = for <'a, 'b> fn(&'a i32, fn(&'b i32) -> &'b i32) -> &'a i32;
+}
+
+#[test]
+fn test_erase_lifetimes() {
+
+   // let ty: Type = syn::parse_quote! { for <'a> fn(&'a i32) -> &'a i32 };
+   // println!("ty: {:?}", ty);
+   let cases = vec![
+      (quote!{ Vec<&'a T> }, quote!{ Vec<&'_ T> }),
+      (quote!{ Ref<'a, 'b, T> }, quote!{ Ref<'_, '_, T> }),
+      (quote!{ fn(&'a T) -> &'a i32 }, quote!{ fn(&'_ T) -> &'_ i32 }),
+      (quote!{ for<'a, 'b> fn(&'a i32) -> &'c i32 }, quote!{ for<'a, 'b> fn(&'a i32) -> &'_ i32 }),
+      (quote!{ for<'a, 'b> fn(&'a &'c &'b i32) -> &'c i32 }, quote!{ for<'a, 'b> fn(&'a &'_ &'b i32) -> &'_ i32 }),
+      (quote!{ Cow<'static, Ref<&'a &'static Foo<'b>>> }, quote!{ Cow<'static, Ref<&'_ &'static Foo<'_>>> })
+   ];
+
+   for (inp, expected) in cases {
+      let inp_ty: Type = parse2(inp).unwrap();
+      let expected_ty: Type = parse2(expected).unwrap();
+
+      let mut transformed = inp_ty.clone();
+      erase_lifetimes(&mut transformed);
+      println!("inp: {}, output: {}", inp_ty.to_token_stream(), transformed.to_token_stream());
+      assert_eq!(transformed, expected_ty);
+   }
 }
