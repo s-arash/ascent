@@ -438,7 +438,7 @@ pub(crate) fn rule_node_summary(rule: &RuleNode) -> String {
    fn bitem_to_str(bitem: &BodyItemNode) -> String {
       match bitem {
          BodyItemNode::Generator(gen) => format!("for_{}", pat_to_ident(&gen.pattern).map(|x| x.to_string()).unwrap_or_default()),
-         BodyItemNode::Clause(bcl) => format!("{}", bcl.rel.to_string()),
+         BodyItemNode::Clause(bcl) => format!("{}", bcl.rel),
          BodyItemNode::Disjunction(_) => todo!(),
          BodyItemNode::Cond(cl) => format!("if_"),
          BodyItemNode::Agg(agg) => format!("agg {}", agg.rel),
@@ -779,7 +779,7 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
                   expr_get_vars(&expr).iter()
                   .any(|var| if let Some(cl_ind) = grounded_vars.get(&var) {*cl_ind == i} else {false});
                if expr_has_vars_from_same_caluse {
-                  let new_ident = fresh_ident(&expr_to_ident(expr).map(|e| e.to_string()).unwrap_or("expr_replaced".to_string()), expr.span());
+                  let new_ident = fresh_ident(&expr_to_ident(expr).map(|e| e.to_string()).unwrap_or_else(|| "expr_replaced".to_string()), expr.span());
                   new_cond_clauses.push(CondClause::If(
                      parse2(quote_spanned! {expr.span()=> if #new_ident.eq(&(#expr))}).unwrap()
                   ));
@@ -901,7 +901,7 @@ fn rule_expand_macro_invocations(mut rule: RuleNode, macros: &HashMap<Ident, &Ma
    -> Result<Punctuated<BodyItemNode, Token![,]>> 
    {
       if depth <= 0 {
-         return Err(Error::new(span.unwrap_or(Span::call_site()), RECURSIVE_MACRO_ERROR))
+         return Err(Error::new(span.unwrap_or_else(Span::call_site), RECURSIVE_MACRO_ERROR))
       }
       match bi {
          BodyItemNode::MacroInvocation(m) => {
@@ -933,7 +933,7 @@ fn rule_expand_macro_invocations(mut rule: RuleNode, macros: &HashMap<Ident, &Ma
    -> Result<Punctuated<HeadItemNode, Token![,]>> 
    {
       if depth <= 0 {
-         return Err(Error::new(span.unwrap_or(Span::call_site()), RECURSIVE_MACRO_ERROR))
+         return Err(Error::new(span.unwrap_or_else(Span::call_site), RECURSIVE_MACRO_ERROR))
       }
       match hi {
          HeadItemNode::MacroInvocation(m) => {
