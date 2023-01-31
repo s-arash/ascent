@@ -169,7 +169,7 @@ impl MirRelationVersion {
 }
 
 fn get_hir_dep_graph(hir: &AscentIr) -> Vec<(usize,usize)> {
-   let mut relations_to_rules_in_head : HashMap<&RelationIdentity, HashSet<usize>> = HashMap::new();
+   let mut relations_to_rules_in_head : HashMap<&RelationIdentity, HashSet<usize>> = HashMap::with_capacity(hir.rules.len());
    for (i, rule) in hir.rules.iter().enumerate(){
       for head_rel in rule.head_clauses.iter().map(|hcl| &hcl.rel){
          relations_to_rules_in_head.entry(head_rel).or_default().insert(i);
@@ -266,9 +266,9 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
       mir_sccs.push(mir_scc);
    }
 
-   let mut sccs_dep_graph = HashMap::new();
    sccs.reverse();
    let sccs_nodes_count = sccs.node_indices().count();
+   let mut sccs_dep_graph = HashMap::with_capacity(sccs_nodes_count);
    for n in sccs.node_indices() {
       //the nodes in the sccs graph is in reverse topological order, so we do this 
       sccs_dep_graph.insert(sccs_nodes_count - n.index() - 1, sccs.neighbors(n).map(|n| sccs_nodes_count - n.index() - 1).collect());
@@ -404,7 +404,7 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
 
    let version_combinations = if dynamic_cls.len() == 0 {vec![vec![]]} else {versions(dynamic_cls.len())};
 
-   let mut mir_body_items = Vec::new();
+   let mut mir_body_items = Vec::with_capacity(version_combinations.len());
 
    for version_combination in version_combinations {
       let versions = dynamic_cls.iter().zip(version_combination)

@@ -152,10 +152,11 @@ impl IrRelation {
 
 pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result<AscentIr>{
    let ir_rules : Vec<(IrRule, Vec<IrRelation>)> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
-   let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
-   let mut relations_full_indices = HashMap::new();
+   let num_relations = prog.relations.len();
+   let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::with_capacity(num_relations);
+   let mut relations_full_indices = HashMap::with_capacity(num_relations);
    let mut relations_initializations = HashMap::new();
-   let mut relations_metadata = HashMap::new();
+   let mut relations_metadata = HashMap::with_capacity(num_relations);
    // let mut relations_no_indices = HashMap::new();
    let mut lattices_full_indices = HashMap::new();
    for rel in prog.relations.iter(){
