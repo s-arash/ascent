@@ -115,7 +115,7 @@ impl<T: Lattice + Clone> Lattice for Rc<T> {
    fn meet(self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
-         Some(cmp) => if cmp.is_le() {self.clone()} else {other.clone()},
+         Some(cmp) => if cmp.is_le() {self} else {other},
          None => Rc::new(self.deref().clone().meet(other.deref().clone())),
       }
    }
@@ -123,7 +123,7 @@ impl<T: Lattice + Clone> Lattice for Rc<T> {
    fn join(self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
-         Some(cmp) => if cmp.is_ge() {self.clone()} else {other.clone()},
+         Some(cmp) => if cmp.is_ge() {self} else {other},
          None => Rc::new(self.deref().clone().join(other.deref().clone())),
       }
    }
