@@ -631,14 +631,25 @@ fn compile_cond_clause(cond: &CondClause, body: proc_macro2::TokenStream) -> pro
 fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> proc_macro2::TokenStream {
    let (head_rels_structs_and_vars, head_update_code) = 
       head_clauses_structs_and_update_code(rule, scc, mir);
-   let rule_code = compile_mir_rule_inner(rule, scc, mir, 0, head_update_code);
+
+   const MAX_PAR_ITERS: usize = 2;
+
+   // do parallel iteration up to this clause index (exclusive)
+   let par_iter_to_ind = if mir.is_parallel {
+      use itertools::FoldWhile::*;
+      rule.body_items.iter().fold_while((0, 0), |(count, i), bi| {
+         let new_count = count + matches!(bi, MirBodyItem::Clause(..)) as usize; 
+         if new_count > MAX_PAR_ITERS { Done((new_count, i)) } else { Continue((new_count, i + 1)) }
+      }).into_inner().1
+   } else { 0 };
+   let rule_code = compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, 0);
    quote!{
       #head_rels_structs_and_vars
       #rule_code
    }
 }
 
-fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: usize, head_update_code: proc_macro2::TokenStream) 
+fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_iter_to_ind: usize, head_update_code: proc_macro2::TokenStream, clause_ind: usize) 
 -> proc_macro2::TokenStream 
 {
    if clause_ind == 0 && rule.reorderable {
@@ -647,8 +658,8 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_
       rule_cp1.reorderable = false;
       rule_cp2.reorderable = false;
       rule_cp2.body_items.swap(0, 1);
-      let rule_cp1_compiled = compile_mir_rule_inner(&rule_cp1, scc, mir, 0, head_update_code.clone());
-      let rule_cp2_compiled = compile_mir_rule_inner(&rule_cp2, scc, mir, 0, head_update_code);
+      let rule_cp1_compiled = compile_mir_rule_inner(&rule_cp1, scc, mir, par_iter_to_ind, head_update_code.clone(), 0);
+      let rule_cp2_compiled = compile_mir_rule_inner(&rule_cp2, scc, mir, par_iter_to_ind, head_update_code        , 0);
 
       if let (MirBodyItem::Clause(bcl1), MirBodyItem::Clause(bcl2)) = (&rule.body_items[0], &rule.body_items[1]){
          // let rel1_full_index = &mir.relations_full_indices[&bcl1.rel.relation];
@@ -673,9 +684,9 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_
       let bitem = &rule.body_items[clause_ind];
       let doing_simple_join = rule.has_simple_join && clause_ind == 0;
       let next_loop = if doing_simple_join {
-         compile_mir_rule_inner(rule, scc, mir, clause_ind + 2, head_update_code)
+         compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, clause_ind + 2)
       } else {
-         compile_mir_rule_inner(rule, scc, mir, clause_ind + 1, head_update_code)
+         compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, clause_ind + 1)
       };
 
       match bitem {
@@ -749,7 +760,7 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_
             // let matching_dot_iter = dot_iter_for_rel_index(&bclause.rel, quote_spanned!{bclause.rel_args_span=> __matching});
             let matching_dot_iter = quote_spanned!{bclause.rel_args_span=> __matching};
 
-            let (index_get, iter_all) = if mir.is_parallel && clause_ind < 2 {
+            let (index_get, iter_all) = if clause_ind < par_iter_to_ind {
                (quote_spanned! {span=> c_index_get}, quote_spanned! {span=> c_iter_all})
             } else {
                (quote_spanned! {span=> index_get}, quote_spanned! {span=> iter_all})
