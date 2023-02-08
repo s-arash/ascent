@@ -652,21 +652,19 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> proc_macro
 fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_iter_to_ind: usize, head_update_code: proc_macro2::TokenStream, clause_ind: usize) 
 -> proc_macro2::TokenStream 
 {
-   if clause_ind == 0 && rule.reorderable {
+   if Some(clause_ind) == rule.simple_join_start_index && rule.reorderable {
       let mut rule_cp1 = rule.clone();
       let mut rule_cp2 = rule.clone();
       rule_cp1.reorderable = false;
       rule_cp2.reorderable = false;
-      rule_cp2.body_items.swap(0, 1);
-      let rule_cp1_compiled = compile_mir_rule_inner(&rule_cp1, scc, mir, par_iter_to_ind, head_update_code.clone(), 0);
-      let rule_cp2_compiled = compile_mir_rule_inner(&rule_cp2, scc, mir, par_iter_to_ind, head_update_code        , 0);
+      rule_cp2.body_items.swap(clause_ind, clause_ind + 1);
+      let rule_cp1_compiled = compile_mir_rule_inner(&rule_cp1, scc, mir, par_iter_to_ind, head_update_code.clone(), clause_ind);
+      let rule_cp2_compiled = compile_mir_rule_inner(&rule_cp2, scc, mir, par_iter_to_ind, head_update_code        , clause_ind);
 
-      if let (MirBodyItem::Clause(bcl1), MirBodyItem::Clause(bcl2)) = (&rule.body_items[0], &rule.body_items[1]){
-         // let rel1_full_index = &mir.relations_full_indices[&bcl1.rel.relation];
+      if let [MirBodyItem::Clause(bcl1), MirBodyItem::Clause(bcl2)] = &rule.body_items[clause_ind..clause_ind+2]{
 
          let rel1_var_name = expr_for_rel(&bcl1.rel);
          
-         // let rel2_full_index = &mir.relations_full_indices[&bcl2.rel.relation];
          let rel2_var_name = expr_for_rel(&bcl2.rel);
 
          return quote_spanned!{bcl1.rel_args_span=>
@@ -682,7 +680,7 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
    }
    if clause_ind < rule.body_items.len(){
       let bitem = &rule.body_items[clause_ind];
-      let doing_simple_join = rule.has_simple_join && clause_ind == 0;
+      let doing_simple_join = rule.simple_join_start_index == Some(clause_ind);
       let next_loop = if doing_simple_join {
          compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, clause_ind + 2)
       } else {
@@ -695,27 +693,13 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
                // println!("doing simple join for {}", mir_rule_summary(rule));
             }
             let (clause_ind, bclause) = 
-               if doing_simple_join {(1, rule.body_items[1].unwrap_clause())} 
+               if doing_simple_join {(clause_ind + 1, rule.body_items[clause_ind + 1].unwrap_clause())} 
                else {(clause_ind, bclause)};
-
-            fn bitem_vars(bitem : &MirBodyItem) -> Vec<Ident> {
-               match bitem {
-                  MirBodyItem::Clause(cl) => {
-                     let cl_vars = cl.args.iter().filter_map(expr_to_ident);
-                     let cond_cl_vars = cl.cond_clauses.iter().flat_map(|cc| cc.bound_vars());
-                     cl_vars.chain(cond_cl_vars).collect()
-                  },
-                  MirBodyItem::Generator(gen) => pattern_get_vars(&gen.pattern),
-                  MirBodyItem::Cond(cond) => cond.bound_vars(),
-                  MirBodyItem::Agg(agg) => pattern_get_vars(&agg.pat),
-               }
-            }
-            
 
             let bclause_rel_name = &bclause.rel.relation.name;
             let selected_args = &bclause.selected_args();
             let pre_clause_vars = rule.body_items.iter().take(clause_ind)
-                                       .flat_map(bitem_vars)
+                                       .flat_map(MirBodyItem::bound_vars)
                                        .collect::<Vec<_>>();
 
             let clause_vars = bclause.vars();
@@ -770,7 +754,7 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
             // The special case where the first clause has indices, but there are no expressions
             // in the args of the first cluase
             if doing_simple_join {
-               let cl1 = rule.body_items[0].unwrap_clause();
+               let cl1 = rule.body_items[rule.simple_join_start_index.unwrap()].unwrap_clause();
                let cl2 = bclause;
                let cl1_var_name = expr_for_rel(&cl1.rel);
                let cl2_var_name = expr_for_rel(&cl2.rel);

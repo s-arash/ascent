@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::{collections::HashSet};
+use std::hash::Hash;
 
 use itertools::Itertools;
 use proc_macro2::{Ident, Span, TokenStream, TokenTree, Group};
@@ -371,5 +372,58 @@ fn test_erase_lifetimes() {
       erase_lifetimes(&mut transformed);
       println!("inp: {}, output: {}", inp_ty.to_token_stream(), transformed.to_token_stream());
       assert_eq!(transformed, expected_ty);
+   }
+}
+
+fn check_lazy_set_contains<T: Hash + Eq>(hs: &mut HashSet<T>, iter: &mut impl Iterator<Item = T>, x: T) -> bool {
+   if hs.contains(&x) { return true }
+   
+   for item in iter {
+      let eq = item == x;
+      hs.insert(item);
+      if eq { return true }
+   }
+   false
+}
+pub fn subsumes<T, Iter1, Iter2>(set1: Iter1, set2: Iter2) -> bool 
+where T: Hash + Eq, Iter1: IntoIterator<Item = T>, Iter2: IntoIterator<Item = T> 
+{
+   let mut hs = HashSet::default();
+   let mut set1 = set1.into_iter();
+   for x in set2 {
+      if !check_lazy_set_contains(&mut hs, &mut set1, x) { return false }
+   }
+   true
+}
+
+pub fn intersects<T, Iter1, Iter2>(set1: Iter1, set2: Iter2) -> bool 
+where T: Hash + Eq, Iter1: IntoIterator<Item = T>, Iter2: IntoIterator<Item = T> 
+{
+   let mut hs = HashSet::default();
+   let mut set1 = set1.into_iter();
+   for x in set2 {
+      if check_lazy_set_contains(&mut hs, &mut set1, x) { return true }
+   }
+   false
+}
+
+#[test]
+fn test_subsumes_and_intersects() {
+   let cases = [
+      (vec![1, 2, 3], vec![3, 3, 4], false, true),
+      (vec![1, 2, 3], vec![3, 3, 2], true, true),
+      (vec![1, 2, 3, 4], vec![1, 3, 4, 2], true, true),
+      (vec![1, 2, 3, 4], vec![], true, false),
+      (vec![1, 2, 3, 4], vec![4, 2, 3, 1, 1, 2, 3, 4], true, true),
+      (vec![1, 2, 3], vec![4], false, false),
+      (vec![], vec![4], false, false),
+      (vec![], vec![], true, false),
+      (vec![1, 2], vec![3, 4], false, false),
+      (vec![1, 2, 3, 4], vec![5, 6, 7, 1], false, true)
+   ];
+   for (s1, s2, subsumes_expected, intersects_expected) in cases {
+      println!("s1: {:?}, s2: {:?}", s1, s2);
+      assert_eq!(subsumes(s1.iter(), s2.iter()), subsumes_expected);
+      assert_eq!(intersects(s1.iter(), s2.iter()), intersects_expected);
    }
 }
