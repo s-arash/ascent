@@ -5,7 +5,7 @@ use rustc_hash::FxHasher;
 use std::hash::{Hash, BuildHasherDefault};
 
 use crate::c_rel_index::{DashMapViewParIter, shards_count};
-use crate::internal::{RelIndexWrite, CRelIndexWrite, RelFullIndexRead, RelFullIndexWrite, CRelFullIndexWrite};
+use crate::internal::{RelIndexWrite, CRelIndexWrite, RelFullIndexRead, RelFullIndexWrite, CRelFullIndexWrite, RelIndexMerge, Freezable};
 use crate::rel_index_read::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
 
 
@@ -14,20 +14,23 @@ pub enum CRelFullIndex<K, V> {
    Frozen(dashmap::ReadOnlyView<K, V, BuildHasherDefault<FxHasher>>)
 }
 
-impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
-   pub fn freeze(&mut self) {
+impl<K: Clone + Hash + Eq, V> Freezable for CRelFullIndex<K, V> {
+   fn freeze(&mut self) {
       update(self, |_self| match _self {
          CRelFullIndex::Unfrozen(dm) => Self::Frozen(dm.into_read_only()),
          CRelFullIndex::Frozen(_) => _self,
       })
    }
 
-   pub fn unfreeze(&mut self) {
+   fn unfreeze(&mut self) {
       update(self, |_self| match _self {
          CRelFullIndex::Frozen(v) => Self::Unfrozen(v.into_inner()),
          CRelFullIndex::Unfrozen(dm) => CRelFullIndex::Unfrozen(dm),
       })
    }
+}
+
+impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
 
    #[inline]
    pub fn unwrap_frozen(&self) -> &dashmap::ReadOnlyView<K, V, BuildHasherDefault<FxHasher>> {
@@ -186,7 +189,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelFullIndexWrite for CRelFullIndex<
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone> RelIndexReadAll<'a> for CRelFullIndex<K, V> {
-   type Key = K;
+   type Key = &'a K;
    type Value = V;
 
    type ValueIteratorType = std::iter::Once<V>;
@@ -221,6 +224,21 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
    type Key = K;
    type Value = V;
 
+   fn index_insert(&mut self, key: Self::Key, value: Self::Value) {
+      let dm = self.unwrap_mut_unfrozen();
+      
+      // let shard = dm.determine_map(&key);
+      // dm.shards_mut()[shard].get_mut().insert(key, SharedValue::new(value));
+      
+      let hash = dm.hash_usize(&key);
+      let shard = dm.determine_shard(hash);
+      dm.shards_mut()[shard].get_mut().raw_entry_mut()
+         .from_key_hashed_nocheck(hash as u64, &key)
+         .insert(key, SharedValue::new(value));
+   }
+}
+
+impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexMerge for CRelFullIndex<K, V> {
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
       
@@ -247,19 +265,6 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
       }
 
    }
-
-   fn index_insert(ind: &mut Self, key: Self::Key, value: Self::Value) {
-      let dm = ind.unwrap_mut_unfrozen();
-      
-      // let shard = dm.determine_map(&key);
-      // dm.shards_mut()[shard].get_mut().insert(key, SharedValue::new(value));
-      
-      let hash = dm.hash_usize(&key);
-      let shard = dm.determine_shard(hash);
-      dm.shards_mut()[shard].get_mut().raw_entry_mut()
-         .from_key_hashed_nocheck(hash as u64, &key)
-         .insert(key, SharedValue::new(value));
-   }
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelIndexWrite for CRelFullIndex<K, V> {
@@ -267,9 +272,9 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelIndexWrite for CRelFullIndex<K, V
    type Value = V;
 
    #[inline(always)]
-   fn index_insert(ind: &Self, key: Self::Key, value: Self::Value) {
+   fn index_insert(&self, key: Self::Key, value: Self::Value) {
       // let before = Instant::now();
-      ind.insert(key, value);
+      self.insert(key, value);
       // unsafe {
       //    crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
       // }

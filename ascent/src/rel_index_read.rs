@@ -28,7 +28,7 @@ pub trait RelIndexReadAll<'a>{
    type Key: 'a;
    type Value;
    type ValueIteratorType: Iterator<Item = Self::Value> + 'a;
-   type AllIteratorType: Iterator<Item = (&'a Self::Key, Self::ValueIteratorType)> + 'a;
+   type AllIteratorType: Iterator<Item = (Self::Key, Self::ValueIteratorType)> + 'a;
    fn iter_all(&'a self) -> Self::AllIteratorType;
 }
 
@@ -57,7 +57,7 @@ impl<'a, K: Eq + std::hash::Hash + 'a, V: Clone + 'a> RelIndexRead<'a> for RelIn
 
 impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for RelIndexType1<K, V> {
 
-   type Key = K;
+   type Key = &'a K;
    type Value = &'a V;
    type ValueIteratorType = core::slice::Iter<'a, V>;
 
@@ -90,7 +90,7 @@ impl<'a, K: Eq + std::hash::Hash, V: 'a + Clone> RelIndexRead<'a> for HashBrownR
 
 impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for HashBrownRelFullIndexType<K, V> {
 
-   type Key = K;
+   type Key = &'a K;
    type Value = &'a V;
    type ValueIteratorType = std::iter::Once<&'a V>;
 
@@ -124,7 +124,7 @@ impl<'a, K: Eq + std::hash::Hash, V: 'a + Clone> RelIndexRead<'a> for LatticeInd
 
 impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for LatticeIndexType<K, V> {
 
-   type Key = K;
+   type Key = &'a K;
    type Value = &'a V;
    type ValueIteratorType = std::collections::hash_set::Iter<'a, V>;
 
@@ -142,8 +142,8 @@ impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for La
 
 
 pub struct RelIndexCombined<'a, Ind1, Ind2> {
-   pub(crate) ind1: &'a Ind1,
-   pub(crate) ind2: &'a Ind2,
+   pub ind1: &'a Ind1,
+   pub ind2: &'a Ind2,
 }
 
 impl <'a, Ind1, Ind2> RelIndexCombined<'a, Ind1, Ind2> {

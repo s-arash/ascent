@@ -3,7 +3,7 @@ use ascent_base::util::update;
 use proc_macro2::{Span, TokenStream};
 use syn::{
    braced, parenthesized, parse2, punctuated::Punctuated, spanned::Spanned, Attribute, Error, Expr, ExprMacro,
-   ExprPath, GenericParam, Generics, Ident, ItemMacro2, MacroDelimiter, Pat, Result, Token, Type, Visibility,
+   ExprPath, GenericParam, Generics, Ident, ItemMacro2, MacroDelimiter, Pat, Path, Result, Token, Type, Visibility,
    WhereClause,
 };
 use syn::token::{Comma, Gt, Lt};
@@ -545,6 +545,15 @@ impl From<&RelationNode> for RelationIdentity{
       }
    }
 } 
+
+#[derive(Parse)]
+pub(crate) struct DsAttributeContents {
+   #[paren]
+   pub paren: syn::token::Paren,
+   #[inside(paren)]
+   #[call(syn::Path::parse_mod_style)]
+   pub path: syn::Path
+}
 
 fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
    fn bitem_desugar(bitem: &BodyItemNode) -> Vec<Vec<BodyItemNode>> {

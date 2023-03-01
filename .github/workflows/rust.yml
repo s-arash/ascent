@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ master, ci, lattices, wasm-support, macro-in-macro, rel-index-trait, par ]
+    branches: [ master, ci, par, byods ]
   pull_request:
     branches: [ master ]
 
@@ -22,7 +22,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
           override: true
-          toolchain: 1.59
+          toolchain: 1.66
     
     - run: cargo --version
 

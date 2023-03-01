@@ -1,7 +1,7 @@
 use instant::Instant;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::internal::{RelIndexWrite, CRelIndexWrite};
+use crate::internal::{RelIndexWrite, CRelIndexWrite, RelIndexMerge, Freezable};
 use crate::rel_index_read::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
 use dashmap::RwLock;
 
@@ -27,9 +27,13 @@ impl<V> Default for CRelNoIndex<V> {
 }
 
 impl<V> CRelNoIndex<V> {
-   pub fn freeze(&mut self) { self.frozen = true; }
-   pub fn unfreeze(&mut self) { self.frozen = false; }
+   
    pub fn hash_usize(&self, _key: &()) -> usize { 0 }
+}
+
+impl<V> Freezable for CRelNoIndex<V> {
+   fn freeze(&mut self) { self.frozen = true; }
+   fn unfreeze(&mut self) { self.frozen = false; }
 }
 
 impl<'a, V: 'a> RelIndexRead<'a> for CRelNoIndex<V> {
@@ -73,6 +77,15 @@ impl<'a, V: 'a> RelIndexWrite for CRelNoIndex<V> {
    type Key = ();
    type Value = V;
 
+   fn index_insert(&mut self, _key: Self::Key, value: Self::Value) {
+      // not necessary because we have a mut reference
+      // assert!(!ind.frozen);
+      let shard_idx = rayon::current_thread_index().unwrap_or(0) % self.vec.len();
+      self.vec[shard_idx].get_mut().push(value);
+   }
+}
+
+impl<'a, V: 'a> RelIndexMerge for CRelNoIndex<V> {
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
       assert_eq!(from.len(), to.len());
@@ -93,28 +106,21 @@ impl<'a, V: 'a> RelIndexWrite for CRelNoIndex<V> {
          crate::internal::MOVE_NO_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
       }
    }
-
-   fn index_insert(ind: &mut Self, _key: Self::Key, value: Self::Value) {
-      // not necessary because we have a mut reference
-      // assert!(!ind.frozen);
-      let shard_idx = rayon::current_thread_index().unwrap_or(0) % ind.vec.len();
-      ind.vec[shard_idx].get_mut().push(value);
-   }
 }
 
 impl<'a, V: 'a> CRelIndexWrite for CRelNoIndex<V> {
    type Key = ();
    type Value = V;
 
-   fn index_insert(ind: &Self, _key: Self::Key, value: Self::Value) {
-      assert!(!ind.frozen);
-      let shard_idx = rayon::current_thread_index().unwrap_or(0) % ind.vec.len();
-      ind.vec[shard_idx].write().push(value);
+   fn index_insert(&self, _key: Self::Key, value: Self::Value) {
+      assert!(!self.frozen);
+      let shard_idx = rayon::current_thread_index().unwrap_or(0) % self.vec.len();
+      self.vec[shard_idx].write().push(value);
    }
 }
 
 impl<'a, V: 'a> RelIndexReadAll<'a> for CRelNoIndex<V> {
-   type Key = ();
+   type Key = &'a ();
    type Value = &'a V;
 
    type ValueIteratorType = <Self as RelIndexRead<'a>>::IteratorType;

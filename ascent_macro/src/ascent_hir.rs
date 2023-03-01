@@ -3,9 +3,9 @@ use std::{collections::{HashMap, HashSet}, ops::Index, rc::Rc};
 use itertools::Itertools;
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
-use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned, parse_quote};
+use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned, parse_quote, Path, parse::Parser, parse_quote_spanned, parenthesized};
 
-use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary}, utils::{expr_to_ident, into_set, is_wild_card, tuple, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
+use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary, DsAttributeContents}, utils::{expr_to_ident, into_set, is_wild_card, tuple, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
 use crate::ascent_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
 
 #[derive(Clone)]
@@ -60,10 +60,11 @@ pub(crate) struct AscentIr {
    pub is_parallel: bool,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct RelationMetadata{
    pub inititialization: Option<Rc<Expr>>,
    pub attributes: Rc<Vec<Attribute>>,
+   pub ds_macro_path: Path,
 }
 
 pub(crate) struct IrRule {
@@ -189,6 +190,8 @@ impl IrRelation {
    }
 }
 
+const RECOGNIIZED_REL_ATTRS: [&str; 1] = ["ds"];
+
 pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: bool) -> syn::Result<AscentIr>{
    let ir_rules : Vec<(IrRule, Vec<IrRelation>)> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
    let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
@@ -219,11 +222,23 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       if let Some(init_expr) = &rel.initialization {
          relations_initializations.insert(rel_identity.clone(), Rc::new(init_expr.clone()));
       }
+      let ds_macro_path = rel.attrs.iter()
+         .filter_map(|attr| attr.path.get_ident().and_then(|ident| if ident == "ds" { Some(&attr.tokens) } else { None }))
+         .collect_vec();
+      if ds_macro_path.len() > 1 {
+         return Err(Error::new(rel.name.span(), "multiple `ds` attributes specified"));
+      }
+      let ds_macro_path = if ds_macro_path.len() == 1 {
+         syn::parse2::<DsAttributeContents>(ds_macro_path[0].clone())?.path
+      } else {
+         parse_quote_spanned! {rel.name.span()=> ::ascent::rel}
+      };
       relations_metadata.insert(
          rel_identity.clone(),
          RelationMetadata {
             inititialization: rel.initialization.clone().map(|i| Rc::new(i)),
-            attributes: Rc::new(rel.attrs.clone())
+            attributes: Rc::new(rel.attrs.iter().filter(|attr| attr.path.get_ident().map_or(true, |ident| !RECOGNIIZED_REL_ATTRS.iter().any(|ra| ident == ra))).cloned().collect_vec()),
+            ds_macro_path
          }
       );
       // relations_no_indices.insert(rel_identity, rel_no_index);

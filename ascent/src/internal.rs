@@ -35,17 +35,30 @@ pub use crate::c_rel_no_index::CRelNoIndex;
 
 pub use crate::c_rel_index::shards_count;
 
-pub trait RelIndexWrite{
+pub trait Freezable {
+   fn freeze(&mut self);
+   fn unfreeze(&mut self);
+}
+
+pub trait RelIndexWrite: Sized {
    type Key;
    type Value;
+   fn index_insert(&mut self, key: Self::Key, value: Self::Value);
+}
+
+
+pub trait RelIndexMerge: Sized {
    fn move_index_contents(from: &mut Self, to: &mut Self);
-   fn index_insert(ind: &mut Self, key: Self::Key, value: Self::Value);
+   fn merge_delta_to_total_new_to_delta(new: &mut Self, delta: &mut Self, total: &mut Self) {
+      Self::move_index_contents(delta, total);
+      std::mem::swap(new, delta);
+   }
 }
 
 pub trait CRelIndexWrite{
    type Key;
    type Value;
-   fn index_insert(ind: & Self, key: Self::Key, value: Self::Value);
+   fn index_insert(&self, key: Self::Key, value: Self::Value);
 }
 
 pub trait RelFullIndexRead {
@@ -53,7 +66,8 @@ pub trait RelFullIndexRead {
    fn contains_key(&self, key: &Self::Key) -> bool;
 }
 
-pub trait RelFullIndexWrite: Default {
+
+pub trait RelFullIndexWrite {
    type Key: Clone;
    type Value;
    /// if an entry for `key` does not exist, inserts `v` for it and returns true.
@@ -77,6 +91,24 @@ impl<K: Eq + Hash, V> RelIndexWrite for RelIndexType1<K, V>{
    type Key = K;
    type Value = V;
 
+   fn index_insert(&mut self, key: K, value: V) {
+      // let before = Instant::now();
+      use std::collections::hash_map::Entry::*;
+      match self.entry(key){
+         Occupied(mut vec) => vec.get_mut().push(value),
+         Vacant(vacant) => {
+            let mut vec = Vec::with_capacity(4);
+            vec.push(value);
+            vacant.insert(vec);
+         },
+      }
+      // unsafe {
+      //    INDEX_INSERT_TOTAL_TIME += before.elapsed();
+      // }
+   }
+}
+
+impl<K: Eq + Hash, V> RelIndexMerge for RelIndexType1<K, V> {
    fn move_index_contents(from: &mut RelIndexType1<K, V>, to: &mut RelIndexType1<K, V>) {
       let before = Instant::now();
       if from.len() > to.len() {
@@ -101,34 +133,20 @@ impl<K: Eq + Hash, V> RelIndexWrite for RelIndexType1<K, V>{
          MOVE_REL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
       }
    }
-
-   fn index_insert(hm: &mut RelIndexType1<K, V>, key: K, value: V) {
-      // let before = Instant::now();
-      use std::collections::hash_map::Entry::*;
-      match hm.entry(key){
-         Occupied(mut vec) => vec.get_mut().push(value),
-         Vacant(vacant) => {
-            let mut vec = Vec::with_capacity(4);
-            vec.push(value);
-            vacant.insert(vec);
-         },
-      }
-      // unsafe {
-      //    INDEX_INSERT_TOTAL_TIME += before.elapsed();
-      // }
-   }
 }
 
 impl RelIndexWrite for RelNoIndexType {
    type Key = ();
    type Value = usize;
 
+   fn index_insert(&mut self, _key: Self::Key, tuple_index: usize) {
+      self.push(tuple_index);
+   }
+}
+
+impl RelIndexMerge for RelNoIndexType {
    fn move_index_contents(ind1: &mut Self, ind2: &mut Self) {
       ind2.append(ind1);
-   }
-
-   fn index_insert(ind: &mut Self, _key: Self::Key, tuple_index: usize) {
-      ind.push(tuple_index);
    }
 }
 
@@ -137,18 +155,21 @@ impl<K: Eq + Hash, V: Hash + Eq> RelIndexWrite for LatticeIndexType<K, V>{
    type Value = V;
 
    #[inline(always)]
+   fn index_insert(&mut self, key: Self::Key, tuple_index: V) {
+      self.entry(key).or_default().insert(tuple_index);
+   }
+}
+
+impl<K: Eq + Hash, V: Hash + Eq> RelIndexMerge for LatticeIndexType<K, V>{
+   #[inline(always)]
    fn move_index_contents(hm1: &mut LatticeIndexType<K, V>, hm2: &mut LatticeIndexType<K, V>) {
       for (k,v) in hm1.drain(){
          let set = hm2.entry(k).or_default();
          set.extend(v);
       }
    }
-
-   #[inline(always)]
-   fn index_insert(hm: &mut Self, key: Self::Key, tuple_index: V) {
-      hm.entry(key).or_default().insert(tuple_index);
-   }
 }
+
 
 pub static mut MOVE_FULL_INDEX_CONTENTS_TOTAL_TIME : Duration = Duration::ZERO;
 pub static mut MOVE_NO_INDEX_CONTENTS_TOTAL_TIME : Duration = Duration::ZERO;
@@ -157,6 +178,16 @@ impl<K: Eq + Hash, V> RelIndexWrite for HashBrownRelFullIndexType<K, V>{
     type Key = K;
     type Value = V;
 
+   #[inline(always)]
+   fn index_insert(&mut self, key: Self::Key, value: V) {
+      self.insert(key, value);
+      // TODO undo this
+      // assert!(hm.insert(key, tuple_index).is_none(), 
+      //    "inserting duplicate index into RelFullIndexType, index:{}", tuple_index);
+   }
+}
+
+impl<K: Eq + Hash, V> RelIndexMerge for HashBrownRelFullIndexType<K, V> {
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
       if from.len() > to.len() {
@@ -169,14 +200,6 @@ impl<K: Eq + Hash, V> RelIndexWrite for HashBrownRelFullIndexType<K, V>{
       unsafe {
          MOVE_FULL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
       }
-   }
-
-   #[inline(always)]
-   fn index_insert(hm: &mut Self, key: Self::Key, value: V) {
-      hm.insert(key, value);
-      // TODO undo this
-      // assert!(hm.insert(key, tuple_index).is_none(), 
-      //    "inserting duplicate index into RelFullIndexType, index:{}", tuple_index);
    }
 }
 
