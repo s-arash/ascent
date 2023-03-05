@@ -1,7 +1,7 @@
 use std::{collections::{HashMap, HashSet}, ops::Index, rc::Rc};
 
 use itertools::Itertools;
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::ToTokens;
 use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned, parse_quote, Path, parse::Parser, parse_quote_spanned, parenthesized};
 
@@ -65,6 +65,7 @@ pub(crate) struct RelationMetadata{
    pub inititialization: Option<Rc<Expr>>,
    pub attributes: Rc<Vec<Attribute>>,
    pub ds_macro_path: Path,
+   pub ds_macro_args: TokenStream
 }
 
 pub(crate) struct IrRule {
@@ -228,17 +229,19 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       if ds_macro_path.len() > 1 {
          return Err(Error::new(rel.name.span(), "multiple `ds` attributes specified"));
       }
-      let ds_macro_path = if ds_macro_path.len() == 1 {
-         syn::parse2::<DsAttributeContents>(ds_macro_path[0].clone())?.path
+      let (ds_macro_path, ds_macro_args) = if ds_macro_path.len() == 1 {
+         let attr_contents = syn::parse2::<DsAttributeContents>(ds_macro_path[0].clone())?;
+         (attr_contents.path, attr_contents.args)
       } else {
-         parse_quote_spanned! {rel.name.span()=> ::ascent::rel}
+         (parse_quote_spanned! {rel.name.span()=> ::ascent::rel}, TokenStream::default())
       };
       relations_metadata.insert(
          rel_identity.clone(),
          RelationMetadata {
             inititialization: rel.initialization.clone().map(|i| Rc::new(i)),
             attributes: Rc::new(rel.attrs.iter().filter(|attr| attr.path.get_ident().map_or(true, |ident| !RECOGNIIZED_REL_ATTRS.iter().any(|ra| ident == ra))).cloned().collect_vec()),
-            ds_macro_path
+            ds_macro_path,
+            ds_macro_args
          }
       );
       // relations_no_indices.insert(rel_identity, rel_no_index);

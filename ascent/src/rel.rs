@@ -14,10 +14,10 @@ pub use rel_codegen;
 
 #[macro_export]
 macro_rules! rel {
-   ($name: ident, $field_types: ty, $indices: expr, ser) => {
+   ($name: ident, $field_types: ty, $indices: expr, ser, ()) => {
       ::std::vec::Vec<$field_types>
    };
-   ($name: ident, $field_types: ty, $indices: expr, par) => {
+   ($name: ident, $field_types: ty, $indices: expr, par, ()) => {
       ::ascent::boxcar::Vec<$field_types>
    };
 }
@@ -25,10 +25,10 @@ pub use rel;
 
 #[macro_export]
 macro_rules! rel_ind_common {
-   ($name: ident, $field_types: ty, $indices: expr, ser) => {
+   ($name: ident, $field_types: ty, $indices: expr, ser, ()) => {
       ()
    };
-   ($name: ident, $field_types: ty, $indices: expr, par) => {
+   ($name: ident, $field_types: ty, $indices: expr, par, ()) => {
       ()
    };
 }
@@ -36,10 +36,10 @@ pub use rel_ind_common;
 
 #[macro_export]
 macro_rules! rel_full_ind {
-   ($name: ident, $field_types: ty, $indices: expr, ser, $key: ty, $val: ty) => {
+   ($name: ident, $field_types: ty, $indices: expr, ser, (), $key: ty, $val: ty) => {
       ascent::internal::RelFullIndexType<$key, $val>
    };
-   ($name: ident, $field_types: ty, $indices: expr, par, $key: ty, $val: ty) => {
+   ($name: ident, $field_types: ty, $indices: expr, par, (), $key: ty, $val: ty) => {
       ascent::internal::CRelFullIndex<$key, $val>
    };
 }
@@ -47,11 +47,11 @@ pub use rel_full_ind;
 
 #[macro_export]
 macro_rules! rel_ind {
-   ($name: ident, $field_types: ty, $indices: expr, ser, $ind: expr, $key: ty, $val: ty) => {
+   ($name: ident, $field_types: ty, $indices: expr, ser, (), $ind: expr, $key: ty, $val: ty) => {
       // ascent::internal::RelIndexType1<$key, $val>
       ascent::rel::ToRelIndexType<$key, $val>
    };
-   ($name: ident, $field_types: ty, $indices: expr, par, $ind: expr, $key: ty, $val: ty) => {
+   ($name: ident, $field_types: ty, $indices: expr, par, (), $ind: expr, $key: ty, $val: ty) => {
       ascent::internal::CRelIndex<$key, $val>
    };
 }

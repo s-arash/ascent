@@ -6,7 +6,7 @@ pub mod internal;
 pub mod rel;
 pub mod aggregators;
 mod convert;
-mod rel_index_read;
+pub mod rel_index_read;
 mod c_rel_index;
 mod exps;
 mod c_rel_full_index;

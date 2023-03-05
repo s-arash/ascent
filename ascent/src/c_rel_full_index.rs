@@ -138,7 +138,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Sync> CRelIndexRead<'a> for CRelFull
 
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelFullIndexRead for CRelFullIndex<K, V> {
+impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelFullIndexRead<'a> for CRelFullIndex<K, V> {
    type Key = K;
 
    #[inline(always)]

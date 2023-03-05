@@ -77,7 +77,7 @@ impl<'a, T> RelIndexReadAll<'a> for &'a T where T: RelIndexReadAll<'a> {
    }
 }
 
-impl<'a, T> RelFullIndexRead for &'a T where T:RelFullIndexRead {
+impl<'a, T> RelFullIndexRead<'a> for &'a T where T:RelFullIndexRead<'a> {
    type Key = T::Key;
    #[inline(always)]
    fn contains_key(&self, key: &Self::Key) -> bool { (**self).contains_key(key) }

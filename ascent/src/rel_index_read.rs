@@ -14,7 +14,7 @@ pub trait RelIndexRead<'a>{
    type Value;
    type IteratorType: Iterator<Item = Self::Value> + Clone + 'a;
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType>;
-   fn len(&self) -> usize;
+   fn len(&'a self) -> usize;
 }
 
 pub trait CRelIndexRead<'a>{

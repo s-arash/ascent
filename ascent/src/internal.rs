@@ -61,9 +61,9 @@ pub trait CRelIndexWrite{
    fn index_insert(&self, key: Self::Key, value: Self::Value);
 }
 
-pub trait RelFullIndexRead {
+pub trait RelFullIndexRead<'a> {
    type Key;
-   fn contains_key(&self, key: &Self::Key) -> bool;
+   fn contains_key(&'a self, key: &Self::Key) -> bool;
 }
 
 
@@ -215,7 +215,7 @@ impl <K: Clone + Hash + Eq, V> RelFullIndexWrite for HashBrownRelFullIndexType<K
    }
 }
 
-impl<K: Hash + Eq, V> RelFullIndexRead for HashBrownRelFullIndexType<K, V> {
+impl<'a, K: Hash + Eq, V> RelFullIndexRead<'a> for HashBrownRelFullIndexType<K, V> {
     type Key = K;
 
    fn contains_key(&self, key: &Self::Key) -> bool {
