@@ -191,10 +191,11 @@ impl IrRelation {
 
 pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: bool) -> syn::Result<AscentIr>{
    let ir_rules : Vec<(IrRule, Vec<IrRelation>)> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
-   let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
-   let mut relations_full_indices = HashMap::new();
+   let num_relations = prog.relations.len();
+   let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::with_capacity(num_relations);
+   let mut relations_full_indices = HashMap::with_capacity(num_relations);
    let mut relations_initializations = HashMap::new();
-   let mut relations_metadata = HashMap::new();
+   let mut relations_metadata = HashMap::with_capacity(num_relations);
    // let mut relations_no_indices = HashMap::new();
    let mut lattices_full_indices = HashMap::new();
    for rel in prog.relations.iter(){
@@ -244,7 +245,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
          relations_ir_relations.entry(extra_rel.relation.clone()).or_default().insert(extra_rel.clone());
       }
    }
-   let declaration = prog.declaration.clone().unwrap_or(parse2(quote! {pub struct AscentProgram;}).unwrap());
+   let declaration = prog.declaration.clone().unwrap_or_else(|| parse2(quote! {pub struct AscentProgram;}).unwrap());
    Ok(AscentIr {
       rules: ir_rules.into_iter().map(|(rule, extra_rels)| rule).collect_vec(),
       relations_ir_relations,
@@ -336,7 +337,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             let ir_bcl = IrBodyClause {
                rel: ir_rel,
                args: bcl.args.iter().cloned().map(BodyClauseArg::unwrap_expr).collect(),
-               rel_args_span: bcl.rel.span().join(bcl.args.span()).unwrap_or(bcl.rel.span()),
+               rel_args_span: bcl.rel.span().join(bcl.args.span()).unwrap_or_else(|| bcl.rel.span()),
                args_span: bcl.args.span(),
                cond_clauses: bcl.cond_clauses.clone()
             };
@@ -382,7 +383,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
    let mut head_clauses = vec![];
    for hcl_node in rule.head_clauses.iter(){
       let hcl_node = hcl_node.clause();
-      let rel = prog.relations.iter().filter(|r| r.name.to_string() == hcl_node.rel.to_string()).next();
+      let rel = prog.relations.iter().filter(|r| hcl_node.rel == r.name.to_string()).next();
       let rel = match rel {
          Some(rel) => rel,
          None => return Err(Error::new(hcl_node.rel.span(), format!("relation {} not defined", hcl_node.rel))),
@@ -447,7 +448,7 @@ pub fn get_indices_given_grounded_variables(args: &[Expr], vars: &[Ident]) -> Ve
 }
 
 pub(crate) fn prog_get_relation<'a>(prog: &'a AscentProgram, name: &Ident, arity: usize) -> syn::Result<&'a RelationNode> {
-   let relation = prog.relations.iter().filter(|r| r.name.to_string() == name.to_string()).next();
+   let relation = prog.relations.iter().filter(|r| *name == r.name.to_string()).next();
    match relation {
       Some(rel) => {
          if rel.field_types.len() != arity {
