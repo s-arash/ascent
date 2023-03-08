@@ -160,7 +160,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       use core::cmp::PartialEq;
       use ascent::internal::RelIndexRead;
       use ascent::internal::RelIndexReadAll;
-      use ascent::to_rel_index::ToRelIndex;
+      use ascent::to_rel_index::ToRelIndex0;
       use ascent::tuple_of_borrowed::TupleOfBorrowed;
       #more_usings
       #par_usings
@@ -417,7 +417,7 @@ fn rel_ds_macro_input(rel: &RelationIdentity, mir: &AscentMir) -> TokenStream {
       .map(|ir_rel| rel_index_to_macro_input(&ir_rel.indices));
    let args = &mir.relations_metadata[rel].ds_macro_args;
    let par: Ident = if mir.is_parallel { parse_quote_spanned! {span=> par} } else { parse_quote_spanned! {span=> ser} };
-   let name = Ident::new(&format!("{}_{}", mir.declaration.ident, rel.name), rel.name.span());
+   let name = Ident::new(&format!("{}_{}", mir.declaration.ident, rel.name), span);
    quote! {
       #name,
       #field_types,
@@ -476,9 +476,9 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
             });
          },
          Either::Right(ir_rel) => {
-            let delta_expr = expr_for_rel_mut(&MirRelation::from(ir_rel.clone(), Delta), mir);
-            let total_expr = expr_for_rel_mut(&MirRelation::from(ir_rel.clone(), Total), mir);
-            let new_expr = expr_for_rel_mut(&MirRelation::from(ir_rel.clone(), New), mir);
+            let delta_expr = expr_for_rel_write(&MirRelation::from(ir_rel.clone(), Delta), mir);
+            let total_expr = expr_for_rel_write(&MirRelation::from(ir_rel.clone(), Total), mir);
+            let new_expr = expr_for_rel_write(&MirRelation::from(ir_rel.clone(), New), mir);
 
             shift_delta_to_total_new_to_delta.push(quote_spanned!{ir_name.span()=>
                // ::ascent::internal::RelIndexMerge::move_index_contents(#delta_var_name, &mut #total_var_name);
@@ -702,7 +702,7 @@ fn compile_update_indices_function_body(mir: &AscentMir) -> proc_macro2::TokenSt
       let ind_common = rel_ind_common_var_name(r);
       let rel_index_write_trait = rel_index_write_trait.clone().with_span(r.name.span());
       let _self = quote_spanned!{r.name.span().resolved_at(Span::call_site())=> self };
-      let to_rel_index_fn = if !par { quote!{to_rel_index_write} } else { quote!{to_rel_index} };
+      let to_rel_index_fn = if !par { quote!{to_rel_index_write} } else { quote!{to_c_rel_index_write} };
       let to_rel_index = if r.is_lattice { quote!{} } else {
          quote! {.#to_rel_index_fn(#_ref #_self.#ind_common) }
       };
@@ -752,7 +752,7 @@ fn compile_update_indices_function_body(mir: &AscentMir) -> proc_macro2::TokenSt
    }
 
    quote! {
-      use ascent::to_rel_index::ToRelIndex;
+      use ascent::to_rel_index::ToRelIndex0;
       use #rel_index_write_trait;
       #(#res)*
    }
@@ -1169,9 +1169,9 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
          for rel_ind in rel_indices.iter(){
             if rel_ind.is_full_index() {continue};
             let var_name = if !mir.is_parallel {
-                expr_for_rel_mut(&MirRelation::from(rel_ind.clone(), New), mir)
+               expr_for_rel_write(&MirRelation::from(rel_ind.clone(), New), mir)
             } else {
-               expr_for_rel(&MirRelation::from(rel_ind.clone(), New), mir)
+               expr_for_c_rel_write(&MirRelation::from(rel_ind.clone(), New), mir)
             };
             // let var_name = ir_relation_version_var_name(&rel_ind.ir_name(), New);
             let args_tuple : Vec<Expr> = rel_ind.indices.iter().map(|&i| {
@@ -1198,7 +1198,7 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
       // let head_rel_full_index_var_name_delta = ir_relation_version_var_name(&head_rel_full_index.ir_name(), Delta);
       // let head_rel_full_index_var_name_total = ir_relation_version_var_name(&head_rel_full_index.ir_name(), Total);
 
-      let expr_for_rel_maybe_mut = if mir.is_parallel { expr_for_rel } else { expr_for_rel_mut };
+      let expr_for_rel_maybe_mut = if mir.is_parallel { expr_for_c_rel_write } else { expr_for_rel_write };
       let head_rel_full_index_expr_new = expr_for_rel_maybe_mut(&MirRelation::from(head_rel_full_index.clone(), New), mir);
       let head_rel_full_index_expr_delta = expr_for_rel(&MirRelation::from(head_rel_full_index.clone(), Delta), mir);
       let head_rel_full_index_expr_total = expr_for_rel(&MirRelation::from(head_rel_full_index.clone(), Total), mir);
@@ -1392,17 +1392,23 @@ fn expr_for_rel(rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream 
 }
 
 // TODO clean up
-fn expr_for_rel_mut(mir_rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream {
+fn expr_for_rel_write(mir_rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream {
    let var = mir_rel.var_name();
-
-   let needs_borrow = false;
-   let borrow = if needs_borrow {quote!{&mut}} else {quote!{}};
-
    if mir_rel.relation.is_lattice {
-      if needs_borrow {quote! { #borrow #var }} else {quote! { (#borrow #var) }}
+      quote!{ #var }
    } else {
       let rel_ind_common = ir_relation_version_var_name(&rel_ind_common_var_name(&mir_rel.relation), mir_rel.version);
       quote! { #var.to_rel_index_write(&mut #rel_ind_common) }
+   }
+}
+
+fn expr_for_c_rel_write(mir_rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream {
+   let var = mir_rel.var_name();
+   if mir_rel.relation.is_lattice {
+      quote!{ #var }
+   } else {
+      let rel_ind_common = ir_relation_version_var_name(&rel_ind_common_var_name(&mir_rel.relation), mir_rel.version);
+      quote! { #var.to_c_rel_index_write(&#rel_ind_common) }
    }
 }
 
@@ -1419,13 +1425,17 @@ fn clause_var_assignments(
    let mut any_vars = false;
    let mut vars_count = 0;
    for (ind_in_tuple, var) in vars {
+      let var_type_ascription = {
+         let ty = &rel.relation.field_types[ind_in_tuple];
+         quote! { : & #ty}
+      };
       any_vars = true;
       vars_count += 1;
       match &rel.val_type {
          IndexValType::Reference => {
             let ind = syn::Index::from(ind_in_tuple);
             assignments.push(quote! {
-               let #var = &__row.#ind;
+               let #var #var_type_ascription = &__row.#ind;
             })
          },
          IndexValType::Direct(inds) => {
@@ -1434,7 +1444,7 @@ fn clause_var_assignments(
 
             assignments.push(quote! {
                // let #var = &#val_ident.#ind;
-               let #var = #val_ident.#ind;
+               let #var #var_type_ascription = #val_ident.#ind;
             })
          },
       }  

@@ -206,14 +206,14 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexM
 
 impl<'a, K: 'a + Clone + Hash + Eq, V: Clone + 'a> RelIndexReadAll<'a> for CRelIndex<K, V> {
    type Key = &'a K;
-   type Value = V;
+   type Value = &'a V;
 
-   type ValueIteratorType = std::iter::Cloned<std::slice::Iter<'a, V>>;
+   type ValueIteratorType = std::slice::Iter<'a, V>;
+
    type AllIteratorType = Box<dyn Iterator<Item = (&'a K, Self::ValueIteratorType)> + 'a>;
 
    fn iter_all(&'a self) -> Self::AllIteratorType {
-      // let res = DashMapViewParIter::new(self.unwrap_frozen()).map(|(k, v)| (k, v.iter().cloned()));
-      let res = self.unwrap_frozen().iter().map(|(k, v)| (k, v.iter().cloned()));
+      let res = self.unwrap_frozen().iter().map(|(k, v)| (k, v.iter()));
       Box::new(res) as _
    }
 }
