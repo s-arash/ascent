@@ -301,7 +301,7 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
       Expr::Loop(l) => block_visit_free_vars_mbm(reft([l.body]), visitor),
       Expr::Macro(m) => {
          eprintln!("WARNING: cannot determine free varaibles of macro invocations. macro invocation:\n{}", 
-                   expr.to_token_stream().to_string())
+                   expr.to_token_stream())
       },
       Expr::Match(m) => {
          visit!(m.expr);

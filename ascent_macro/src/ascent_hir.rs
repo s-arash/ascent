@@ -71,7 +71,7 @@ pub(crate) struct RelationMetadata{
 pub(crate) struct IrRule {
    pub head_clauses: Vec<IrHeadClause>,
    pub body_items: Vec<IrBodyItem>,
-   pub is_simple_join: bool,
+   pub simple_join_start_index: Option<usize>
 }
 
 pub(crate) fn ir_rule_summary(rule: &IrRule) -> String {
@@ -195,10 +195,11 @@ const RECOGNIIZED_REL_ATTRS: [&str; 1] = ["ds"];
 
 pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: bool) -> syn::Result<AscentIr>{
    let ir_rules : Vec<(IrRule, Vec<IrRelation>)> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
-   let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::new();
-   let mut relations_full_indices = HashMap::new();
+   let num_relations = prog.relations.len();
+   let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::with_capacity(num_relations);
+   let mut relations_full_indices = HashMap::with_capacity(num_relations);
    let mut relations_initializations = HashMap::new();
-   let mut relations_metadata = HashMap::new();
+   let mut relations_metadata = HashMap::with_capacity(num_relations);
    // let mut relations_no_indices = HashMap::new();
    let mut lattices_full_indices = HashMap::new();
    for rel in prog.relations.iter(){
@@ -262,7 +263,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
          relations_ir_relations.entry(extra_rel.relation.clone()).or_default().insert(extra_rel.clone());
       }
    }
-   let declaration = prog.declaration.clone().unwrap_or(parse2(quote! {pub struct AscentProgram;}).unwrap());
+   let declaration = prog.declaration.clone().unwrap_or_else(|| parse2(quote! {pub struct AscentProgram;}).unwrap());
    Ok(AscentIr {
       rules: ir_rules.into_iter().map(|(rule, extra_rels)| rule).collect_vec(),
       relations_ir_relations,
@@ -283,38 +284,40 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
       for v in new_vars.into_iter() {
          if grounded_vars.contains(&v) {
             // TODO may someday this will work
-            // let other_var = grounded_vars.iter().find(|&x| x == &v).unwrap();
-            // let other_err = Error::new(other_var.span(), "");
-            let err = Error::new(v.span(), format!("'{}' shadows another variable with the same name", v));
-            // err.combine(other_err);
+            let other_var = grounded_vars.iter().find(|&x| x == &v).unwrap();
+            let other_err = Error::new(other_var.span(), "variable being shadowed");
+            let mut err = Error::new(v.span(), format!("'{}' shadows another variable with the same name", v));
+            err.combine(other_err);
             return Err(err);
          }
          grounded_vars.push(v);
       }
       Ok(())
    }
-   let mut first_two_items_all_args_vars = true;
-   let mut first_two_items_simple_clauses = true;
+
+   let first_clause_ind = rule.body_items.iter().enumerate().find(|(_, bi)| matches!(bi, BodyItemNode::Clause(..))).map(|(i, _)| i);
+   let mut first_two_clauses_simple = first_clause_ind.is_some() &&
+      matches!(rule.body_items.get(first_clause_ind.unwrap() + 1), Some(BodyItemNode::Clause(..)));
    for (bitem_ind, bitem) in rule.body_items.iter().enumerate() {
       match bitem {
          BodyItemNode::Clause(ref bcl) => {
-            if bitem_ind == 0 && bcl.cond_clauses.iter().any(|c| matches!(c, &CondClause::IfLet(_)))
+            if first_clause_ind == Some(bitem_ind) && bcl.cond_clauses.iter().any(|c| matches!(c, &CondClause::IfLet(_)))
             {
-               first_two_items_simple_clauses = false;
+               first_two_clauses_simple = false;
             }
 
-            if bitem_ind == 1 && first_two_items_simple_clauses{
+            if first_clause_ind.map(|x| x + 1) == Some(bitem_ind) && first_two_clauses_simple{
                let mut self_vars = HashSet::new();
                for var in bcl.args.iter().filter_map(|arg| expr_to_ident(arg.unwrap_expr_ref())) {
                   if !self_vars.insert(var) {
-                     first_two_items_simple_clauses = false;
+                     first_two_clauses_simple = false;
                   }
                }
                for cond_cl in bcl.cond_clauses.iter(){
                   let cond_expr = cond_cl.expr();
                   let expr_idents = expr_get_vars(&cond_expr);
                   if !expr_idents.iter().all(|v| self_vars.contains(v)){
-                     first_two_items_simple_clauses = false;
+                     first_two_clauses_simple = false;
                      break;
                   }
                   self_vars.extend(cond_cl.bound_vars());
@@ -325,13 +328,16 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
                if let Some(var) = expr_to_ident(arg.unwrap_expr_ref()) {
                   if grounded_vars.contains(&var){
                      indices.push(i);
+                     if first_clause_ind == Some(bitem_ind) {
+                        first_two_clauses_simple = false;
+                     }
                   } else {
                      grounded_vars.push(var);
                   }
                } else {
                   indices.push(i);
-                  if bitem_ind < 2 {
-                     first_two_items_all_args_vars = false;
+                  if bitem_ind < 2 + first_clause_ind.unwrap_or(0) {
+                     first_two_clauses_simple = false;
                   }
                }
             }
@@ -349,30 +355,21 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             let ir_bcl = IrBodyClause {
                rel: ir_rel,
                args: bcl.args.iter().cloned().map(BodyClauseArg::unwrap_expr).collect(),
-               rel_args_span: bcl.rel.span().join(bcl.args.span()).unwrap_or(bcl.rel.span()),
+               rel_args_span: bcl.rel.span().join(bcl.args.span()).unwrap_or_else(|| bcl.rel.span()),
                args_span: bcl.args.span(),
                cond_clauses: bcl.cond_clauses.clone()
             };
             body_items.push(IrBodyItem::Clause(ir_bcl));
          },
          BodyItemNode::Generator(ref gen) => {
-            if bitem_ind <= 1 {
-               first_two_items_simple_clauses = false;
-            }
             extend_grounded_vars(&mut grounded_vars, pattern_get_vars(&gen.pattern))?;
             body_items.push(IrBodyItem::Generator(gen.clone()));
          },
          BodyItemNode::Cond(ref cl) => {
             body_items.push(IrBodyItem::Cond(cl.clone()));
-            if bitem_ind <= 1 {
-               first_two_items_simple_clauses = false;
-            }
             extend_grounded_vars(&mut grounded_vars, cl.bound_vars())?;
          },
          BodyItemNode::Agg(ref agg) => {
-            if bitem_ind <= 1 {
-               first_two_items_simple_clauses = false;
-            }
             extend_grounded_vars(&mut grounded_vars, pattern_get_vars(&agg.pat))?;
             let indices = agg.rel_args.iter().enumerate().filter(|(i, expr)| {
                if is_wild_card(expr) {
@@ -404,7 +401,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
    let mut head_clauses = vec![];
    for hcl_node in rule.head_clauses.iter(){
       let hcl_node = hcl_node.clause();
-      let rel = prog.relations.iter().filter(|r| r.name.to_string() == hcl_node.rel.to_string()).next();
+      let rel = prog.relations.iter().filter(|r| hcl_node.rel == r.name.to_string()).next();
       let rel = match rel {
          Some(rel) => rel,
          None => return Err(Error::new(hcl_node.rel.span(), format!("relation {} not defined", hcl_node.rel))),
@@ -419,29 +416,29 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
       };
       head_clauses.push(head_clause);
    }
-   let is_simple_join = first_two_items_all_args_vars && first_two_items_simple_clauses && body_items.len() >= 2; 
-   let simple_join_ir_relations = if is_simple_join {
-      let (bcl1, bcl2) = match (&body_items[0], &body_items[1]) {
-         (IrBodyItem::Clause(bcl1), IrBodyItem::Clause(bcl2)) => (bcl1, bcl2),
+   
+   let is_simple_join = first_two_clauses_simple && body_items.len() >= 2;
+   let simple_join_start_index = if is_simple_join {first_clause_ind} else {None};
+
+   let simple_join_ir_relations = if let Some(start_ind) = simple_join_start_index {
+      let (bcl1, bcl2) = match &body_items[start_ind..start_ind + 2] {
+         [IrBodyItem::Clause(bcl1), IrBodyItem::Clause(bcl2)] => (bcl1, bcl2),
           _ => panic!("incorrect simple join handling in ascent_hir")
       };  
       let bcl2_vars = bcl2.args.iter().filter_map(expr_to_ident).collect_vec();
       let indices = get_indices_given_grounded_variables(&bcl1.args, &bcl2_vars);
       let new_cl1_ir_relation = IrRelation::new(bcl1.rel.relation.clone(), indices);
-      // TODO cleanup
-      // let new_cl2_ir_relation = IrRelation::new(bcl2.rel.relation.clone(), vec![]);
-
-      vec![new_cl1_ir_relation] //, new_cl2_ir_relation]
+      vec![new_cl1_ir_relation]
    } else {vec![]};
 
-   if is_simple_join {
-      if let [IrBodyItem::Clause(cl1), IrBodyItem::Clause(cl2)] = &mut body_items[0..=1] {
+   if let Some(start_ind) = simple_join_start_index {
+      if let IrBodyItem::Clause(cl1) = &mut body_items[start_ind] {
          cl1.rel = simple_join_ir_relations[0].clone();
       }
    }
-   // println!("is_simple_join is {} for rule {}", is_simple_join, rule_node_summary(rule));
+
    Ok((IrRule {
-      is_simple_join,
+      simple_join_start_index,
       head_clauses, 
       body_items, 
    }, vec![]))
@@ -469,7 +466,7 @@ pub fn get_indices_given_grounded_variables(args: &[Expr], vars: &[Ident]) -> Ve
 }
 
 pub(crate) fn prog_get_relation<'a>(prog: &'a AscentProgram, name: &Ident, arity: usize) -> syn::Result<&'a RelationNode> {
-   let relation = prog.relations.iter().filter(|r| r.name.to_string() == name.to_string()).next();
+   let relation = prog.relations.iter().filter(|r| *name == r.name.to_string()).next();
    match relation {
       Some(rel) => {
          if rel.field_types.len() != arity {

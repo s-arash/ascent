@@ -141,6 +141,48 @@ fn bench_par_iter() {
       }
    });
    println!("par_bridge took {:?}", before.elapsed());
+}
+
+#[test]
+fn bench_par_flat_map() {
+
+   fn calc_sum(x: usize) -> usize {
+      let mut res = 0;
+      for i in 0..=(x >> 5) {
+         res += i;
+      }
+      if res >= usize::MAX {
+         panic!("boo");
+      }
+      res
+   }
+
+   let len = 40;
+   let mut arr = Vec::with_capacity(len);
+
+   for _ in 0..len {
+      let vec = (0..1000).collect::<Vec<_>>();
+      arr.push(vec);
+   }
+
+   
+   let before = Instant::now();
+   arr.iter().flat_map(|v| v.iter()).for_each(|x| {
+      calc_sum(*x);
+   });
+   println!("ser flat_map took {:?}", before.elapsed());
+
+   let before = Instant::now();
+   arr.par_iter().flat_map(|v| v.par_iter()).for_each(|x| {
+      calc_sum(*x);
+   });
+   println!("par flat_map took {:?}", before.elapsed());
+
+   let before = Instant::now();
+   arr.par_iter().flat_map_iter(|v| v.iter()).for_each(|x| {
+      calc_sum(*x);
+   });
+   println!("par flat_map_iter took {:?}", before.elapsed());
 
 }
 

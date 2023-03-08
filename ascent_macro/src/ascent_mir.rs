@@ -5,7 +5,7 @@ use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap:
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
-use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary, IndexValType}, ascent_mir::MirRelationVersion::*, ascent_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
+use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary, IndexValType}, ascent_mir::MirRelationVersion::*, ascent_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type, subsumes, intersects}, syn_utils::pattern_get_vars};
 use crate::ascent_syntax::{CondClause, GeneratorNode, RelationIdentity};
 use crate::{ascent_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, AscentIr}};
 
@@ -48,7 +48,7 @@ pub(crate) struct MirRule {
    // TODO rename to head_clauses
    pub head_clause: Vec<IrHeadClause>,
    pub body_items: Vec<MirBodyItem>,
-   pub has_simple_join: bool,
+   pub simple_join_start_index: Option<usize>,
    pub reorderable: bool
 }
 
@@ -63,10 +63,11 @@ pub(crate) fn mir_rule_summary(rule: &MirRule) -> String {
          MirBodyItem::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
       }
    }
-   format!("{} <-- {}{}",
+   format!("{} <-- {}{simple_join}{reorderable}",
             rule.head_clause.iter().map(|hcl| hcl.rel.name.to_string()).join(", "),
             rule.body_items.iter().map(bitem_to_str).join(", "),
-            if rule.has_simple_join {" [SIMPLE JOIN]"} else {""})
+            simple_join = if rule.simple_join_start_index.is_some() {" [SIMPLE JOIN]"} else {""},
+            reorderable = if rule.simple_join_start_index.is_some() && !rule.reorderable {" [NOT REORDERABLE]"} else {""})
 }
 
 #[derive(Clone)]
@@ -82,6 +83,19 @@ impl MirBodyItem {
       match self {
          MirBodyItem::Clause(cl) => cl,
          _ => panic!("MirBodyItem: unwrap_clause called on non_clause")
+      }
+   }
+
+   pub fn bound_vars(&self) -> Vec<Ident> {
+      match self {
+         MirBodyItem::Clause(cl) => {
+            let cl_vars = cl.args.iter().filter_map(expr_to_ident);
+            let cond_cl_vars = cl.cond_clauses.iter().flat_map(|cc| cc.bound_vars());
+            cl_vars.chain(cond_cl_vars).collect()
+         },
+         MirBodyItem::Generator(gen) => pattern_get_vars(&gen.pattern),
+         MirBodyItem::Cond(cond) => cond.bound_vars(),
+         MirBodyItem::Agg(agg) => pattern_get_vars(&agg.pat),
       }
    }
 }
@@ -172,7 +186,7 @@ impl MirRelationVersion {
 }
 
 fn get_hir_dep_graph(hir: &AscentIr) -> Vec<(usize,usize)> {
-   let mut relations_to_rules_in_head : HashMap<&RelationIdentity, HashSet<usize>> = HashMap::new();
+   let mut relations_to_rules_in_head : HashMap<&RelationIdentity, HashSet<usize>> = HashMap::with_capacity(hir.rules.len());
    for (i, rule) in hir.rules.iter().enumerate(){
       for head_rel in rule.head_clauses.iter().map(|hcl| &hcl.rel){
          relations_to_rules_in_head.entry(head_rel).or_default().insert(i);
@@ -215,11 +229,6 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
          for bitem in rule.body_items.iter() {
             if let Some(rel) = bitem.rel(){
                body_only_relations.entry(rel.relation.clone()).or_default().insert(rel.clone());
-               if rule.is_simple_join {
-                  // body_only_relations.entry(rel.relation.clone()).or_default().insert(hir.relations_full_indices[&rel.relation].clone());
-                  // TODO we can use only no_index, for that codegen needs to be updated.
-                  // body_only_relations.entry(rel.relation.clone()).or_default().insert(hir.relations_no_indices[&rel.relation].clone());
-               }
             }
          }
 
@@ -269,9 +278,9 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
       mir_sccs.push(mir_scc);
    }
 
-   let mut sccs_dep_graph = HashMap::new();
    sccs.reverse();
    let sccs_nodes_count = sccs.node_indices().count();
+   let mut sccs_dep_graph = HashMap::with_capacity(sccs_nodes_count);
    for n in sccs.node_indices() {
       //the nodes in the sccs graph is in reverse topological order, so we do this 
       sccs_dep_graph.insert(sccs_nodes_count - n.index() - 1, sccs.neighbors(n).map(|n| sccs_nodes_count - n.index() - 1).collect());
@@ -354,8 +363,8 @@ fn compile_hir_rule_to_mir_rules_old(rule: &IrRule, dynamic_relations: &HashSet<
       .map(|bcls| MirRule {
          body_items: bcls,
          head_clause: rule.head_clauses.clone(),
-         has_simple_join: rule.is_simple_join,
-         reorderable: rule.is_simple_join
+         simple_join_start_index: rule.simple_join_start_index,
+         reorderable: rule.simple_join_start_index == Some(0)
       }).collect()
 }
 
@@ -377,7 +386,7 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
    }
 
    // TODO is it worth it?
-   fn versions(dynamic_cls: &[usize], is_simple_join: bool) -> Vec<Vec<MirRelationVersion>> {
+   fn versions(dynamic_cls: &[usize], simple_join_start_index: Option<usize>) -> Vec<Vec<MirRelationVersion>> {
       fn remove_total_delta_at_index(ind: usize, res: &mut Vec<Vec<MirRelationVersion>>) {
          let mut i = 0;
          while i < res.len() {
@@ -394,9 +403,9 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
       let mut res = versions_base(count);
       let no_total_delta_at_beginning = false;
       if no_total_delta_at_beginning {
-         if is_simple_join {
-            remove_total_delta_at_index(0, &mut res);
-            remove_total_delta_at_index(1, &mut res);
+         if let Some(ind) = simple_join_start_index {
+            remove_total_delta_at_index(ind, &mut res);
+            remove_total_delta_at_index(ind + 1, &mut res);
          } else if dynamic_cls.get(0) == Some(&0) {
             remove_total_delta_at_index(0, &mut res);
          }
@@ -434,10 +443,9 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
       _ => None,
    }).collect_vec();
 
-   let version_combinations = if dynamic_cls.len() == 0 {vec![vec![]]} else {versions(&dynamic_cls[..], rule.is_simple_join)};
+   let version_combinations = if dynamic_cls.len() == 0 {vec![vec![]]} else {versions(&dynamic_cls[..], rule.simple_join_start_index)};
 
-   // println!("version_combos: \n{}", version_combinations.iter().map(|combo| combo.iter().map(|v| format!("{v:?}")).join(", ")).join("\n"));
-   let mut mir_body_items = Vec::new();
+   let mut mir_body_items = Vec::with_capacity(version_combinations.len());
 
    for version_combination in version_combinations {
       let versions = dynamic_cls.iter().zip(version_combination)
@@ -447,11 +455,19 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
       mir_body_items.push(mir_bodys)
    }
 
-   mir_body_items.into_iter()
-      .map(|bcls| MirRule {
+   mir_body_items.into_iter().map(|bcls| {
+
+      // rule is reorderable if it is a simple join and the second clause does not depend on items 
+      // before the first clause (i.e., let z = &1, foo(x, y), bar(y, z) is not reorderable)
+      let reorderable = rule.simple_join_start_index.map_or(false, |ind| {
+         let pre_first_clause_vars = bcls.iter().take(ind).flat_map(MirBodyItem::bound_vars);
+         !intersects(pre_first_clause_vars, bcls[ind + 1].bound_vars().into_iter())
+      });
+      MirRule {
          body_items: bcls,
          head_clause: rule.head_clauses.clone(),
-         has_simple_join: rule.is_simple_join,
-         reorderable: rule.is_simple_join
-      }).collect()
+         simple_join_start_index: rule.simple_join_start_index,
+         reorderable
+      }
+   }).collect()
 }

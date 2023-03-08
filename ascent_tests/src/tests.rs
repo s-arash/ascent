@@ -737,6 +737,56 @@ fn test_ascent_simple_join3(){
 }
 
 #[test]
+fn test_ascent_simple_join4() {
+   
+   #[derive(Default, Clone, Copy)]
+   struct Prop { transitive: bool, reflexive: bool, symmetric: bool }
+   let no_prop = Prop::default();
+
+   let input_rel = vec![(1, 2), (2, 3)];
+
+   let test_cases = vec![
+      (Prop { transitive: true, ..no_prop }, vec![(1, 2), (2, 3), (1, 3)]),
+      (Prop { reflexive: true, ..no_prop }, vec![(1, 2), (2, 3), (1, 1), (2, 2), (3, 3)]),
+      (Prop { symmetric: true, ..no_prop }, vec![(1, 2), (2, 3), (3, 2), (2, 1)]),
+      (Prop { reflexive: true, transitive: true, symmetric: true }, vec![(1, 2), (2, 3), (1, 3), (1, 1), (2, 2), (3, 3), (2, 1), (3, 2), (3, 1)])
+   ];
+
+   for (prop, expected) in test_cases {
+      let res = ascent_run_m_par! {
+         relation rel(i32, i32) = input_rel.iter().cloned().collect();
+
+         rel(y, x) <-- if prop.symmetric, rel(x, y);
+         rel(y, y), rel(x, x) <-- if prop.reflexive, rel(x, y);
+         rel(x, z) <-- if prop.transitive, rel(x, y), rel(y, z);
+      };
+      assert_rels_eq!(res.rel, expected);
+   }
+}
+
+#[test]
+fn test_ascent_simple_join5() {
+   let res = ascent_run_m_par! {
+      relation foo(i32, i32);
+      foo(1,2), foo(2, 3);
+      foo(x, z) <-- let x = &42, foo(x, y), foo(y, z);
+
+      relation bar(i32, i32);
+      bar(1, 2), bar(2, 3);
+      bar(x, z) <-- let z = &42, bar(x, y), bar(y, z);
+
+      relation baz(i32, i32);
+      baz(x, y) <-- foo(x, y), bar(x, y);
+      baz(x, z) <-- let _ = 42, if let Some(w) = Some(42), baz(x, y), baz(y, z);
+      
+   };
+
+   assert_rels_eq!(res.foo, [(1, 2), (2, 3)]);
+   assert_rels_eq!(res.bar, [(1, 2), (2, 3)]);
+   assert_rels_eq!(res.baz, [(1, 2), (2, 3), (1, 3)]);
+}
+
+#[test]
 fn test_ascent_wildcards(){
    let res = ascent_run_m_par!{
       relation foo(i32, i32, i32);
