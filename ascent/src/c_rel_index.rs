@@ -221,6 +221,12 @@ pub struct DashMapViewParIter<'a, K, V, S> {
    shards: &'a [RwLock<hashbrown::HashMap<K, SharedValue<V>, S>>]
 }
 
+impl<'a, K, V, S> Clone for DashMapViewParIter<'a, K, V, S> {
+   fn clone(&self) -> Self {
+      Self { shards: self.shards }
+   }
+}
+
 impl<'a, K: Eq + Hash, V, S: BuildHasher + Clone> DashMapViewParIter<'a, K, V, S> {
    pub fn new(v: &'a ReadOnlyView<K, V, S>) -> Self {
       Self {
@@ -279,7 +285,7 @@ where
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: Clone + 'a + Sync + Send> CRelIndexReadAll<'a> for CRelIndex<K, V> {
-   type Key = K;
+   type Key = &'a K;
    type Value = &'a V;
 
    type ValueIteratorType = rayon::slice::Iter<'a, V>;

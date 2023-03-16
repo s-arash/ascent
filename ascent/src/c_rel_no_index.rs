@@ -133,7 +133,7 @@ impl<'a, V: 'a> RelIndexReadAll<'a> for CRelNoIndex<V> {
 }
 
 impl<'a, V: 'a + Sync + Send> CRelIndexReadAll<'a> for CRelNoIndex<V> {
-   type Key = ();
+   type Key = &'a ();
    type Value = &'a V;
 
    type ValueIteratorType = <Self as CRelIndexRead<'a>>::IteratorType;

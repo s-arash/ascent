@@ -18,7 +18,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    for (rel, rel_indices) in mir.relations_ir_relations.iter(){
       let name = &rel.name;
       let rel_attrs = &mir.relations_metadata[rel].attributes;
-      let rel_indices_comment = format!("\nphysical indices:\n {}", 
+      let rel_indices_comment = format!("\nlogical indices: {}", 
          rel_indices.iter().map(|ind| format!("{}", ind.ir_name())).join("; "));
       let rel_type = rel_type(rel, mir);
       let rel_ind_common = rel_ind_common_var_name(rel);
@@ -55,18 +55,10 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    }
 
    let sccs_ordered = &mir.sccs;
-   let mut scc_time_fields = vec![];
-   let mut scc_time_field_defaults = vec![];
    let mut rule_time_fields = vec![];
    let mut rule_time_fields_defaults = vec![];
    for i in 0..mir.sccs.len(){
       let name = scc_time_field_name(i);
-      scc_time_fields.push(quote!{
-         pub #name: std::time::Duration,
-      });
-      scc_time_field_defaults.push(quote!{
-         #name: std::time::Duration::ZERO,
-      });
       for (rule_ind, rule) in mir.sccs[i].rules.iter().enumerate() {
          let name = rule_time_field_name(i, rule_ind);
          rule_time_fields.push(quote!{
@@ -89,7 +81,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          {
             let _scc_start_time = ::ascent::internal::Instant::now();
             #scc_compiled
-            _self.#scc_time_field_name += _scc_start_time.elapsed();
+            _self.scc_times[#i] += _scc_start_time.elapsed();
          }
       });
    }
@@ -239,16 +231,18 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       rel_codegens.push(quote_spanned!{ macro_path.span()=> #macro_path::rel_codegen!{#macro_input} });
    }
 
-
+   let sccs_count = sccs_ordered.len();
    let res = quote! {
       #(#rel_codegens)*
 
       #(#struct_attrs)*
       #vis struct #struct_name #generics {
          #(#relation_fields)*
-         #(#scc_time_fields)*
+         scc_times: [std::time::Duration; #sccs_count],
+         scc_iters: [usize; #sccs_count],
          #(#rule_time_fields)*
          pub update_time_nanos: std::sync::atomic::AtomicU64,
+         pub update_indices_duration: std::time::Duration,
       }
       impl #impl_generics #struct_name #ty_generics #where_clause {
          #run_func
@@ -256,7 +250,9 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          #run_timeout_func
          // TODO remove pub update_indices at some point
          fn update_indices_priv(&mut self) {
+            let before = ::ascent::internal::Instant::now();
             #update_indices_body
+            self.update_indices_duration += before.elapsed();
          }
 
          #[deprecated = "Explicit call to update_indices not required anymore."]
@@ -279,9 +275,11 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          fn default() -> Self {
             let mut _self = #struct_name {
                #(#field_defaults)*
-               #(#scc_time_field_defaults)*
+               scc_times: [std::time::Duration::ZERO; #sccs_count],
+               scc_iters: [0; #sccs_count],
                #(#rule_time_fields_defaults)*
                update_time_nanos: Default::default(),
+               update_indices_duration: std::time::Duration::default()
             };
             #(#relation_initializations_for_default_impl)*
             _self
@@ -314,6 +312,7 @@ fn rel_ind_common_type(rel: &RelationIdentity, mir: &AscentMir) -> Type {
    }
 }
 
+// TODO remove
 fn rel_index_type_old(rel: &IrRelation, mir: &AscentMir) -> Type {
    let span = rel.relation.name.span();
 
@@ -360,6 +359,8 @@ fn rel_index_type(rel: &IrRelation, mir: &AscentMir) -> Type {
       } else {
          if is_lat_full_index {
             quote_spanned! { span=>ascent::internal::CRelFullIndex<#key_type, #value_type> }
+         } else if rel.is_no_index() {
+            quote_spanned! { span=>ascent::internal::CRelNoIndex<#value_type> }
          } else {
             quote_spanned! { span=>ascent::internal::CRelIndex<#key_type, #value_type> }
          }
@@ -412,7 +413,7 @@ fn rel_index_to_macro_input(ind: &[usize]) -> TokenStream {
 fn rel_ds_macro_input(rel: &RelationIdentity, mir: &AscentMir) -> TokenStream {
    let span = rel.name.span();
    let field_types = tuple_type(&rel.field_types);
-   let indices = mir.relations_ir_relations[&rel].iter()
+   let indices = mir.relations_ir_relations[rel].iter()
       .sorted_by_key(|r| &r.indices)
       .map(|ir_rel| rel_index_to_macro_input(&ir_rel.indices));
    let args = &mir.relations_metadata[rel].ds_macro_args;
@@ -443,6 +444,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
    let mut freeze_code = vec![];
    let mut unfreeze_code = vec![];
 
+   let _self = quote! { _self };
 
    use std::iter::once;
    for rel in scc.dynamic_relations.iter().flat_map(|(rel, indices)| once(Either::Left(rel)).chain(indices.iter().map(Either::Right))) {
@@ -456,23 +458,19 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
       let new_var_name = ir_relation_version_var_name(&ir_name, MirRelationVersion::New);
       let total_field = &ir_name;
       // let ty = rel_index_type(&rel, mir);
-      move_total_to_delta.push(quote! {
-         // #[allow(non_snake_case)]
-         // let #delta_var_name : &mut #ty = &mut _self.#total_field;
-         let mut #delta_var_name: #ty = ::std::mem::take(&mut _self.#total_field);
-         // #[allow(non_snake_case)]
+      move_total_to_delta.push(quote_spanned! {ir_name.span()=>
+         let mut #delta_var_name: #ty = ::std::mem::take(&mut #_self.#total_field);
          let mut #total_var_name : #ty = Default::default();
-         // #[allow(non_snake_case)]
          let mut #new_var_name : #ty = Default::default();
       });
 
       match rel {
          Either::Left(rel_ind_common) => {
             shift_delta_to_total_new_to_delta.push(quote_spanned!{ir_name.span()=>
-               // ::ascent::internal::RelIndexMerge::move_index_contents(#delta_var_name, &mut #total_var_name);
-               // #delta_var_name.clear();
-               // std::mem::swap(&mut #new_var_name, #delta_var_name);
                ::ascent::internal::RelIndexMerge::merge_delta_to_total_new_to_delta(&mut #new_var_name, &mut #delta_var_name, &mut #total_var_name);
+            });
+            move_total_to_delta.push(quote_spanned! {ir_name.span()=>
+               ::ascent::internal::RelIndexMerge::init(&mut #new_var_name, &mut #delta_var_name, &mut #total_var_name);
             });
          },
          Either::Right(ir_rel) => {
@@ -481,26 +479,25 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
             let new_expr = expr_for_rel_write(&MirRelation::from(ir_rel.clone(), New), mir);
 
             shift_delta_to_total_new_to_delta.push(quote_spanned!{ir_name.span()=>
-               // ::ascent::internal::RelIndexMerge::move_index_contents(#delta_var_name, &mut #total_var_name);
-               // #delta_var_name.clear();
-               // std::mem::swap(&mut #new_var_name, #delta_var_name);
                ::ascent::internal::RelIndexMerge::merge_delta_to_total_new_to_delta(&mut #new_expr, &mut #delta_expr, &mut #total_expr);
+            });
+            move_total_to_delta.push(quote_spanned! {ir_name.span()=>
+               ::ascent::internal::RelIndexMerge::init(&mut #new_expr, &mut #delta_expr, &mut #total_expr);
             });
          },
       }
       
-
-      move_total_to_field.push(quote!{ //_spanned!{rel.relation.name.span()=>
-         _self.#total_field = #total_var_name;
+      move_total_to_field.push(quote_spanned!{ir_name.span()=>
+         #_self.#total_field = #total_var_name;
       });
 
       if mir.is_parallel {
-         freeze_code.push(quote!{ //_spanned!{rel.relation.name.span()=>
+         freeze_code.push(quote_spanned!{ir_name.span()=>
             #total_var_name.freeze();
             #delta_var_name.freeze();
          });
 
-         unfreeze_code.push(quote!{ //_spanned!{rel.relation.name.span()=>
+         unfreeze_code.push(quote_spanned!{ir_name.span()=>
             #total_var_name.unfreeze();
             #delta_var_name.unfreeze();
          });
@@ -516,19 +513,19 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
       let total_field = &ir_name;
 
       if mir.is_parallel {
-         move_total_to_delta.push(quote! { //_spanned!{ir_name.span()=>
-            _self.#total_field.freeze();
+         move_total_to_delta.push(quote_spanned!{ir_name.span()=>
+            #_self.#total_field.freeze();
          });
       }
 
-      move_total_to_delta.push(quote! {
+      move_total_to_delta.push(quote_spanned! {ir_name.span()=>
          // #[allow(non_snake_case)]
          // let #total_var_name : &mut #ty = &mut _self.#total_field;
-         let #total_var_name: #ty = std::mem::take(&mut _self.#total_field);
+         let #total_var_name: #ty = std::mem::take(&mut #_self.#total_field);
       });
 
-      move_total_to_field.push(quote!{ //_spanned!{rel.relation.name.span()=>
-         _self.#total_field = #total_var_name;
+      move_total_to_field.push(quote_spanned!{ir_name.span()=>
+         #_self.#total_field = #total_var_name;
       });
    }
    
@@ -585,21 +582,19 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
    let evaluate_rules_loop = if scc.is_looping { quote! {
       #[allow(unused_assignments, unused_variables)]
       loop {
-         // let mut __changed = false;
          #changed_var_def_code
 
          #(#freeze_code)*
          // evaluate rules
          #evaluate_rules
 
-         // for dynamic indices in the scc:
-         //    append delta to total.
-         //    move new to delta
          #(#unfreeze_code)*
          #(#shift_delta_to_total_new_to_delta)*
+         _self.scc_iters[#scc_ind] += 1;
          if !#check_changed_code {break;}
          __check_return_conditions!();
       }
+
    }} else {quote! {
       #[allow(unused_assignments, unused_variables)]
       {
@@ -613,6 +608,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
 
          #(#shift_delta_to_total_new_to_delta)*
          #(#shift_delta_to_total_new_to_delta)*
+         _self.scc_iters[#scc_ind] += 1;
          __check_return_conditions!();
       }
    }};
@@ -651,7 +647,7 @@ fn compile_scc_times_summary_body(mir: &AscentMir) -> proc_macro2::TokenStream {
       let i_str = format!("{}", i);
       let scc_time_field_name = scc_time_field_name(i);
       res.push(quote!{
-         writeln!(&mut res, "scc {} time: {:?}", #i_str, self.#scc_time_field_name).unwrap();
+         writeln!(&mut res, "scc {}: iterations: {}, time: {:?}", #i_str, self.scc_iters[#i], self.scc_times[#i]).unwrap();
       });
       if mir.config.include_rule_times {
          let mut sum_of_rule_times = quote!{ std::time::Duration::ZERO };
@@ -675,9 +671,13 @@ fn compile_scc_times_summary_body(mir: &AscentMir) -> proc_macro2::TokenStream {
          });
       }
    }
+   let update_indices_time_code = quote! {
+      writeln!(&mut res, "update_indices time: {:?}", self.update_indices_duration).unwrap();
+   };
    quote!{
       use std::fmt::Write;
       let mut res = String::new();
+      #update_indices_time_code
       #(#res)*
       res
    }

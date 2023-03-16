@@ -24,10 +24,7 @@ pub use ascent_macro::ascent_run_par;
 
 pub use ascent_base::*;
 
-pub mod rayon {
-   pub use rayon::*;
-}
-
-pub mod boxcar {
-   pub use boxcar::Vec;
-}
+pub use hashbrown;
+pub use dashmap;
+pub use boxcar;
+pub use rayon;

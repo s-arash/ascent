@@ -32,12 +32,13 @@ pub use crate::c_rel_index::CRelIndex;
 pub use crate::c_rel_full_index::CRelFullIndex;
 pub use crate::c_lat_index::CLatIndex;
 pub use crate::c_rel_no_index::CRelNoIndex;
+pub use crate::c_rel_index::DashMapViewParIter;
 
 pub use crate::c_rel_index::shards_count;
 
 pub trait Freezable {
-   fn freeze(&mut self);
-   fn unfreeze(&mut self);
+   fn freeze(&mut self) { }
+   fn unfreeze(&mut self) { }
 }
 
 pub trait RelIndexWrite: Sized {
@@ -46,13 +47,16 @@ pub trait RelIndexWrite: Sized {
    fn index_insert(&mut self, key: Self::Key, value: Self::Value);
 }
 
-
 pub trait RelIndexMerge: Sized {
    fn move_index_contents(from: &mut Self, to: &mut Self);
    fn merge_delta_to_total_new_to_delta(new: &mut Self, delta: &mut Self, total: &mut Self) {
       Self::move_index_contents(delta, total);
       std::mem::swap(new, delta);
    }
+
+   /// Called once at the start of the SCC
+   #[allow(unused_variables)]
+   fn init(new: &mut Self, delta: &mut Self, total: &mut Self) { }
 }
 
 pub trait CRelIndexWrite{

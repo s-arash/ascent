@@ -36,7 +36,7 @@ pub trait CRelIndexReadAll<'a>{
    type Key: 'a;
    type Value;
    type ValueIteratorType: ParallelIterator<Item = Self::Value> + 'a;
-   type AllIteratorType: ParallelIterator<Item = (&'a Self::Key, Self::ValueIteratorType)> + 'a;
+   type AllIteratorType: ParallelIterator<Item = (Self::Key, Self::ValueIteratorType)> + 'a;
    fn c_iter_all(&'a self) -> Self::AllIteratorType;
 }
 

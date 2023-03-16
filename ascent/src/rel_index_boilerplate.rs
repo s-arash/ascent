@@ -47,6 +47,10 @@ impl<'a, T> RelIndexMerge for &'a mut T where T:RelIndexMerge {
    fn merge_delta_to_total_new_to_delta(new: &mut Self, delta: &mut Self, total: &mut Self) {
       T::merge_delta_to_total_new_to_delta(*new, *delta, *total)
    }
+
+   fn init(new: &mut Self, delta: &mut Self, total: &mut Self) {
+      T::init(new, delta, total)
+   }
 }
 
 impl<'a, T> RelIndexRead<'a> for &'a T where T: RelIndexRead<'a> {

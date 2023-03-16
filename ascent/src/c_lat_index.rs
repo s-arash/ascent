@@ -195,7 +195,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone + Hash + Eq> RelIndexReadAll<'
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: 'a + Clone + Hash + Eq + Sync + Send> CRelIndexReadAll<'a> for CLatIndex<K, V> {
-   type Key = K;
+   type Key = &'a K;
    type Value = &'a V;
 
    type ValueIteratorType = rayon::collections::hash_set::Iter<'a, V>;

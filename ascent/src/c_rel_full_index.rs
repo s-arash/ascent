@@ -32,6 +32,14 @@ impl<K: Clone + Hash + Eq, V> Freezable for CRelFullIndex<K, V> {
 
 impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
 
+
+   pub fn exact_len(&self) -> usize {
+      match self {
+        CRelFullIndex::Unfrozen(uf) => uf.len(),
+         CRelFullIndex::Frozen(f) => f.len(),
+      }
+   }
+
    #[inline]
    pub fn unwrap_frozen(&self) -> &dashmap::ReadOnlyView<K, V, BuildHasherDefault<FxHasher>> {
       match self {
@@ -202,7 +210,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone> RelIndexReadAll<'a> for CRelF
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Send + Sync> CRelIndexReadAll<'a> for CRelFullIndex<K, V> {
-   type Key = K;
+   type Key = &'a K;
    type Value = &'a V;
 
    type ValueIteratorType = rayon::iter::Once<&'a V>;
