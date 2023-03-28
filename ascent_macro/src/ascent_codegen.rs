@@ -1035,8 +1035,9 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
             let to_iter_func = ind_val_option_to_iter_func_name_for_rel(&mir_relation);
             let _self = quote!{ _self };
             quote_spanned! {agg.span=>
-               let __matching = #rel_expr.index_get( &#selected_args_tuple);
-               let __agregated_rel = &#_self.#rel_name;
+               let __aggregated_rel = #rel_expr;
+               let __matching = __aggregated_rel.index_get( &#selected_args_tuple);
+               // let __agregated_rel = &#_self.#rel_name;
                let __agg_args = __matching.into_iter().flatten()
                      .map(|__val| {
                               // let __row = &__agregated_rel[__val];

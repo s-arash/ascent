@@ -14,6 +14,7 @@ pub(crate) struct AscentConfig {
    pub include_rule_times: bool,
    pub generate_run_partial: bool,
    pub inter_rule_parallelism: bool,
+   pub default_ds: DsAttributeContents,
 }
 
 impl AscentConfig {
@@ -26,7 +27,8 @@ impl AscentConfig {
       let generate_run_partial = attrs.iter().any(|attr| attr.path.is_ident(Self::GENERATE_RUN_TIMEOUT_ATTR));
       let inter_rule_parallelism = attrs.iter().filter(|attr| attr.path.is_ident(Self::INTER_RULE_PARALLELISM_ATTR)).next();
 
-      let recognized_attrs = [Self::MEASURE_RULE_TIMES_ATTR, Self::GENERATE_RUN_TIMEOUT_ATTR, Self::INTER_RULE_PARALLELISM_ATTR];
+      let recognized_attrs = 
+         [Self::MEASURE_RULE_TIMES_ATTR, Self::GENERATE_RUN_TIMEOUT_ATTR, Self::INTER_RULE_PARALLELISM_ATTR, REL_DS_ATTR];
       for attr in attrs.iter() {
          if !recognized_attrs.iter().any(|recognized_attr| attr.path.is_ident(recognized_attr)) {
             return Err(Error::new_spanned(attr, 
@@ -39,11 +41,15 @@ impl AscentConfig {
             return Err(Error::new_spanned(inter_rule_parallelism, "attribute only allowed in parallel Ascent"));
          }
       }
+      let default_ds = get_ds_attr(&attrs)?.unwrap_or_else(|| 
+         DsAttributeContents { path: parse_quote! {::ascent::rel}, args: TokenStream::default() }
+      );
       Ok(AscentConfig {
          inter_rule_parallelism: inter_rule_parallelism.is_some(),
          attrs,
          include_rule_times,
          generate_run_partial,
+         default_ds
       })
    }
 }
@@ -191,10 +197,12 @@ impl IrRelation {
    }
 }
 
-const RECOGNIIZED_REL_ATTRS: [&str; 1] = ["ds"];
+const REL_DS_ATTR: &str = "ds";
+const RECOGNIIZED_REL_ATTRS: [&str; 1] = [REL_DS_ATTR];
 
 pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: bool) -> syn::Result<AscentIr>{
    let ir_rules : Vec<(IrRule, Vec<IrRelation>)> = prog.rules.iter().map(|r| compile_rule_to_ir_rule(r, prog)).try_collect()?;
+   let config = AscentConfig::new(prog.attributes.clone(), is_parallel)?;
    let num_relations = prog.relations.len();
    let mut relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>> = HashMap::with_capacity(num_relations);
    let mut relations_full_indices = HashMap::with_capacity(num_relations);
@@ -224,25 +232,15 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       if let Some(init_expr) = &rel.initialization {
          relations_initializations.insert(rel_identity.clone(), Rc::new(init_expr.clone()));
       }
-      let ds_macro_path = rel.attrs.iter()
-         .filter_map(|attr| attr.path.get_ident().and_then(|ident| if ident == "ds" { Some(&attr.tokens) } else { None }))
-         .collect_vec();
-      if ds_macro_path.len() > 1 {
-         return Err(Error::new(rel.name.span(), "multiple `ds` attributes specified"));
-      }
-      let (ds_macro_path, ds_macro_args) = if ds_macro_path.len() == 1 {
-         let attr_contents = syn::parse2::<DsAttributeContents>(ds_macro_path[0].clone())?;
-         (attr_contents.path, attr_contents.args)
-      } else {
-         (parse_quote_spanned! {rel.name.span()=> ::ascent::rel}, TokenStream::default())
-      };
+      let ds_attribute = get_ds_attr(&rel.attrs)?.unwrap_or_else(|| config.default_ds.clone());
+      
       relations_metadata.insert(
          rel_identity.clone(),
          RelationMetadata {
             inititialization: rel.initialization.clone().map(|i| Rc::new(i)),
             attributes: Rc::new(rel.attrs.iter().filter(|attr| attr.path.get_ident().map_or(true, |ident| !RECOGNIIZED_REL_ATTRS.iter().any(|ra| ident == ra))).cloned().collect_vec()),
-            ds_macro_path,
-            ds_macro_args
+            ds_macro_path: ds_attribute.path,
+            ds_macro_args: ds_attribute.args
          }
       );
       // relations_no_indices.insert(rel_identity, rel_no_index);
@@ -272,9 +270,23 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       relations_metadata: relations_metadata,
       // relations_no_indices,
       declaration,
-      config: AscentConfig::new(prog.attributes.clone(), is_parallel)?,
+      config,
       is_parallel
    })
+}
+
+fn get_ds_attr(attrs: &[Attribute]) -> syn::Result<Option<DsAttributeContents>> {
+   let ds_attrs = attrs.iter()
+      .filter(|attr| attr.path.get_ident().map_or(false, |ident| ident == REL_DS_ATTR))
+      .collect_vec();
+   match &ds_attrs[..] {
+      [] => Ok(None),
+      [attr] => {
+         let res = syn::parse2::<DsAttributeContents>(attr.tokens.clone())?;
+         Ok(Some(res))
+      },
+      [attr1, attr2, ..] => Err(Error::new(attr2.bracket_token.span, "multiple `ds` attributes specified")),
+   }
 }
 
 fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result<(IrRule, Vec<IrRelation>)> {

@@ -546,6 +546,7 @@ impl From<&RelationNode> for RelationIdentity{
    }
 } 
 
+#[derive(Clone)]
 pub(crate) struct DsAttributeContents {
    pub path: syn::Path,
    pub args: TokenStream,
