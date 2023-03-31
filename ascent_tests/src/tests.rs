@@ -915,3 +915,18 @@ fn test_repeated_vars_simple_joins() {
    println!("bar: {:?}", prog.bar);
    assert_rels_eq!(prog.bar, [(1, 2)]);
 }
+
+#[test]
+fn test_aggregated_lattice() {
+   let res = ascent::ascent_run! {
+      relation foo(i32, i32);
+      lattice bar(i32, i32);
+
+      bar(x, y) <-- for x in 0..2, for y in 5..10;
+
+      foo(x, z) <--
+         for x in 0..2,
+         agg z = ascent::aggregators::sum(y) in bar(x, y);
+   };
+   assert_rels_eq!(res.bar, [(0, 9), (1, 9)]);
+}

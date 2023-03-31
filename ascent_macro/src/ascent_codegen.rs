@@ -1026,7 +1026,7 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
 
             let vars_assignments = clause_var_assignments(
                &MirRelation::from(agg.rel.clone(), MirRelationVersion::Total), agg_args_tuple_indices, 
-               &parse_quote_spanned!{agg.span=> __val}, &parse_quote_spanned!{agg.span=>__agregated_rel},
+               &parse_quote_spanned!{agg.span=> __val}, &parse_quote!{_self.#rel_name},
                false, mir
             );
 
@@ -1037,13 +1037,10 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
             quote_spanned! {agg.span=>
                let __aggregated_rel = #rel_expr;
                let __matching = __aggregated_rel.index_get( &#selected_args_tuple);
-               // let __agregated_rel = &#_self.#rel_name;
-               let __agg_args = __matching.into_iter().flatten()
-                     .map(|__val| {
-                              // let __row = &__agregated_rel[__val];
-                              #vars_assignments
-                              #agg_args_tuple
-                     });
+               let __agg_args = __matching.into_iter().flatten().map(|__val| {
+                  #vars_assignments
+                  #agg_args_tuple
+               });
                for #pat in #agg_func(__agg_args) {
                   #next_loop
                }
@@ -1362,11 +1359,8 @@ fn expr_for_rel_OLD(rel: &MirRelation) -> proc_macro2::TokenStream {
 fn expr_for_rel(rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream {
    fn expr_for_rel_inner(ir_name: &Ident, version: MirRelationVersion, mir: &AscentMir, mir_rel: &MirRelation) -> (TokenStream, bool) {
       let var = ir_relation_version_var_name(&ir_name, version);
-      let needs_borrow = false;
-      let borrow = if needs_borrow {quote!{&}} else {quote!{}};
-      
       if mir_rel.relation.is_lattice {
-         (quote! { #borrow #var }, needs_borrow)
+         (quote! { & #var }, true)
       } else {
          let rel_ind_common = ir_relation_version_var_name(&rel_ind_common_var_name(&mir_rel.relation), version);
          (quote! { #var.to_rel_index(& #rel_ind_common) }, false)
