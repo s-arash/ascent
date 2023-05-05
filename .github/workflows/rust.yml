@@ -22,7 +22,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
           override: true
-          toolchain: 1.59
+          toolchain: 1.66
     
     - run: cargo --version
 
