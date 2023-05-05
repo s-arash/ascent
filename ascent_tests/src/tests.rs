@@ -882,3 +882,19 @@ fn test_repeated_vars_simple_joins() {
    println!("bar: {:?}", prog.bar);
    assert!(rels_equal(prog.bar, [(1, 2)]));
 }
+
+#[test]
+fn supports_non_copy_types() {
+   ascent! {
+      relation edge(String, String);
+      relation path(String, String);
+      
+      path(x, y) <-- edge(x, y);
+      path(x, z) <-- edge(x, y), path(y, z);
+   }
+
+   let mut prog = AscentProgram::default();
+   prog.edge = vec![("1".to_owned(), "2".to_owned()), ("2".to_owned(), "3".to_owned())];
+   prog.run();
+   println!("path: {:?}", prog.path);
+}
