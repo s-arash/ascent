@@ -592,8 +592,6 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
                if cloning_needed {quote_spanned! {span=> .clone()}} 
                else {quote! { }}
             }
-            let cloning_needed = true;
-            let row_maybe_clone = maybe_clone(cloning_needed, bclause.rel_args_span);
             
             // let matching_dot_iter = dot_iter_for_rel_index(&bclause.rel, quote_spanned!{bclause.rel_args_span=> __matching});
             let matching_dot_iter = quote_spanned!{bclause.rel_args_span=> __matching};
@@ -633,8 +631,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
 
                let mut cl1_conds_then_rest = quote! {
                   for __ind in #matching_dot_iter.clone() {
-                     // TODO we may be doing excessive cloning
-                     let __row = &_self.#cl2_rel_name[__ind] #row_maybe_clone;
+                     let __row = &_self.#cl2_rel_name[__ind];
                      #(#new_vars_assignments)*
                      #conds_then_next_loop
                   }
@@ -658,8 +655,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
                quote_spanned! {bclause.rel_args_span=>
                   if let Some(__matching) = #rel_version_exp.index_get( &#selected_args_tuple) {
                      for __ind in #matching_dot_iter {
-                        // TODO we may be doing excessive cloning
-                        let __row = &_self.#bclause_rel_name[__ind] #row_maybe_clone;
+                        let __row = &_self.#bclause_rel_name[__ind].clone();
                         #(#new_vars_assignments)*
                         #conds_then_next_loop
                      }
@@ -796,8 +792,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
                   .or_else(|| #head_lat_full_index_var_name_full.get(&__lattice_key)) 
                {
                   let __existing_ind = *__existing_ind.iter().next().unwrap();
-                  // TODO possible excessive cloning here?
-                  let __lat_changed = ::ascent::Lattice::join_mut(&mut _self.#head_rel_name[__existing_ind].#tuple_lat_index, __new_row.#tuple_lat_index.clone());
+                  let __lat_changed = ::ascent::Lattice::join_mut(&mut _self.#head_rel_name[__existing_ind].#tuple_lat_index, __new_row.#tuple_lat_index);
                   if __lat_changed {
                      let __new_row_ind = __existing_ind;
                      #(#update_indices)*
