@@ -813,8 +813,8 @@ fn test_run_timeout() {
 
    let mut prog = Diverging::default();
    prog.foo = vec![(1,), (2,)];
-   let run_timout_res = prog.run_timeout(Duration::from_millis(5));
-   assert!(!run_timout_res);
+   let run_timeout_res = prog.run_timeout(Duration::from_millis(5));
+   assert!(!run_timeout_res);
 }
 
 #[test]

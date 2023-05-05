@@ -77,7 +77,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let relation_sizes_body = compile_relation_sizes_body(mir);
    let scc_times_summary_body = compile_scc_times_summary_body(mir);
 
-   let mut type_constaints = vec![];
+   let mut type_constraints = vec![];
    let mut field_type_names = HashSet::<String>::new();
    let mut lat_field_type_names = HashSet::<String>::new();
 
@@ -91,11 +91,11 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
             container.insert(path.path.clone().into_token_stream().to_string())
          } else {true}; 
          if add {
-            let type_constaints_type = 
+            let type_constraints_type = 
                if is_lat {quote_spanned!(field_type.span()=>LatTypeConstraints)} 
                else {quote_spanned!(field_type.span()=>TypeConstraints)}; 
-            type_constaints.push(quote_spanned!{field_type.span()=>
-               let _type_constraints : ascent::internal::#type_constaints_type<#field_type>;
+            type_constraints.push(quote_spanned!{field_type.span()=>
+               let _type_constraints : ascent::internal::#type_constraints_type<#field_type>;
             });
          }
       }
@@ -103,7 +103,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
 
    let mut relation_initializations = vec![];
    for (rel, md) in mir.relations_metadata.iter() {
-      if let Some(ref init) = md.inititialization {
+      if let Some(ref init) = md.initialization {
          let rel_name = &rel.name;
          relation_initializations.push(quote! {
             _self.#rel_name = #init;
@@ -212,8 +212,8 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
             self.update_indices_priv();
          }
          #[allow(unused_imports)]
-         fn type_constaints() {
-            #(#type_constaints)*
+         fn type_constraints() {
+            #(#type_constraints)*
          }
          #summary_fn
          
@@ -568,11 +568,11 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
             let common_vars = clause_vars.iter().filter(|(_i,v)| pre_clause_vars.contains(v)).collect::<Vec<_>>();
             let common_vars_no_indices = common_vars.iter().map(|(_i,v)| v.clone()).collect::<Vec<_>>();
 
-            let mut new_vars_assignmnets = vec![];
+            let mut new_vars_assignments = vec![];
             for (i,var) in clause_vars.iter(){
                if common_vars_no_indices.contains(var) {continue;}
                let i_ind = syn::Index{index: *i as u32, span: var.span()};
-               new_vars_assignmnets.push(quote_spanned! {var.span()=> let #var = &__row.#i_ind;});
+               new_vars_assignments.push(quote_spanned! {var.span()=> let #var = &__row.#i_ind;});
             }
 
             let selected_args_cloned = selected_args.iter().map(exp_cloned).collect_vec();
@@ -600,7 +600,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
 
             // TODO cleanup
             // The special case where the first clause has indices, but there are no expressions
-            // in the args of the first cluase
+            // in the args of the first clause
             if doing_simple_join {
                let cl1 = rule.body_items[0].unwrap_clause();
                let cl2 = bclause;
@@ -635,7 +635,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
                   for __ind in #matching_dot_iter.clone() {
                      // TODO we may be doing excessive cloning
                      let __row = &_self.#cl2_rel_name[__ind] #row_maybe_clone;
-                     #(#new_vars_assignmnets)*
+                     #(#new_vars_assignments)*
                      #conds_then_next_loop
                   }
                };
@@ -660,7 +660,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
                      for __ind in #matching_dot_iter {
                         // TODO we may be doing excessive cloning
                         let __row = &_self.#bclause_rel_name[__ind] #row_maybe_clone;
-                        #(#new_vars_assignmnets)*
+                        #(#new_vars_assignments)*
                         #conds_then_next_loop
                      }
                   }
@@ -701,10 +701,10 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir, clause_ind: u
             let to_iter_func = ind_val_option_to_iter_func_name_for_rel(&mir_relation);
             quote_spanned! {agg.span=>
                let __matching = #rel_version_var_name.index_get( &#selected_args_tuple);
-               let __agregated_rel = &_self.#rel_name;
+               let __aggregated_rel = &_self.#rel_name;
                let __agg_args = __matching.into_iter().flatten()
                      .map(|__ind| {
-                              let __row = &__agregated_rel[__ind];
+                              let __row = &__aggregated_rel[__ind];
                               #agg_args_tuple
                      });
                for #pat in #agg_func(__agg_args) {

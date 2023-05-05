@@ -51,7 +51,7 @@ pub(crate) struct AscentIr {
 
 #[derive(Clone, Default)]
 pub(crate) struct RelationMetadata{
-   pub inititialization: Option<Rc<Expr>>,
+   pub initialization: Option<Rc<Expr>>,
    pub attributes: Rc<Vec<Attribute>>,
 }
 
@@ -192,7 +192,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram) -> syn::Result
       relations_metadata.insert(
          rel_identity.clone(),
          RelationMetadata {
-            inititialization: rel.initialization.clone().map(|i| Rc::new(i)),
+            initialization: rel.initialization.clone().map(|i| Rc::new(i)),
             attributes: Rc::new(rel.attrs.clone())
          }
       );
