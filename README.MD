@@ -119,6 +119,12 @@ where N: Ord + Clone
 ```
 Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
 
+### Parallel Ascent
+
+Ascent is capable of producing parallel code. The macros `ascent_par!` and `ascent_run_par!` produce parallelized code. 
+Naturally, column types must be `Send + Sync` to work in parallel Ascent. 
+
+Parallel Ascent utilizes [`rayon`](https://crates.io/crates/rayon), so the parallelism level can be controlled either via `rayon`'s [`ThreadPoolBuilder`](https://docs.rs/rayon/latest/rayon/struct.ThreadPoolBuilder.html) or using the `RAYON_NUM_THREADS` environment variable (see [here](https://github.com/rayon-rs/rayon/blob/master/FAQ.md#how-many-threads-will-rayon-spawn) for more info).
 ### `ascent_run!`
 
 In addition to `ascent!`, we provide the `ascent_run!` macro. Unlike `ascent!`, this macro evaluates the ascent program when invoked. The main advantage of `ascent_run!` is that local variables are in scope inside the Ascent program. For example, we can define a function for discovering the (optionally reflexive) transitive closure of a relation like so:

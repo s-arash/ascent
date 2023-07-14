@@ -11,71 +11,124 @@ use crate::{ascent_impl, utils::token_stream_replace_macro_ident};
 #[test]
 fn test_macro0() {
    let inp = quote!{
-      relation subset(i32, i32, i32);
-      relation subset_error(i32, i32, i32);
-      relation placeholder_origin(i32);
-      relation known_placeholder_subset(i32, i32) = vec![(2, 3), (3, 4)];
+      struct Polonius<T: FactTypes>;
+      relation subset(T::Origin, T::Origin, T::Point);// = ctx.subset_base.clone();
+      relation cfg_edge(T::Point, T::Point);
+      relation origin_live_on_entry(T::Origin, T::Point);
+      relation origin_contains_loan_on_entry(T::Origin, T::Loan, T::Point);
+      relation loan_live_at(T::Loan, T::Point);
+      relation loan_invalidated_at(T::Loan, T::Point);
+      relation errors(T::Loan, T::Point);
+      relation placeholder_origin(T::Origin);
+      relation subset_error(T::Origin, T::Origin, T::Point);
+      relation loan_killed_at(T::Loan, T::Point);// = loan_killed_at.iter().cloned().collect();
+      relation known_placeholder_subset(T::Origin, T::Origin);// = known_placeholder_subset.iter().cloned().collect();
 
-      placeholder_origin(o1),
-      known_placeholder_subset(p1, p2) <--
-         subset(p1, p2, o1);
+      subset(origin1, origin3, point) <--
+         subset(origin1, origin2, point),
+         subset(origin2, origin3, point),
+         if origin1 != origin3;
 
-      subset(o1, o2, 42) <--
-         placeholder_origin(o1),
-         placeholder_origin(o2),
-         known_placeholder_subset(o1, o2);
+      subset(origin1, origin2, point2) <--
+         subset(origin1, origin2, point1),
+         cfg_edge(point1, point2),
+         origin_live_on_entry(origin1, point2),
+         origin_live_on_entry(origin2, point2);
 
-      subset_error(*origin1, *origin2, *point) <--
+      origin_contains_loan_on_entry(origin2, loan, point) <--
+         origin_contains_loan_on_entry(origin1, loan, point),
+         subset(origin1, origin2, point);
+
+      origin_contains_loan_on_entry(origin, loan, point2) <--
+         origin_contains_loan_on_entry(origin, loan, point1),
+         cfg_edge(point1, point2),
+         !loan_killed_at(loan, point1),
+         origin_live_on_entry(origin, point2);
+
+      loan_live_at(loan, point) <--
+         origin_contains_loan_on_entry(origin, loan, point),
+         origin_live_on_entry(origin, point);
+
+      errors(loan, point) <--
+         loan_invalidated_at(loan, point),
+         loan_live_at(loan, point);
+
+      subset_error(origin1, origin2, point) <--
          subset(origin1, origin2, point),
          placeholder_origin(origin1),
          placeholder_origin(origin2),
          !known_placeholder_subset(origin1, origin2),
          if origin1 != origin2;
    };
-   write_ascent_run_to_scratchpad(inp);
+   // write_ascent_run_to_scratchpad(inp);
+   write_ascent_run_par_to_scratchpad(inp);
 }
 #[test]
-fn test_macro1() {
+fn test_macro_generic_tc() {
    let inp = quote!{
-      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash;
+      struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Sync + Send;
       relation edge(TNode, TNode);
       relation path(TNode, TNode);
 
-      path(x.clone(), y.clone()) <-- edge(x,y), path(x, y);
-      path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
-      path(x.clone(), z.clone()) <-- path(x,y), path(y, z);
+      path(x, z) <-- edge(x, y), path(y, z);
+      // path(x, z) <-- path(x, y), path(y, z);
    };
 
+   // write_to_scratchpad(inp);
+   write_par_to_scratchpad(inp);
+}
+
+#[test]
+fn test_macro_multiple_dynamic_clauses() {
+   let inp = quote! {
+      relation a(i32, i32);
+      relation b(i32, i32);
+      relation c(i32, i32);
+
+      a(y, z),
+      b(z, w),
+      c(x, y) <--
+         a(x, y),
+         b(y, z),
+         c(z, w);
+   };
    write_to_scratchpad(inp);
+}
+
+#[test]
+fn test_macro_tc() {
+   let inp = quote!{
+      #![measure_rule_times]
+      struct TC;
+      relation edge(i32, i32);
+      relation path(i32, i32);
+
+      path(x, y) <-- edge(x, y);
+      // path(x, z) <-- edge(x, y), path(y, z);
+      path(x, z) <-- path(x, y), path(y, z);
+   };
+
+   // write_to_scratchpad(inp);
+   write_par_to_scratchpad(inp);
 }
 
 #[test]
 fn test_macro2() {
    let input = quote! {
-      relation foo(i32);
+      relation foo(i32, Option<i32>);
       relation bar(i32, i32);
-      relation res(i32);
-      relation bar_refl(i32);
-      relation bar3(i32, i32, i32);
-      relation bar3_res(i32);
+      relation baz(i32, i32, i32);
+      foo(1, Some(2));
+      foo(2, None);
+      foo(3, Some(5));
+      foo(4, Some(10));
 
-      foo(3);
-      bar(2, 1);
-      bar(1, 1);
-      bar(3, 3);
 
-      bar_refl(*x) <-- bar(x, x);
+      bar(3, 6);
+      bar(5, 10);
+      bar(10, 20);
 
-      res(*x) <-- foo(x), bar(x, x);
-
-      bar3(10,10,11);
-      bar3(1,1,1);
-      bar3(1,2,3);
-      bar3(2,1,3);
-
-      bar3_res(*x) <-- bar3(x, y, z), res(x), if x > y, bar3_res(y);
-
-      foo(x), bar(x, x + 1) <-- bar3_res(x), let y = x - 2, bar_refl(x);
+      baz(*x, *y, *z) <-- foo(x, ?Some(y)), bar(y , z);
    };
 
    write_to_scratchpad(input);
@@ -143,12 +196,27 @@ fn test_macro_patterns() {
 }
 
 #[test]
+fn test_macro_sp(){
+   let input = quote!{
+      relation edge(i32, i32, u32);
+      lattice shortest_path(i32, i32, Dual<u32>);
+      
+      shortest_path(x, y, Dual(*len)) <-- edge(x, y, len);
+      shortest_path(x, z, Dual(len + plen)) <-- edge(x, y, len), shortest_path(y, z, ?Dual(plen));
+   };
+   // write_to_scratchpad(input);
+   write_par_to_scratchpad(input);
+}
+
+#[test]
 fn test_macro_lattices(){
    let input = quote!{
-      lattice shortest_path(i32, i32, Dual<u32>);
+      lattice longest_path(i32, i32, u32);
       relation edge(i32, i32, u32);
 
-      shortest_path(*x,*y, Dual(*w)) <-- edge(x,y,w);
+      longest_path(x, y, ew) <-- edge(x, y, ew);
+      longest_path(x, z, *ew + *w) <-- edge(x, y, ew), longest_path(y, z, w);
+
 
       // edge(1,2, 3);
       // edge(2,3, 5);
@@ -156,7 +224,8 @@ fn test_macro_lattices(){
       // edge(2,4, 10);
 
    };
-   write_to_scratchpad(input);
+   // write_to_scratchpad(input);
+   write_par_to_scratchpad(input);
 }
 
 #[test]
@@ -231,27 +300,86 @@ fn exp_items_in_fn(){
    println!("point is {:?}, with size {}", p, p.size());
 }
 
-fn write_to_scratchpad_base(tokens: TokenStream, is_ascent_run: bool) -> TokenStream {
-   let code = ascent_impl(tokens, is_ascent_run);
+fn write_to_scratchpad_base(tokens: TokenStream, prefix: TokenStream, is_ascent_run: bool, is_parallel: bool) -> TokenStream {
+   let code = ascent_impl(tokens, is_ascent_run, is_parallel);
    let code = code.unwrap();
    let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
    let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
+   std::fs::write("src/scratchpad.rs", prefix.to_string());
    std::fs::write("src/scratchpad.rs", code_in_template).unwrap();
    std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
    code
 }
 
 fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, false)
+   write_to_scratchpad_base(tokens, quote!{}, false, false)
+}
+
+fn write_with_prefix_to_scratchpad(tokens: TokenStream, prefix: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, prefix, false, false)
+}
+
+fn write_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, quote!{}, false, true)
 }
 
 fn write_ascent_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, true)
+   write_to_scratchpad_base(tokens, quote!{}, true, false)
+}
+
+fn write_ascent_run_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, quote!{}, true, true)
 }
 
 
 #[test]
 fn test_macro_lambda_calc(){
+   let prefix = quote! {
+      #[derive(Clone, PartialEq, Eq, Debug, Hash)]
+      pub enum LambdaCalcExpr{
+         Ref(&'static str),
+         Lam(&'static str, Rc<LambdaCalcExpr>),
+         App(Rc<LambdaCalcExpr>, Rc<LambdaCalcExpr>)
+      }
+
+      use LambdaCalcExpr::*;
+
+      impl LambdaCalcExpr {
+         #[allow(dead_code)]
+         fn depth(&self) -> usize {
+            match self{
+               LambdaCalcExpr::Ref(_) => 0,
+               LambdaCalcExpr::Lam(_x,b) => 1 + b.depth(),
+               LambdaCalcExpr::App(f,e) => 1 + max(f.depth(), e.depth())
+            }
+         }
+      }
+      fn app(f: LambdaCalcExpr, a: LambdaCalcExpr) -> LambdaCalcExpr {
+         App(Rc::new(f), Rc::new(a))
+      }
+      fn lam(x: &'static str, e: LambdaCalcExpr) -> LambdaCalcExpr {
+         Lam(x, Rc::new(e))
+      }
+
+      fn sub(exp: &LambdaCalcExpr, var: &str, e: &LambdaCalcExpr) -> LambdaCalcExpr {
+         match exp {
+            Ref(x) if *x == var => e.clone(),
+            Ref(_x) => exp.clone(),
+            App(ef,ea) => app(sub(ef, var, e), sub(ea, var, e)),
+            Lam(x, _eb) if *x == var => exp.clone(),
+            Lam(x, eb) => lam(x, sub(eb, var, e))
+         }
+      }
+
+      #[allow(non_snake_case)]
+      fn U() -> LambdaCalcExpr {lam("x", app(Ref("x"), Ref("x")))}
+      #[allow(non_snake_case)]
+      fn I() -> LambdaCalcExpr {lam("x", Ref("x"))}
+
+      fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
+         inp.map(|tuple| tuple.0).min().cloned().into_iter()
+      }
+   };
    let inp = quote!{
       relation output(LambdaCalcExpr);
       relation input(LambdaCalcExpr);
@@ -277,7 +405,7 @@ fn test_macro_lambda_calc(){
          eval(ef.deref(), ?Lam(fx, fb)),
          eval(sub(fb, fx, ea), final_res);
    };
-   write_to_scratchpad(inp);
+   write_with_prefix_to_scratchpad(inp, prefix);
 }
 
 #[test]
@@ -349,20 +477,6 @@ fn test_token_stream_replace_macro_ident() {
 
 }
 
-macro_rules! hygiene_test {
-   ($e: expr) => {
-      // x = $e;
-      println!("{}", XXX);
-   };
-}
-
-const XXX: i32 = 42;
-
-fn test_macro_hygiene() {
-   let mut x = "baz";
-   hygiene_test!("foo");
-   hygiene_test!("bar");
-}
 
 #[test]
 fn test_macro_item() {

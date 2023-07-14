@@ -1,135 +1,149 @@
 
-use nohash_hasher::BuildNoHashHasher;
+use rayon::prelude::*;
+use rustc_hash::FxHasher;
 
 use crate::internal::*;
 
 use std::collections::HashSet;
 use core::slice::Iter;
+use std::hash::BuildHasherDefault;
 use std::iter::Chain;
 
 pub trait RelIndexRead<'a>{
    type Key;
-   type IteratorType: Iterator<Item = usize> + Clone + 'a;
+   type Value;
+   type IteratorType: Iterator<Item = Self::Value> + Clone + 'a;
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType>;
    fn len(&self) -> usize;
 }
 
+pub trait CRelIndexRead<'a>{
+   type Key;
+   type Value;
+   type IteratorType: ParallelIterator<Item = Self::Value> + Clone + 'a;
+   fn c_index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType>;
+}
+
 pub trait RelIndexReadAll<'a>{
    type Key: 'a;
-   type ValueIteratorType: Iterator<Item = usize> + 'a;
+   type Value;
+   type ValueIteratorType: Iterator<Item = Self::Value> + 'a;
    type AllIteratorType: Iterator<Item = (&'a Self::Key, Self::ValueIteratorType)> + 'a;
    fn iter_all(&'a self) -> Self::AllIteratorType;
 }
 
+pub trait CRelIndexReadAll<'a>{
+   type Key: 'a;
+   type Value;
+   type ValueIteratorType: ParallelIterator<Item = Self::Value> + 'a;
+   type AllIteratorType: ParallelIterator<Item = (&'a Self::Key, Self::ValueIteratorType)> + 'a;
+   fn c_iter_all(&'a self) -> Self::AllIteratorType;
+}
 
-impl<'a, K: Eq + std::hash::Hash + 'a> RelIndexRead<'a> for RelIndexType1<K> {
-   type IteratorType = std::iter::Cloned<core::slice::Iter<'a, usize>>;
+impl<'a, K: Eq + std::hash::Hash + 'a, V: Clone + 'a> RelIndexRead<'a> for RelIndexType1<K, V> {
+   type IteratorType = core::slice::Iter<'a, V>;
    type Key = K;
-
-   fn index_get(&'a self, key: &K) -> Option<Self::IteratorType> {
-      self.get(key).map(|vec| vec.iter().cloned())
-   }
-
-   #[inline(always)]
-   fn len(&self) -> usize { self.len() }
-}
-
-// #[inline]
-fn rel_index_type_iter_all_mapper<'a,'b,K>((k,v): (&'a K, &'b Vec<usize>)) -> (&'a K, std::iter::Cloned<Iter<'b, usize>>) {
-   (k, v.iter().cloned())
-}
-
-impl<'a, K: Eq + std::hash::Hash + 'a> RelIndexReadAll<'a> for RelIndexType1<K> {
-
-   type Key = K;
-   type ValueIteratorType = std::iter::Cloned<core::slice::Iter<'a, usize>>;
-
-   type AllIteratorType = std::iter::Map<std::collections::hash_map::Iter<'a, K, Vec<usize>>, for <'aa, 'bb> fn ((&'aa K, &'bb Vec<usize>)) -> (&'aa K, std::iter::Cloned<Iter<'bb, usize>>)>;
-
-   fn iter_all(&'a self) -> Self::AllIteratorType {
-      let res: std::iter::Map<std::collections::hash_map::Iter<'a, K, Vec<usize>>, for <'aa, 'bb> fn ((&'aa K, &'bb Vec<usize>)) -> (&'aa K, std::iter::Cloned<Iter<'bb, usize>>)> 
-         = self.iter().map(rel_index_type_iter_all_mapper);
-      res
-   }
-}
-
-
-impl<'a, K: Eq + std::hash::Hash> RelIndexRead<'a> for HashBrownRelFullIndexType<K> {
-   type IteratorType = std::iter::Once<usize>;
-   type Key = K;
-
-   // #[inline]
-   fn index_get(&'a self, key: &K) -> Option<Self::IteratorType> {
-      let res: Option<std::iter::Once<usize>> = self.get(key).cloned().map(std::iter::once);
-      res
-   }
-
-   #[inline(always)]
-   fn len(&self) -> usize { self.len() }
-}
-
-impl<'a, K: Eq + std::hash::Hash + 'a> RelIndexReadAll<'a> for HashBrownRelFullIndexType<K> {
-
-   type Key = K;
-   type ValueIteratorType = std::iter::Once<usize>;
-
-   type AllIteratorType = std::iter::Map<hashbrown::hash_map::Iter<'a, K, usize>, for <'aa, 'bb> fn ((&'aa K, &'bb usize)) -> (&'aa K, std::iter::Once<usize>)>;
-
-   fn iter_all(&'a self) -> Self::AllIteratorType {
-      let res: std::iter::Map<hashbrown::hash_map::Iter<K, usize>, for <'aa, 'bb> fn ((&'aa K, &'bb usize)) -> (&'aa K, std::iter::Once<usize>)> = 
-         self.iter().map(rel_full_inedx_type_iter_all_mapper);
-      res
-   }
-}
-
-
-// #[inline]
-fn rel_full_inedx_type_iter_all_mapper<'a, 'b, K>((k, v): (&'a K, &'b usize)) -> (&'a K, std::iter::Once<usize>) {
-   (k, std::iter::once(*v))
-}
-
-// #[inline]
-fn lattice_index_type_iter_all_mapper<'a, 'b, K>((k,v): (&'a K, &'b std::collections::HashSet<usize, BuildNoHashHasher<usize>>)) 
--> (&'a K, std::iter::Cloned<std::collections::hash_set::Iter<'b, usize>>) {
-   (k, v.iter().cloned())
-}
-
-impl<'a, K: Eq + std::hash::Hash> RelIndexRead<'a> for LatticeIndexType<K> {
-   type IteratorType = std::iter::Cloned<std::collections::hash_set::Iter<'a, usize>>;
-   type Key = K;
+   type Value = &'a V;
 
    #[inline]
    fn index_get(&'a self, key: &K) -> Option<Self::IteratorType> {
-      let res: Option<std::iter::Cloned<std::collections::hash_set::Iter<usize>>> = 
-         self.get(key).map(HashSet::iter).map(Iterator::cloned);
-      res
+      let v = self.get(key)?;
+      Some(v.iter())
    }
 
    #[inline(always)]
    fn len(&self) -> usize { self.len() }
 }
 
-impl<'a, K: Eq + std::hash::Hash + 'a> RelIndexReadAll<'a> for LatticeIndexType<K> {
+impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for RelIndexType1<K, V> {
 
    type Key = K;
-   type ValueIteratorType = std::iter::Cloned<std::collections::hash_set::Iter<'a, usize>>;
+   type Value = &'a V;
+   type ValueIteratorType = core::slice::Iter<'a, V>;
 
-   type AllIteratorType = std::iter::Map<std::collections::hash_map::Iter<'a, K, HashSet<usize, BuildNoHashHasher<usize>>>, for <'aa, 'bb> fn ((&'aa K, &'bb std::collections::HashSet<usize, BuildNoHashHasher<usize>>)) -> (&'aa K, std::iter::Cloned<std::collections::hash_set::Iter<'bb, usize>>)>;
+   type AllIteratorType = std::iter::Map<std::collections::hash_map::Iter<'a, K, Vec<V>>, for <'aa, 'bb> fn ((&'aa K, &'bb Vec<V>)) -> (&'aa K, Iter<'bb, V>)>;
+
+   fn iter_all(&'a self) -> Self::AllIteratorType {
+      let res: std::iter::Map<std::collections::hash_map::Iter<'a, K, Vec<V>>, for <'aa, 'bb> fn ((&'aa K, &'bb Vec<V>)) -> (&'aa K, Iter<'bb, V>)> 
+         = self.iter().map(|(k, v)| (k, v.iter()));
+      res
+   }
+}
+
+
+impl<'a, K: Eq + std::hash::Hash, V: 'a + Clone> RelIndexRead<'a> for HashBrownRelFullIndexType<K, V> {
+   type IteratorType = std::iter::Once<&'a V>;
+   type Key = K;
+   type Value = &'a V;
+
+
+   #[inline]
+   fn index_get(&'a self, key: &K) -> Option<Self::IteratorType> {
+      let res = self.get(key)?;
+      Some(std::iter::once(res))
+   }
+
+   #[inline(always)]
+   fn len(&self) -> usize { self.len() }
+
+}
+
+impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for HashBrownRelFullIndexType<K, V> {
+
+   type Key = K;
+   type Value = &'a V;
+   type ValueIteratorType = std::iter::Once<&'a V>;
+
+   type AllIteratorType = std::iter::Map<hashbrown::hash_map::Iter<'a, K, V>, for <'aa, 'bb> fn ((&'aa K, &'bb V)) -> (&'aa K, std::iter::Once<&'bb V>)>;
+
+   fn iter_all(&'a self) -> Self::AllIteratorType {
+      let res: std::iter::Map<hashbrown::hash_map::Iter<K, V>, for <'aa, 'bb> fn ((&'aa K, &'bb V)) -> (&'aa K, std::iter::Once<&'bb V>)> = 
+         self.iter().map(|(k, v)| (k, std::iter::once(v)));
+      res
+   }
+}
+
+
+impl<'a, K: Eq + std::hash::Hash, V: 'a + Clone> RelIndexRead<'a> for LatticeIndexType<K, V> {
+   type IteratorType = std::collections::hash_set::Iter<'a, V>;
+   type Key = K;
+   type Value = &'a V;
+
+
+   #[inline]
+   fn index_get(&'a self, key: &K) -> Option<Self::IteratorType> {
+      let res: Option<std::collections::hash_set::Iter<'a, V>> = 
+         self.get(key).map(HashSet::iter);
+      res
+   }
+
+   #[inline(always)]
+   fn len(&self) -> usize { self.len() }
+
+}
+
+impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for LatticeIndexType<K, V> {
+
+   type Key = K;
+   type Value = &'a V;
+   type ValueIteratorType = std::collections::hash_set::Iter<'a, V>;
+
+   type AllIteratorType = std::iter::Map<std::collections::hash_map::Iter<'a, K, HashSet<V, BuildHasherDefault<FxHasher>>>, for <'aa, 'bb> fn ((&'aa K, &'bb std::collections::HashSet<V, BuildHasherDefault<FxHasher>>)) -> (&'aa K, std::collections::hash_set::Iter<'bb, V>)>;
 
    #[inline]
    fn iter_all(&'a self) -> Self::AllIteratorType {
       use std::collections::hash_map::Iter;
-      type H = std::hash::BuildHasherDefault<nohash_hasher::NoHashHasher<usize>>;
-      let res: std::iter::Map<Iter<K, HashSet<usize, H>>, for <'aa, 'bb> fn ((&'aa K, &'bb HashSet<usize, H>)) -> (&'aa K, std::iter::Cloned<std::collections::hash_set::Iter<'bb, usize>>)> 
-         = self.iter().map(lattice_index_type_iter_all_mapper);
+      type H = BuildHasherDefault<FxHasher>;
+      let res: std::iter::Map<Iter<K, HashSet<V, H>>, for <'aa, 'bb> fn ((&'aa K, &'bb HashSet<V, H>)) -> (&'aa K, std::collections::hash_set::Iter<'bb, V>)> 
+         = self.iter().map(|(k, v)| (k, v.iter()));
       res
    }
 }
 
 
 pub struct RelIndexCombined<'a, Ind1, Ind2> {
-   ind1: &'a Ind1,
-   ind2: &'a Ind2,
+   pub(crate) ind1: &'a Ind1,
+   pub(crate) ind2: &'a Ind2,
 }
 
 impl <'a, Ind1, Ind2> RelIndexCombined<'a, Ind1, Ind2> {
@@ -137,9 +151,10 @@ impl <'a, Ind1, Ind2> RelIndexCombined<'a, Ind1, Ind2> {
    pub fn new(ind1: &'a Ind1, ind2: &'a Ind2) -> Self { Self { ind1, ind2 } }
 } 
 
-impl <'a, Ind1, Ind2, K> RelIndexRead<'a> for RelIndexCombined<'a, Ind1, Ind2> 
-where Ind1: RelIndexRead<'a, Key = K>,  Ind2: RelIndexRead<'a, Key = K>, {
+impl <'a, Ind1, Ind2, K, V> RelIndexRead<'a> for RelIndexCombined<'a, Ind1, Ind2> 
+where Ind1: RelIndexRead<'a, Key = K, Value = V>,  Ind2: RelIndexRead<'a, Key = K, Value = V>, {
     type Key = K;
+    type Value = V;
 
     type IteratorType = Chain<std::iter::Flatten<std::option::IntoIter<Ind1::IteratorType>>, 
                               std::iter::Flatten<std::option::IntoIter<Ind2::IteratorType>>>;
@@ -195,10 +210,11 @@ where Ind1: RelIndexRead<'a, Key = K>,  Ind2: RelIndexRead<'a, Key = K>, {
 //    }
 // }
 
-impl <'a, Ind1, Ind2, K: 'a, VTI: Iterator<Item = usize> + 'a> RelIndexReadAll<'a> for RelIndexCombined<'a, Ind1, Ind2> 
+impl <'a, Ind1, Ind2, K: 'a, V: 'a, VTI: Iterator<Item = V> + 'a> RelIndexReadAll<'a> for RelIndexCombined<'a, Ind1, Ind2> 
 where Ind1: RelIndexReadAll<'a, Key = K, ValueIteratorType = VTI>,  Ind2: RelIndexReadAll<'a, Key = K, ValueIteratorType = VTI>
 {
-    type Key = K;
+   type Key = K;
+   type Value = V;
 
    type ValueIteratorType = VTI;
 

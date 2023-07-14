@@ -5,7 +5,7 @@ use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap:
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
-use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary}, ascent_mir::MirRelationVersion::*, ascent_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type}};
+use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary, IndexValType}, ascent_mir::MirRelationVersion::*, ascent_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type, subsumes, intersects}, syn_utils::pattern_get_vars};
 use crate::ascent_syntax::{CondClause, GeneratorNode, RelationIdentity};
 use crate::{ascent_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, AscentIr}};
 
@@ -18,7 +18,8 @@ pub(crate) struct AscentMir {
    pub relations_metadata: HashMap<RelationIdentity, RelationMetadata>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub declaration: Declaration,
-   pub config: AscentConfig
+   pub config: AscentConfig,
+   pub is_parallel: bool,
 }
 
 pub(crate) struct MirScc {
@@ -47,7 +48,7 @@ pub(crate) struct MirRule {
    // TODO rename to head_clauses
    pub head_clause: Vec<IrHeadClause>,
    pub body_items: Vec<MirBodyItem>,
-   pub has_simple_join: bool,
+   pub simple_join_start_index: Option<usize>,
    pub reorderable: bool
 }
 
@@ -62,10 +63,11 @@ pub(crate) fn mir_rule_summary(rule: &MirRule) -> String {
          MirBodyItem::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
       }
    }
-   format!("{} <-- {}{}",
+   format!("{} <-- {}{simple_join}{reorderable}",
             rule.head_clause.iter().map(|hcl| hcl.rel.name.to_string()).join(", "),
             rule.body_items.iter().map(bitem_to_str).join(", "),
-            if rule.has_simple_join {" [SIMPLE JOIN]"} else {""})
+            simple_join = if rule.simple_join_start_index.is_some() {" [SIMPLE JOIN]"} else {""},
+            reorderable = if rule.simple_join_start_index.is_some() && !rule.reorderable {" [NOT REORDERABLE]"} else {""})
 }
 
 #[derive(Clone)]
@@ -81,6 +83,19 @@ impl MirBodyItem {
       match self {
          MirBodyItem::Clause(cl) => cl,
          _ => panic!("MirBodyItem: unwrap_clause called on non_clause")
+      }
+   }
+
+   pub fn bound_vars(&self) -> Vec<Ident> {
+      match self {
+         MirBodyItem::Clause(cl) => {
+            let cl_vars = cl.args.iter().filter_map(expr_to_ident);
+            let cond_cl_vars = cl.cond_clauses.iter().flat_map(|cc| cc.bound_vars());
+            cl_vars.chain(cond_cl_vars).collect()
+         },
+         MirBodyItem::Generator(gen) => pattern_get_vars(&gen.pattern),
+         MirBodyItem::Cond(cond) => cond.bound_vars(),
+         MirBodyItem::Agg(agg) => pattern_get_vars(&agg.pat),
       }
    }
 }
@@ -123,6 +138,7 @@ pub(crate) struct MirRelation {
    pub version: MirRelationVersion,
    pub is_full_index: bool,
    pub is_no_index: bool,
+   pub val_type: IndexValType,
 }
 
 pub(crate) fn ir_relation_version_var_name(ir_name: &Ident, version : MirRelationVersion) -> Ident{
@@ -149,6 +165,7 @@ impl MirRelation {
          relation: ir_relation.relation,
          indices: ir_relation.indices,
          version,
+         val_type: ir_relation.val_type
       }
    }
 }
@@ -212,11 +229,6 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
          for bitem in rule.body_items.iter() {
             if let Some(rel) = bitem.rel(){
                body_only_relations.entry(rel.relation.clone()).or_default().insert(rel.clone());
-               if rule.is_simple_join {
-                  // body_only_relations.entry(rel.relation.clone()).or_default().insert(hir.relations_full_indices[&rel.relation].clone());
-                  // TODO we can use only no_index, for that codegen needs to be updated.
-                  // body_only_relations.entry(rel.relation.clone()).or_default().insert(hir.relations_no_indices[&rel.relation].clone());
-               }
             }
          }
 
@@ -252,7 +264,7 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
             if let MirBodyItem::Agg(agg) = bi {
                if dynamic_relations.contains_key(&agg.rel.relation) {
                   return Err(syn::Error::new(agg.span, 
-                     format!("use of aggregated relation {} cannot be stratified.", &agg.rel.relation.name)));
+                     format!("use of aggregated relation {} cannot be stratified", &agg.rel.relation.name)));
                }
             }
          }
@@ -283,7 +295,8 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
       // relations_no_indices: hir.relations_no_indices.clone(),
       relations_metadata: hir.relations_metadata.clone(),
       declaration: hir.declaration.clone(),
-      config: hir.config.clone()
+      config: hir.config.clone(),
+      is_parallel: hir.is_parallel,
    })
 }
 
@@ -350,18 +363,18 @@ fn compile_hir_rule_to_mir_rules_old(rule: &IrRule, dynamic_relations: &HashSet<
       .map(|bcls| MirRule {
          body_items: bcls,
          head_clause: rule.head_clauses.clone(),
-         has_simple_join: rule.is_simple_join,
-         reorderable: rule.is_simple_join
+         simple_join_start_index: rule.simple_join_start_index,
+         reorderable: rule.simple_join_start_index == Some(0)
       }).collect()
 }
 
 fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<RelationIdentity>) -> Vec<MirRule>{
    
-   fn versions(count: usize) -> Vec<Vec<MirRelationVersion>> {
+   fn versions_base(count: usize) -> Vec<Vec<MirRelationVersion>> {
       if count == 0 {
          vec![]
       } else {
-         let mut res = versions(count - 1);
+         let mut res = versions_base(count - 1);
          for i in 0..res.len() {
             res[i].push(MirRelationVersion::TotalDelta);
          }
@@ -370,6 +383,34 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
          res.push(new_combination);
          res
       }
+   }
+
+   // TODO is it worth it?
+   fn versions(dynamic_cls: &[usize], simple_join_start_index: Option<usize>) -> Vec<Vec<MirRelationVersion>> {
+      fn remove_total_delta_at_index(ind: usize, res: &mut Vec<Vec<MirRelationVersion>>) {
+         let mut i = 0;
+         while i < res.len() {
+            if res[i].get(ind) == Some(&TotalDelta) {
+               res.insert(i + 1, res[i].clone());
+               res[i][ind] = Total;
+               res[i + 1][ind] = Delta;
+            }
+            i += 1;
+         }
+      }
+      
+      let count = dynamic_cls.len();
+      let mut res = versions_base(count);
+      let no_total_delta_at_beginning = false;
+      if no_total_delta_at_beginning {
+         if let Some(ind) = simple_join_start_index {
+            remove_total_delta_at_index(ind, &mut res);
+            remove_total_delta_at_index(ind + 1, &mut res);
+         } else if dynamic_cls.get(0) == Some(&0) {
+            remove_total_delta_at_index(0, &mut res);
+         }
+      }
+      res
    }
 
    fn hir_body_item_to_mir_body_item(hir_bitem : &IrBodyItem, version: Option<MirRelationVersion>) -> MirBodyItem{
@@ -402,7 +443,7 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
       _ => None,
    }).collect_vec();
 
-   let version_combinations = if dynamic_cls.len() == 0 {vec![vec![]]} else {versions(dynamic_cls.len())};
+   let version_combinations = if dynamic_cls.len() == 0 {vec![vec![]]} else {versions(&dynamic_cls[..], rule.simple_join_start_index)};
 
    let mut mir_body_items = Vec::with_capacity(version_combinations.len());
 
@@ -413,12 +454,20 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
          .collect_vec();
       mir_body_items.push(mir_bodys)
    }
-   
-   mir_body_items.into_iter()
-      .map(|bcls| MirRule {
+
+   mir_body_items.into_iter().map(|bcls| {
+
+      // rule is reorderable if it is a simple join and the second clause does not depend on items 
+      // before the first clause (i.e., let z = &1, foo(x, y), bar(y, z) is not reorderable)
+      let reorderable = rule.simple_join_start_index.map_or(false, |ind| {
+         let pre_first_clause_vars = bcls.iter().take(ind).flat_map(MirBodyItem::bound_vars);
+         !intersects(pre_first_clause_vars, bcls[ind + 1].bound_vars().into_iter())
+      });
+      MirRule {
          body_items: bcls,
          head_clause: rule.head_clauses.clone(),
-         has_simple_join: rule.is_simple_join,
-         reorderable: rule.is_simple_join
-      }).collect()
+         simple_join_start_index: rule.simple_join_start_index,
+         reorderable
+      }
+   }).collect()
 }

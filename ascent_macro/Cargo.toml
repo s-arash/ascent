@@ -25,3 +25,5 @@ duplicate = "0.4"
 
 [dev-dependencies]
 ascent = { path = "../ascent" }
+rayon = "1.5"
+crossbeam = "0.8"

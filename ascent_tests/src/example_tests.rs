@@ -2,6 +2,8 @@ use ascent::ascent_run;
 use ascent::ascent;
 use std::rc::Rc;
 use ascent::aggregators::mean;
+use crate::ascent_m_par;
+use crate::ascent_run_m_par;
 use crate::assert_rels_eq;
 use crate::utils::rels_equal;
 use std::hash::Hash;
@@ -28,7 +30,7 @@ fn test_agg_example() {
    type Student = u32;
    type Course = u32;
    type Grade = u16;
-   ascent! {
+   ascent_m_par! {
       relation student(Student);
       relation course_grade(Student, Course, Grade);
       relation avg_grade(Student, Grade);
@@ -38,11 +40,11 @@ fn test_agg_example() {
          agg avg = mean(g) in course_grade(s, _, g);
    }
    let mut prog = AscentProgram::default();
-   prog.student = vec![(1, ), (2, )];
-   prog.course_grade = vec![(1, 600, 60), (1, 602, 80), (2, 602, 70), (2, 605, 90)];
+   prog.student = FromIterator::from_iter([(1, ), (2, )]);
+   prog.course_grade = FromIterator::from_iter([(1, 600, 60), (1, 602, 80), (2, 602, 70), (2, 605, 90)]);
    prog.run();
    println!("avg grade: {:?}", prog.avg_grade);
-   assert!(rels_equal(&prog.avg_grade, &[(1, 70), (2, 80)]));
+   assert_rels_eq!(&prog.avg_grade, &[(1, 70), (2, 80)]);
 }
 
 #[test]
@@ -85,7 +87,7 @@ fn test_generic_tc_example() {
 
 #[test]
 fn test_borrowed_strings() {
-   ascent! {
+   ascent_m_par! {
       struct Ancestory<'a>;
       relation parent(&'a str, &'a str);
       relation ancestor(&'a str,&'a str);
@@ -108,4 +110,30 @@ fn test_borrowed_strings() {
    prog.run();
    println!("ancestors: {:?}", prog.ancestor);
    assert_eq!(prog.ancestor.len(), 3);
+}
+
+#[test]
+fn test_borrowed_strings_2() {
+
+   fn ancestory_fn<'a>(parent_rel: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<(&'a str, &'a str)> {
+      ascent_run_m_par! {
+         struct Ancestory<'a>;
+         relation parent(&'a str, &'a str) = parent_rel.collect();
+         relation ancestor(&'a str,&'a str);
+
+         ancestor(p, c) <-- parent(p, c);
+
+         ancestor(p, gc) <--
+            parent(p, c), ancestor(c, gc);
+      }.ancestor.into_iter().collect()
+   }
+
+   let james = "James".to_string();
+   let harry = "Harry".to_string();
+   let albus = "Albus".to_string();
+
+   let parent_rel = vec![(james.clone(), harry.clone()), (harry.clone(), albus.clone())];
+   let ancestor = ancestory_fn(parent_rel.iter().map(|(x, y)| (&x[..], &y[..])));
+   println!("ancestors: {:?}", ancestor);
+   assert_eq!(ancestor.len(), 3);
 }
