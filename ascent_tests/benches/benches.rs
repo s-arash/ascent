@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
+use ascent_tests::ascent_m_par;
 use stopwatch::Stopwatch;
 use ascent::{ascent};
 use ascent::lattice::Dual;
@@ -94,7 +95,7 @@ fn bench_lattice(){
 
 
 fn bench_tc_path_join_path(nodes_count: i32) {
-   ascent! {
+   ascent_m_par! {
       // #![include_rule_times]
       struct TCPathJoinPath;
       relation edge(i32, i32);
@@ -112,9 +113,8 @@ fn bench_tc_path_join_path(nodes_count: i32) {
    let mut stopwatch = Stopwatch::start_new();
    tc.run();
    stopwatch.stop();
-   println!("{}", TCPathJoinPath::summary());
    println!("tc path_join_path for {} nodes took {:?}", nodes_count, stopwatch.elapsed());
-   println!("summary: \n{}", tc.scc_times_summary());
+   // println!("summary: \n{}", tc.scc_times_summary());
    println!("path size: {}", tc.path.len());
 }
 

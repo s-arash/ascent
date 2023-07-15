@@ -74,18 +74,22 @@ impl<K: Clone + Hash + Eq, V> CRelIndex<K, V> {
       }
    }
 
+   #[inline]
    #[allow(dead_code)]
    // TODO remove if not used
    fn insert2(&self, key: K, value: V) {
-      let dm = self.unwrap_unfrozen();
-
-      let hash = dm.hash_usize(&key);
-
-      let idx = dm.determine_shard(hash);
+      use std::hash::Hasher;
       use dashmap::Map;
+
+      let dm = self.unwrap_unfrozen();
+      let mut hasher = dm.hasher().build_hasher();
+      key.hash(&mut hasher);
+      let hash = hasher.finish();
+
+      let idx = dm.determine_shard(hash as usize);
       let mut shard = unsafe { dm._yield_write_shard(idx) };
 
-      match shard.raw_entry_mut().from_key_hashed_nocheck(hash as u64, &key) {
+      match shard.raw_entry_mut().from_key_hashed_nocheck(hash, &key) {
          hashbrown::hash_map::RawEntryMut::Occupied(mut occ) => {
             occ.get_mut().get_mut().push(value);
          },
