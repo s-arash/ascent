@@ -70,7 +70,7 @@ impl<K: Clone + Hash + Eq, V> CRelIndex<K, V> {
    fn insert(&self, key: K, value: V) {
       match self.unwrap_unfrozen().entry(key) {
          dashmap::mapref::entry::Entry::Occupied(mut occ) => {occ.get_mut().push(value);},
-         dashmap::mapref::entry::Entry::Vacant(vac) => {vac.insert_quick(vec![value]);},
+         dashmap::mapref::entry::Entry::Vacant(vac) => {vac.insert(vec![value]);},
       }
    }
 

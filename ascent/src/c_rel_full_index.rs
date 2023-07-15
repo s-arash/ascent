@@ -86,7 +86,7 @@ impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
       use dashmap::Map;
       let mut shard = unsafe { dm._yield_write_shard(idx) };
 
-      match shard.raw_entry_mut().from_key_hashed_nocheck(hash as u64, &key) {
+      match shard.raw_entry_mut().from_key_hashed_nocheck(hash as u64, key) {
          hashbrown::hash_map::RawEntryMut::Occupied(_) => false,
          hashbrown::hash_map::RawEntryMut::Vacant(vac) => {
             vac.insert(key.clone(), SharedValue::new(value));
