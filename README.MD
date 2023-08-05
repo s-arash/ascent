@@ -167,7 +167,7 @@ You can find more about macros in Ascent macros [here](MACROS.MD).
 - The feature **`wasm-bindgen`** allows Ascent programs to run in WASM environments.
 
 - **`struct`** declarations can be added to the top of `ascent!` definitions. This allows changing the
-  name of the generated type and introduction of type/lifetime parameters and constraints.
+  name and visibility of the generated type and introduction of type/lifetime parameters and constraints.
    ```Rust
    ascent! {
       struct GenericTC<N: Clone + Eq + Hash>;
@@ -175,3 +175,6 @@ You can find more about macros in Ascent macros [here](MACROS.MD).
       // ...
    }
    ```
+
+   *Hint*: If you get a "private type ... in public interface (error E0446)" warning, you can fix it by
+   making the generated Ascent type private, as done in the above example.
