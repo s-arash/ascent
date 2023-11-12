@@ -48,7 +48,6 @@ pub use rel_full_ind;
 #[macro_export]
 macro_rules! rel_ind {
    ($name: ident, $field_types: ty, $indices: expr, ser, (), $ind: expr, $key: ty, $val: ty) => {
-      // ascent::internal::RelIndexType1<$key, $val>
       ascent::rel::ToRelIndexType<$key, $val>
    };
    ($name: ident, $field_types: ty, $indices: expr, par, (), [], $key: ty, $val: ty) => {

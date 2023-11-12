@@ -5,6 +5,8 @@ Ascent is a logic programming language (similar to Datalog) embedded in Rust via
 
 For more information, check out [the CC paper](https://s-arash.github.io/ascent/cc22main-p95-seamless-deductive-inference-via-macros.pdf) on Ascent.
 
+In addition, [the OOPSLA paper](https://dl.acm.org/doi/pdf/10.1145/3622840) describes the "Bring Your Own Data Structures to Datalog" aspect of Ascent.
+
 ## Examples
 
 ### Computing all the connected nodes in a graph
@@ -53,6 +55,20 @@ ascent! {
    cargo run
    ```
 ## Features
+
+## BYODS
+BYODS (short for Bring Your Own Data Structures to Datalog) is an extension of Ascent that enables relations to be backed by custom data structures. This feature allows improving the algorithmic complexity of Ascent programs by optimizing the data structures used to back relations. For example, a program that requires transitive relation computation of a large graph could improve its performance by choosing a union-find based data structure for the transitive closure relation:
+
+```Rust
+ascent! {
+   #[ds(trrel_uf)]
+   relation path(Node, Node);
+   
+   path(x, y) <-- edge(x, y);
+}
+```
+
+The `#[ds(trrel_uf)]` attibute directs the Ascent compiler to use the data structure provider defined in the module `trrrel_uf` for the `path` relation. See [BYODS.MD](BYODS.MD) for more information on BYODS.
 
 ### Lattices
 

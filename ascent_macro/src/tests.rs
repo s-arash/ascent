@@ -66,8 +66,9 @@ fn test_macro0() {
 #[test]
 fn test_macro_generic_tc() {
    let inp = quote!{
+      #![ds(custom_ds)]
       struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Sync + Send;
-      #[ds(DS: arg1, arg2)]
+      #[ds(ascent::rel)]
       relation edge(TNode, TNode);
       relation path(TNode, TNode);
 
@@ -175,7 +176,7 @@ fn test_macro3() {
 fn test_macro_agg() {
    let inp = quote!{
       relation foo(i32, i32);
-      relation bar(i32, i32, i32);
+      lattice bar(i32, i32, i32);
       relation baz(i32, i32, i32);
 
       baz(x, y, min_z) <--
@@ -195,7 +196,7 @@ fn test_macro_generator() {
       path(*x, *z) <-- edge(x,y), path(y, z);
    };
 
-   write_to_scratchpad(input);
+   write_par_to_scratchpad(input);
 }
 
 #[test]

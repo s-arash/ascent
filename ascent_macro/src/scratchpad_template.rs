@@ -30,6 +30,7 @@ fn _test<T: FactTypes>() {
    use ascent::lattice::set::Set;
    use ascent::Dual;
 
+   use ascent::rel as custom_ds;
    todo!("here");
    ;
 }
