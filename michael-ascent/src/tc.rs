@@ -2,8 +2,6 @@ use ascent::ascent;
 use rand::Rng;
 use std::collections::HashSet;
 
-// https://arxiv.org/pdf/2103.15217
-
 ascent! {
    relation edge(i32, i32);
    // i32 is 32 bit integer
