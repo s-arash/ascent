@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 ascent = { path = "../ascent" }
 rand = "0.8.5"
+rustacuda = "0.1"
+rustacuda_core = "0.1"
+rustacuda_derive = "0.1"

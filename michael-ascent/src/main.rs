@@ -1,44 +1,93 @@
 use ascent::ascent;
 use rand::Rng;
 use std::collections::HashSet;
+use std::error::Error;
 
-ascent! {
-   relation edge(i32, i32);
-   // i32 is 32 bit integer
-   // Rust should make sure the data is 32 bit
-   relation path(i32, i32);
+// https://arxiv.org/pdf/2103.15217
 
-   path(x, y) <-- edge(x, y);
-   path(x, z) <-- edge(x, y), path(y, z);
+mod tc {
+    use ascent::ascent;
+
+    ascent! {
+       relation edge(i32, i32);
+       relation path(i32, i32);
+       // edge(x, x + 1) <-- for x in (0..1000);
+       path(*x, *y) <-- edge(x,y);
+       path(*x, *z) <-- edge(x,y), path(y, z);
+       // path(*x, *z) <-- path(x,y), edge(y, z);
+
+    }
 }
 
-// too tired to be writing the paths
-fn gen_pairs(amnt: i32, edge_amnt: usize) -> Vec<(i32, i32)> {
-   /*
-      https://www.reddit.com/r/rust/comments/2552cj/let_vs_let_mut_syntax_rather_verbose/
+fn loop_graph(nodes: usize) -> Vec<(i32, i32)> {
+    let mut res = vec![];
+    let nodes = nodes as i32;
+    for x in 0..nodes {
+        res.push((x, (x + 1) % nodes));
+    }
+    res
+}
 
-      mut is a key to say it is mutable
-   */
-   let mut rng = rand::thread_rng();
-   let mut edges = HashSet::new();
+fn complete_graph(nodes: usize) -> Vec<(i32, i32, u32)> {
+    let mut res = vec![];
+    let nodes = nodes as i32;
+    for x in 0..nodes {
+        for y in 0..nodes {
+            if x != y {
+                res.push((x, y, 1));
+            }
+        }
+    }
+    res
+}
 
-   while edges.len() < edge_amnt {
-      let x = rng.gen_range(1..=amnt);
-      let y = rng.gen_range(1..=amnt);
+fn bench_tc_for_graph(graph: Vec<(i32, i32)>, name: &str) {
+    /**
+     * This function benchmarks given a graph. I will utilize this for random or file read graphs
+     */
+    let before = Instant::now();
+    let mut tc = tc::AscentProgram::default();
+    tc.edge = graph;
+    tc.run();
+    let elapsed = before.elapsed();
+    println!("tc for {} took {:?}", name, elapsed);
+    // println!("summary: \n{}", tc.scc_times_summary());
+    println!("path size: {}", tc.path.len());
+}
 
-      if x != y { // prob dont want self loops
-         edges.insert((x, y));
-      }
-   }
+fn random_graph(nodes: usize) -> Vec<(i32, i32)> {
+    /**
+     * This will generate a random graph and feed it to bench_tc_for_graph()
+     */
+}
 
-   edges.into_iter().collect() // should turn the hashset to vec
+fn bench_tc_path_join_path(nodes_count: i32) {
+    /**
+     * This function does linear graph parallel benchmarking
+     */
+    ascent_m_par! {
+       // #![include_rule_times]
+       struct TCPathJoinPath;
+       relation edge(i32, i32);
+       relation path(i32, i32);
+       path(x, z) <-- path(x,y), path(y, z);
+       path(x, y) <-- edge(x,y);
+    }
+    let mut tc = TCPathJoinPath::default();
+    println!("{}", TCPathJoinPath::summary());
 
-   // also since the last statement does not have a semicolon, it should indicate that it is a return (which is a CRAZY thing)
+    for i in 0..nodes_count {
+        tc.edge.push((i, i + 1));
+    }
+
+    let mut stopwatch = Stopwatch::start_new();
+    tc.run();
+    stopwatch.stop();
+    println!("tc path_join_path for {} nodes took {:?}", nodes_count, stopwatch.elapsed());
+    // println!("summary: \n{}", tc.scc_times_summary());
+    println!("path size: {}", tc.path.len());
 }
 
 fn main() {
-   let mut prog = AscentProgram::default();
-   prog.edge = gen_pairs(10000000, 10000000);
-   prog.run();
-   println!("Path: {:?}", prog.path);
+    bench_tc_path_join_path(100000);
 }
