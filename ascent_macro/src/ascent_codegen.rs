@@ -215,7 +215,6 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let (impl_generics, ty_generics, where_clause) = mir.declaration.generics.split_for_impl();
    let vis = &mir.declaration.visibility;
    let struct_name = &mir.declaration.ident;
-   let generics = &mir.declaration.generics;
    let struct_attrs = &mir.declaration.attrs;
    let summary_fn = if is_ascent_run { quote! {
       pub fn summary(&self) -> &'static str {#summary}
@@ -226,7 +225,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let rule_time_fields_defaults = if mir.config.include_rule_times {rule_time_fields_defaults} else {vec![]};
    let res = quote! {
       #(#struct_attrs)*
-      #vis struct #struct_name #generics {
+      #vis struct #struct_name #ty_generics {
          #(#relation_fields)*
          #(#scc_time_fields)*
          #(#rule_time_fields)*
