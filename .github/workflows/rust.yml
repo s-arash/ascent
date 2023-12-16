@@ -63,3 +63,23 @@ jobs:
     - name: Run macro tests
       working-directory: ./ascent_macro
       run: cargo test test  
+  
+  dependency-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v2
+      - run: cargo --version
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            override: true
+            toolchain: nightly
+
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: taiki-e/install-action@cargo-minimal-versions
+
+      - name: cargo minimal-versions
+        run: cargo +stable minimal-versions check --workspace --all-features --ignore-private -v
+  
