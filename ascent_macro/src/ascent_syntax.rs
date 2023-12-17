@@ -1,9 +1,9 @@
 extern crate proc_macro;
 use ascent_base::util::update;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{Span, TokenStream, TokenTree, Delimiter};
 use syn::{
    braced, parenthesized, parse2, punctuated::Punctuated, spanned::Spanned, Attribute, Error, Expr, ExprMacro,
-   ExprPath, GenericParam, Generics, Ident, ItemMacro2, MacroDelimiter, Pat, Result, Token, Type, Visibility,
+   ExprPath, GenericParam, Generics, Ident, ItemMacro2, MacroDelimiter, Pat, Path, Result, Token, Type, Visibility,
    WhereClause,
 };
 use syn::token::{Comma, Gt, Lt};
@@ -545,6 +545,29 @@ impl From<&RelationNode> for RelationIdentity{
       }
    }
 } 
+
+#[derive(Clone)]
+pub(crate) struct DsAttributeContents {
+   pub path: syn::Path,
+   pub args: TokenStream,
+}
+
+impl Parse for DsAttributeContents {
+   fn parse(input: ParseStream) -> Result<Self> {
+      let content;
+      parenthesized!(content in input);
+
+      let path = syn::Path::parse_mod_style(&content)?;
+      let args = if content.peek(Token![:]) {
+         content.parse::<Token![:]>()?;
+         TokenStream::parse(&content)?
+      } else {
+         TokenStream::default()
+      };
+
+      Ok(Self { path, args })
+   }
+}
 
 fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
    fn bitem_desugar(bitem: &BodyItemNode) -> Vec<Vec<BodyItemNode>> {

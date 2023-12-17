@@ -66,7 +66,9 @@ fn test_macro0() {
 #[test]
 fn test_macro_generic_tc() {
    let inp = quote!{
+      #![ds(custom_ds)]
       struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Sync + Send;
+      #[ds(ascent::rel)]
       relation edge(TNode, TNode);
       relation path(TNode, TNode);
 
@@ -98,7 +100,7 @@ fn test_macro_multiple_dynamic_clauses() {
 #[test]
 fn test_macro_tc() {
    let inp = quote!{
-      #![measure_rule_times]
+      // #![measure_rule_times]
       struct TC;
       relation edge(i32, i32);
       relation path(i32, i32);
@@ -135,6 +137,39 @@ fn test_macro2() {
 }
 
 #[test]
+fn test_clone_warning() {
+   let input = quote! {
+      struct Ancestory<'a>;
+      relation parent(&'a str, &'a str);
+      relation ancestor(&'a str,&'a str);
+
+      ancestor(p, c) <-- parent(p, c);
+
+      ancestor(p, gc) <--
+         parent(p, c), ancestor(c, gc);
+   };
+
+   write_to_scratchpad(input);
+}
+
+#[test]
+fn test_macro_unary_rels() {
+   let input = quote! {
+      relation foo(i32);
+      relation bar(i32);
+      relation baz(i32, i32);
+      foo(1);
+
+      bar(3);
+
+      foo(x), bar(y) <-- baz(x, y);
+      baz(x, x + 1) <-- foo(x), bar(x);
+   };
+
+   write_to_scratchpad(input);
+}
+
+#[test]
 fn test_macro3() {
    let input = quote! {
       relation bar(i32, i32);
@@ -157,7 +192,7 @@ fn test_macro3() {
 fn test_macro_agg() {
    let inp = quote!{
       relation foo(i32, i32);
-      relation bar(i32, i32, i32);
+      lattice bar(i32, i32, i32);
       relation baz(i32, i32, i32);
 
       baz(x, y, min_z) <--
@@ -177,7 +212,7 @@ fn test_macro_generator() {
       path(*x, *z) <-- edge(x,y), path(y, z);
    };
 
-   write_to_scratchpad(input);
+   write_par_to_scratchpad(input);
 }
 
 #[test]
@@ -201,11 +236,35 @@ fn test_macro_sp(){
       relation edge(i32, i32, u32);
       lattice shortest_path(i32, i32, Dual<u32>);
       
+      edge(1, 2, 30);
+
       shortest_path(x, y, Dual(*len)) <-- edge(x, y, len);
       shortest_path(x, z, Dual(len + plen)) <-- edge(x, y, len), shortest_path(y, z, ?Dual(plen));
    };
    // write_to_scratchpad(input);
    write_par_to_scratchpad(input);
+}
+
+#[test]
+fn test_lattice(){
+   let input = quote! {
+      relation foo(i32, i32);
+      relation bar(i32, i32);
+
+      bar(x, x+1) <-- for x in 0..10;
+      foo(*x, *y) <-- bar(x, y);
+
+      lattice foo_as_set(ascent::lattice::set::Set<(i32, i32)>);
+      foo_as_set(ascent::lattice::set::Set::singleton((*x, *y))) <-- foo(x, y);
+
+      relation baz(i32, i32);
+      baz(1, 2);
+      baz(1, 3);
+
+      relation res(i32, i32);
+      res(*x, *y) <-- baz(x, y), foo_as_set(all_foos), if !all_foos.contains(&(*x, *y));
+   };
+   write_to_scratchpad(input);
 }
 
 #[test]
@@ -215,7 +274,8 @@ fn test_macro_lattices(){
       relation edge(i32, i32, u32);
 
       longest_path(x, y, ew) <-- edge(x, y, ew);
-      longest_path(x, z, *ew + *w) <-- edge(x, y, ew), longest_path(y, z, w);
+      // longest_path(x, z, *ew + *w) <-- edge(x, y, ew), longest_path(y, z, w);
+      longest_path(x, z, *l1 + *l2) <-- longest_path(x, y, l1), longest_path(y, z, l2);
 
 
       // edge(1,2, 3);

@@ -8,7 +8,7 @@ use std::time::Instant;
 use rayon::prelude::*;
 
 use crate::c_rel_index::CRelIndex;
-use crate::internal::RelIndexWrite;
+use crate::internal::{RelIndexWrite, Freezable};
 use crate::rel_index_read::RelIndexRead;
 use std::sync::atomic::Ordering::Relaxed;
 
@@ -111,10 +111,11 @@ fn bench_crel_index() {
    let before = Instant::now();
    let mut _sum = 0;
    for _ in 0..iters {
-      rel_index.freeze();
+      crate::internal::Freezable::freeze(&mut rel_index as _);
       _sum += rel_index.index_get(&42).unwrap().next().unwrap();
       rel_index.unfreeze();
    }
+   
    let elapsed = before.elapsed();
 
    println!("freeze_unfreeze for {} iterations time: {:?}", iters, elapsed);

@@ -113,47 +113,78 @@ impl<T: BoundedLattice + Eq> BoundedLattice for Option<T> where Option<T> : Latt
 
 
 impl<T: Lattice + Clone> Lattice for Rc<T> {
-   fn meet(self, other: Self) -> Self {
+   fn meet(mut self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
-         Some(cmp) => if cmp.is_le() {self} else {other},
-         None => Rc::new(self.deref().clone().meet(other.deref().clone())),
+         Some(cmp) => if cmp.is_le() {self.clone()} else {other.clone()},
+         None => { 
+            if let Some(self_owned) = Rc::get_mut(&mut self){
+               self_owned.meet_mut(other.deref().clone());
+               self
+            } else {
+               Rc::new(self.deref().clone().meet(other.deref().clone()))
+            }
+         },
       }
    }
 
-   fn join(self, other: Self) -> Self {
+   fn join(mut self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
-         Some(cmp) => if cmp.is_ge() {self} else {other},
-         None => Rc::new(self.deref().clone().join(other.deref().clone())),
+         Some(cmp) => if cmp.is_ge() {self.clone()} else {other.clone()},
+         None => { 
+            if let Some(self_owned) = Rc::get_mut(&mut self){
+               self_owned.join_mut(other.deref().clone());
+               self
+            } else {
+               Rc::new(self.deref().clone().join(other.deref().clone()))
+            }
+         },
       }
    }
 }
 
 impl<T: Lattice + Clone> Lattice for Arc<T> {
-   fn meet(self, other: Self) -> Self {
+   fn meet(mut self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
          Some(cmp) => if cmp.is_le() {self.clone()} else {other.clone()},
-         None => Arc::new(self.deref().clone().meet(other.deref().clone())),
+         None => { 
+            if let Some(self_owned) = Arc::get_mut(&mut self){
+               self_owned.meet_mut(other.deref().clone());
+               self
+            } else {
+               Arc::new(self.deref().clone().meet(other.deref().clone()))
+            }
+         },
       }
    }
 
-   fn join(self, other: Self) -> Self {
+   #[allow(unused_mut)]
+   fn join(mut self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
          Some(cmp) => if cmp.is_ge() {self.clone()} else {other.clone()},
-         None => Arc::new(self.deref().clone().join(other.deref().clone())),
+         None => {
+            if let Some(self_owned) = Arc::get_mut(&mut self){
+               self_owned.join_mut(other.deref().clone());
+               self
+            } else {
+               Arc::new(self.deref().clone().join(other.deref().clone()))
+            }
+         } 
       }
    }
 }
 
 impl<T: Lattice + Sized> Lattice for Box<T> {
-   fn meet(self, other: Self) -> Self {
-      Box::new((*self).meet(*other))
+   fn meet(mut self, other: Self) -> Self {
+      (*self).meet_mut(*other);
+      self
    }
 
-   fn join(self, other: Self) -> Self {
-      Box::new((*self).join(*other))
+   fn join(mut self, other: Self) -> Self {
+      (*self).join_mut(*other);
+      self
    }
 }

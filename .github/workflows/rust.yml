@@ -2,9 +2,11 @@ name: Rust
 
 on:
   push:
-    branches: [ master, ci, lattices, wasm-support, macro-in-macro, rel-index-trait, par ]
+    branches: [ master, ci, par, byods ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, byods ]
+    paths-ignore:
+      - '**/*.MD'
 
 env:
   CARGO_TERM_COLOR: always
