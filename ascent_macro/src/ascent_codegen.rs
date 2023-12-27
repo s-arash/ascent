@@ -657,7 +657,7 @@ fn compile_scc_times_summary_body(mir: &AscentMir) -> proc_macro2::TokenStream {
          }
          res.push(quote! {
             let sum_of_rule_times = #sum_of_rule_times;
-            writeln!(&mut res, "  some of rule times: {:?}", sum_of_rule_times).unwrap();
+            writeln!(&mut res, "  sum of rule times: {:?}", sum_of_rule_times).unwrap();
          });
          for (rule_ind, rule) in mir.sccs[i].rules.iter().enumerate() {
             let rule_time_field = rule_time_field_name(i, rule_ind);

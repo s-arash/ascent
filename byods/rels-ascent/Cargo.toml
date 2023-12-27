@@ -1,0 +1,23 @@
+[package]
+name = "rels-ascent"
+version = "0.1.0"
+edition = "2021"
+
+[dev-dependencies]
+proptest = "1"
+rand = "0.8"
+serde = "1.0.193"
+csv = "1"
+separator = "0.4.1"
+
+
+[dependencies]
+ascent = { path = "../../ascent", version = "0.5.0" }
+itertools = "0.12"
+rustc-hash = "1.1"
+derive_more = "0.99"
+paste = "1.0"
+hashbrown = { version = "0.14", features = ["raw", "rayon"] }
+
+[features]
+compact = []

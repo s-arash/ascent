@@ -66,6 +66,22 @@ jobs:
       working-directory: ./ascent_macro
       run: cargo test test  
   
+  byods-rels:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      
+      - name: cargo test
+        working-directory: ./byods/rels-ascent
+        run: cargo test
+     
   dependency-check:
     runs-on: ubuntu-latest
     
