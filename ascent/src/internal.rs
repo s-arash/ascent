@@ -206,7 +206,7 @@ pub struct TypeConstraints<T> where T : Clone + Eq + Hash{_t: ::core::marker::Ph
 /// type constraints for a lattice
 pub struct LatTypeConstraints<T> where T : Clone + Eq + Hash + Lattice{_t: ::core::marker::PhantomData<T>}
 
-/// type contraints for parallel Ascent
+/// type constraints for parallel Ascent
 pub struct ParTypeConstraints<T> where T: Send + Sync {_t: ::core::marker::PhantomData<T>}
 
 #[inline(always)]
