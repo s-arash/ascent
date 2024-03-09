@@ -459,7 +459,7 @@ pub(crate) fn rule_node_summary(rule: &RuleNode) -> String {
 
 #[derive(Parse)]
 pub struct MacroDefParam {
-   dollor: Token![$],
+   dollar: Token![$],
    name: Ident,
    colon: Token![:],
    kind: MacroParamKind
@@ -775,10 +775,10 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
             let mut new_cond_clauses = vec![];
             for arg_ind in 0..cl.args.len() {
                let expr = cl.args[arg_ind].unwrap_expr_ref();
-               let expr_has_vars_from_same_caluse =
+               let expr_has_vars_from_same_clause =
                   expr_get_vars(&expr).iter()
                   .any(|var| if let Some(cl_ind) = grounded_vars.get(&var) {*cl_ind == i} else {false});
-               if expr_has_vars_from_same_caluse {
+               if expr_has_vars_from_same_clause {
                   let new_ident = fresh_ident(&expr_to_ident(expr).map(|e| e.to_string()).unwrap_or_else(|| "expr_replaced".to_string()), expr.span());
                   new_cond_clauses.push(CondClause::If(
                      parse2(quote_spanned! {expr.span()=> if #new_ident.eq(&(#expr))}).unwrap()

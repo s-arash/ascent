@@ -88,7 +88,7 @@ fn test_generic_tc_example() {
 #[test]
 fn test_borrowed_strings() {
    ascent_m_par! {
-      struct Ancestory<'a>;
+      struct Ancestry<'a>;
       relation parent(&'a str, &'a str);
       relation ancestor(&'a str,&'a str);
 
@@ -104,7 +104,7 @@ fn test_borrowed_strings() {
 
    let parent_rel = vec![(james.clone(), harry.clone()), (harry.clone(), albus.clone())];
 
-   let mut prog = Ancestory::default();
+   let mut prog = Ancestry::default();
    // prog.parent = vec![(&zal[..], &rostam[..]), (&rostam[..], &sohrab[..])];
    prog.parent = parent_rel.iter().map(|(p, c)| (&p[..], &c[..])).collect();
    prog.run();
@@ -115,9 +115,9 @@ fn test_borrowed_strings() {
 #[test]
 fn test_borrowed_strings_2() {
 
-   fn ancestory_fn<'a>(parent_rel: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<(&'a str, &'a str)> {
+   fn ancestry_fn<'a>(parent_rel: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<(&'a str, &'a str)> {
       ascent_run_m_par! {
-         struct Ancestory<'a>;
+         struct Ancestry<'a>;
          relation parent(&'a str, &'a str) = parent_rel.collect();
          relation ancestor(&'a str,&'a str);
 
@@ -133,7 +133,7 @@ fn test_borrowed_strings_2() {
    let albus = "Albus".to_string();
 
    let parent_rel = vec![(james.clone(), harry.clone()), (harry.clone(), albus.clone())];
-   let ancestor = ancestory_fn(parent_rel.iter().map(|(x, y)| (&x[..], &y[..])));
+   let ancestor = ancestry_fn(parent_rel.iter().map(|(x, y)| (&x[..], &y[..])));
    println!("ancestors: {:?}", ancestor);
    assert_eq!(ancestor.len(), 3);
 }

@@ -863,7 +863,7 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
 
             let vars_assignments = clause_var_assignments(
                &MirRelation::from(agg.rel.clone(), MirRelationVersion::Total), agg_args_tuple_indices, 
-               &parse_quote_spanned!{agg.span=> __val}, &parse_quote_spanned!{agg.span=>__agregated_rel},
+               &parse_quote_spanned!{agg.span=> __val}, &parse_quote_spanned!{agg.span=>__aggregated_rel},
                false, mir
             );
 
@@ -873,10 +873,10 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
             let _self = quote!{ _self };
             quote_spanned! {agg.span=>
                let __matching = #rel_version_var_name.index_get( &#selected_args_tuple);
-               let __agregated_rel = &#_self.#rel_name;
+               let __aggregated_rel = &#_self.#rel_name;
                let __agg_args = __matching.into_iter().flatten()
                      .map(|__val| {
-                              // let __row = &__agregated_rel[__val];
+                              // let __row = &__aggregated_rel[__val];
                               #vars_assignments
                               #agg_args_tuple
                      });
