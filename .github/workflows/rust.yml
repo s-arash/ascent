@@ -57,7 +57,9 @@ jobs:
 
     - name: Run wasm tests
       working-directory: ./wasm-tests
-      run: wasm-pack test  --headless --firefox
+      run: |
+        cargo tree
+        wasm-pack test  --headless --firefox
 
       # macro tests should be last, because they produce scratchpad.rs, which my not compile
     - name: Run macro tests
