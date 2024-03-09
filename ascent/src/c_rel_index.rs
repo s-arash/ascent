@@ -253,8 +253,10 @@ where
    }
 }
 
+type CRelIndexReadAllParIterShard<K, V, S> = hashbrown::HashMap<K, SharedValue<VecType<V>>, S>;
+
 pub struct CRelIndexReadAllParIter<'a, K, V, S> {
-   shards: &'a [RwLock<hashbrown::HashMap<K, SharedValue<VecType<V>>, S>>]
+   shards: &'a [RwLock<CRelIndexReadAllParIterShard<K, V, S>>]
 }
 
 impl<'a, K, V, S> ParallelIterator for CRelIndexReadAllParIter<'a, K, V, S>
@@ -287,7 +289,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: Clone + 'a + Sync + Send> C
 
    #[inline]
    fn c_iter_all(&'a self) -> Self::AllIteratorType {
-      CRelIndexReadAllParIter{shards: &self.unwrap_frozen().shards()}
+      CRelIndexReadAllParIter{shards: self.unwrap_frozen().shards()}
    }
 }
 
@@ -309,8 +311,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelIndexWrite for CRelIndex<K, V> {
 
 pub fn shards_count() -> usize {
    static RES: once_cell::sync::Lazy<usize> = once_cell::sync::Lazy::new(|| {
-      let res = (rayon::current_num_threads() * 4).next_power_of_two();
-      res
+      (rayon::current_num_threads() * 4).next_power_of_two()
       // (std::thread::available_parallelism().map_or(1, usize::from) * 4).next_power_of_two()
    });
    *RES

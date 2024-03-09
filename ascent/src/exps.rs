@@ -100,13 +100,13 @@ fn bench_crel_index() {
    let mut rel_index = CRelIndex::default();
 
    let before = Instant::now();
-   for i in 0..1000_000 {
+   for i in 0..1_000_000 {
       RelIndexWrite::index_insert(&mut rel_index, i, i);
    }
    let elapsed = before.elapsed();
    println!("insert time: {:?}", elapsed);
 
-   let iters = 1000_000;
+   let iters = 1_000_000;
 
    let before = Instant::now();
    let mut _sum = 0;
@@ -123,7 +123,7 @@ fn bench_crel_index() {
 // #[test]
 fn bench_par_iter() {
 
-   let arr = (1..1000_000).collect::<Vec<_>>();
+   let arr = (1..1_000_000).collect::<Vec<_>>();
 
    let before = Instant::now();
    arr.par_iter().for_each(|x| {
@@ -148,10 +148,8 @@ fn bench_par_flat_map() {
    fn calc_sum(x: usize) -> usize {
       let mut res = 0;
       for i in 0..=(x >> 5) {
+         assert!(res < usize::MAX);
          res += i;
-      }
-      if res >= usize::MAX {
-         panic!("boo");
       }
       res
    }

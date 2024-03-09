@@ -60,7 +60,7 @@ where N: Ord + Add + Clone + Sum<N>
 /// // This example program is expected to produce 6 paths.
 /// assert_eq!(res.num_paths[0].0, 6);
 ///```
-pub fn count<'a>(inp: impl Iterator<Item = ()>) -> impl Iterator<Item = usize>
+pub fn count(inp: impl Iterator<Item = ()>) -> impl Iterator<Item = usize>
 {
    let (size_floor, size_ceiling)= inp.size_hint();
    let size_ceiling = size_ceiling.unwrap_or(usize::MAX);
@@ -92,7 +92,7 @@ where
       let mut sorted: Vec<_> = inp.map(|tuple| tuple.0.clone()).collect();
       sorted.sort();
       let p_index = (sorted.len() as f64 * p / 100.0) as usize;
-      if sorted.len() > 0 {
+      if !sorted.is_empty() {
          Some(sorted.swap_remove(p_index))
       } else {
          None
@@ -101,7 +101,7 @@ where
 }
 
 /// backs negations (eg `!foo(x)`) in `ascent`
-pub fn not<'a>(mut inp: impl Iterator<Item = ()>) -> impl Iterator<Item = ()>
+pub fn not(mut inp: impl Iterator<Item = ()>) -> impl Iterator<Item = ()>
 {
    let any = inp.next().is_some();
    if any {None} else {Some(())}.into_iter()

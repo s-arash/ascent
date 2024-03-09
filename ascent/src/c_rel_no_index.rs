@@ -40,8 +40,7 @@ impl<'a, V: 'a> RelIndexRead<'a> for CRelNoIndex<V> {
 
    fn index_get(&'a self, _key: &Self::Key) -> Option<Self::IteratorType> {
       assert!(self.frozen);
-      let res: std::iter::FlatMap<std::slice::Iter<'a, RwLock<Vec<V>>>, std::slice::Iter<'a, V>, fn(&RwLock<Vec<V>>) -> std::slice::Iter<V>> 
-      = self.vec.iter().flat_map(|v| {
+      let res: Self::IteratorType = self.vec.iter().flat_map(|v| {
          let data = unsafe { &*v.data_ptr()};
          data.iter()
       });
@@ -60,8 +59,7 @@ impl<'a, V: 'a + Sync + Send> CRelIndexRead<'a> for CRelNoIndex<V> {
 
    fn c_index_get(&'a self, _key: &Self::Key) -> Option<Self::IteratorType> {
       assert!(self.frozen);
-      let res: rayon::iter::FlatMap<rayon::slice::Iter<'a, RwLock<Vec<V>>>, fn(&RwLock<Vec<V>>) -> rayon::slice::Iter<V>> 
-         = self.vec.par_iter().flat_map(|v| {
+      let res: Self::IteratorType = self.vec.par_iter().flat_map(|v| {
          let data = unsafe {&* v.data_ptr()};
          data.par_iter()
       });

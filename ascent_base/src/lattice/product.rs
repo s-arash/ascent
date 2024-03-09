@@ -95,7 +95,7 @@ fn test_product_lattice(){
 
    assert!(Product((1,3)) < Product((2,3)));
    assert!(!{Product((1,4)) < Product((2,3))});
-   assert!(Product((1,4)).partial_cmp(&Product((2,3))) == None);
+   assert!(Product((1,4)).partial_cmp(&Product((2,3))).is_none());
 }
 
 
