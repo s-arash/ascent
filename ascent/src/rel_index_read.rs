@@ -9,16 +9,13 @@ use core::slice::Iter;
 use std::hash::BuildHasherDefault;
 use std::iter::Chain;
 
+#[allow(clippy::len_without_is_empty)]
 pub trait RelIndexRead<'a>{
    type Key;
    type Value;
    type IteratorType: Iterator<Item = Self::Value> + Clone + 'a;
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType>;
    fn len(&self) -> usize;
-
-   fn is_empty(&self) -> bool {
-      self.len() == 0
-   }
 }
 
 pub trait CRelIndexRead<'a>{

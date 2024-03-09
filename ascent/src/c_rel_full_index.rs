@@ -180,7 +180,8 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelFullIndexWrite for CRelFullIndex<
       // unsafe {
       //    crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
       // }
-      
+
+      #[allow(clippy::let_and_return)]
       res
    }
 }
