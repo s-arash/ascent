@@ -200,8 +200,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: 'a + Clone + Hash + Eq + Sy
 
    fn c_iter_all(&'a self) -> Self::AllIteratorType {
       use rayon::prelude::*;
-      let res: rayon::iter::Map<DashMapViewParIter<'a, K, SetType<V>, BuildHasherDefault<FxHasher>>, for<'aa, 'bb> fn((&'aa K, &'bb SetType<V>)) -> (&'aa K, rayon::collections::hash_set::Iter<'bb, V>)>
-         = DashMapViewParIter::new(self.unwrap_frozen()).map(|(k, v)| (k, v.par_iter()));
+      let res: Self::AllIteratorType = DashMapViewParIter::new(self.unwrap_frozen()).map(|(k, v)| (k, v.par_iter()));
       res
    }
 }

@@ -38,8 +38,8 @@ fn test_ord_lattice(){
    assert_eq!(OrdLattice(42).meet(OrdLattice(22)), OrdLattice(22));
 
    let mut x = OrdLattice(42);
-   assert_eq!(x.join_mut(OrdLattice(42)), false);
+   assert!(!x.join_mut(OrdLattice(42)));
    assert_eq!(x.0, 42);
-   assert_eq!(x.meet_mut(OrdLattice(42)), false);
+   assert!(!x.meet_mut(OrdLattice(42)));
    assert_eq!(x.0, 42);
 }

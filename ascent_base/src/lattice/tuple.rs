@@ -107,13 +107,13 @@ tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
 tuple_lattice_impl!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 
 impl super::Lattice for () {
-   fn meet(self, _other: Self) -> Self { () }
-   fn join(self, _other: Self) -> Self { () }
+   fn meet(self, _other: Self) -> Self {  }
+   fn join(self, _other: Self) -> Self {  }
 }
 
 impl BoundedLattice for () {
-   fn bottom() -> Self { () }
-   fn top() -> Self { () }
+   fn bottom() -> Self {  }
+   fn top() -> Self {  }
 }
 
 
