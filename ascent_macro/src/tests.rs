@@ -229,6 +229,58 @@ fn test_macro_lattices(){
 }
 
 #[test]
+fn test_no_generic(){
+   let input = quote!{
+      struct AscentProgram;
+      relation dummy(usize);
+   };
+   // write_to_scratchpad(input);
+   write_to_scratchpad(input);
+}
+
+#[test]
+fn test_generic_ty(){
+   let input = quote!{
+      struct AscentProgram<T: Clone + Hash + Eq>;
+      relation dummy(T);
+   };
+   // write_to_scratchpad(input);
+   write_to_scratchpad(input);
+}
+
+#[test]
+fn test_generic_ty_where_clause(){
+   let input = quote!{
+      struct AscentProgram<T> where T: Clone + Hash + Eq;
+      relation dummy(T);
+   };
+   // write_to_scratchpad(input);
+   write_to_scratchpad(input);
+}
+
+#[test]
+fn test_generic_ty_with_divergent_impl_generics(){
+   let input = quote!{
+      struct AscentProgram<T>;
+      impl<T: Clone + Hash + Eq> AscentProgram<T>;
+      relation dummy(T);
+   };
+   // write_to_scratchpad(input);
+   write_to_scratchpad(input);
+}
+
+#[test]
+fn test_generic_ty_with_divergent_impl_generics_where_clause(){
+   let input = quote!{
+      struct AscentProgram<T>;
+      impl<T> AscentProgram<T> where T: Clone + Hash + Eq;
+      relation dummy(T);
+   };
+   // write_to_scratchpad(input);
+   write_to_scratchpad(input);
+}
+
+#[test]
 fn exp_borrowing(){
    // let mut v: Vec<i32> = vec![];
    // let mut u: Vec<i32> = vec![];

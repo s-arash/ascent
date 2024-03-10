@@ -86,6 +86,51 @@ fn test_generic_tc_example() {
 }
 
 #[test]
+fn test_generic_ty() {
+   ascent! {
+      struct AscentProgram<T> where T: Clone + Hash + Eq;
+      relation dummy(T);
+   }
+
+   struct Container<T>(AscentProgram<T>) where T: Clone + Hash + Eq;
+
+   impl<T> Container<T>
+   where
+      T: Clone + Hash + Eq
+   {
+      fn run(&mut self) {
+         self.0.run();
+      }
+   }
+
+   let mut container: Container<bool> = Container(AscentProgram::default());
+   container.run();
+}
+
+#[test]
+fn test_generic_ty_with_divergent_impl_generics() {
+   ascent! {
+      struct AscentProgram<T>;
+      impl<T> AscentProgram<T> where T: Clone + Hash + Eq;
+      relation dummy(T);
+   }
+
+   struct Container<T>(AscentProgram<T>);
+
+   impl<T> Container<T>
+   where
+      T: Clone + Hash + Eq
+   {
+      fn run(&mut self) {
+         self.0.run();
+      }
+   }
+
+   let mut container: Container<bool> = Container(AscentProgram::default());
+   container.run();
+}
+
+#[test]
 fn test_borrowed_strings() {
    ascent_m_par! {
       struct Ancestry<'a>;
