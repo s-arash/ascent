@@ -38,7 +38,8 @@ pub(crate) fn mir_summary(mir: &AscentMir) -> String{
          writeln!(&mut res, "  {}", mir_rule_summary(r));
       }
       write!(&mut res, "  dynamic relations: ");
-      writeln!(&mut res, "{}", scc.dynamic_relations.keys().map(|r| r.name.to_string()).join(", "));
+      let sorted_dynamic_relations = scc.dynamic_relations.keys().sorted_by_key(|rel| &rel.name).map(|r| r.name.to_string());
+      writeln!(&mut res, "{}", sorted_dynamic_relations.into_iter().join(", "));
    }
    res
 }
@@ -199,7 +200,7 @@ fn get_hir_dep_graph(hir: &AscentIr) -> Vec<(usize,usize)> {
          if let Some(body_rel) = bitem.rel() {
             let body_rel_identity = &body_rel.relation;
             if let Some(set) = relations_to_rules_in_head.get(body_rel_identity){
-               for &rule_with_rel_in_head in set.iter(){
+               for &rule_with_rel_in_head in set.iter().sorted(){
                   edges.push((rule_with_rel_in_head, i));
                }
             }
