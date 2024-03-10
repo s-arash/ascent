@@ -5,7 +5,7 @@ use petgraph::{algo::{condensation, kosaraju_scc}, dot::{Config, Dot}, graphmap:
 use proc_macro2::{Ident, Span};
 use quote::ToTokens;
 use syn::{Expr, Type, parse2};
-use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary, IndexValType}, ascent_mir::MirRelationVersion::*, ascent_syntax::Declaration, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type, subsumes, intersects}, syn_utils::pattern_get_vars};
+use crate::{ascent_hir::{AscentConfig, IrAggClause, IrBodyItem, get_indices_given_grounded_variables, ir_name_for_rel_indices, RelationMetadata, ir_rule_summary, IndexValType}, ascent_mir::MirRelationVersion::*, ascent_syntax::{TypeSignature, ImplSignature, Signatures}, utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_type, subsumes, intersects}, syn_utils::pattern_get_vars};
 use crate::ascent_syntax::{CondClause, GeneratorNode, RelationIdentity};
 use crate::{ascent_hir::{IrBodyClause, IrHeadClause, IrRelation, IrRule, AscentIr}};
 
@@ -17,7 +17,7 @@ pub(crate) struct AscentMir {
    // pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
    pub relations_metadata: HashMap<RelationIdentity, RelationMetadata>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
-   pub declaration: Declaration,
+   pub signatures: Signatures,
    pub config: AscentConfig,
    pub is_parallel: bool,
 }
@@ -294,7 +294,7 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir>{
       lattices_full_indices: hir.lattices_full_indices.clone(),
       // relations_no_indices: hir.relations_no_indices.clone(),
       relations_metadata: hir.relations_metadata.clone(),
-      declaration: hir.declaration.clone(),
+      signatures: hir.signatures.clone(),
       config: hir.config.clone(),
       is_parallel: hir.is_parallel,
    })
