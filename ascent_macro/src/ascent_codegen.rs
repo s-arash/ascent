@@ -174,6 +174,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          #[allow(unused_imports)]
          #[doc = "Runs the Ascent program to a fixed point."]
          pub fn run(&mut self) {
+            #![allow(clippy::all)]
             macro_rules! __check_return_conditions {() => {};}
             #run_usings
             self.update_indices_priv();
@@ -187,6 +188,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          #[allow(unused_imports)]
          #[doc = "Runs the Ascent program to a fixed point or until the timeout is reached. In case of a timeout returns false"]
          pub fn run_timeout(&mut self, timeout: ::std::time::Duration) -> bool {
+            #![allow(clippy::all)]
             let __start_time = ::ascent::internal::Instant::now();
             macro_rules! __check_return_conditions {() => {
                if timeout < ::std::time::Duration::MAX && __start_time.elapsed() >= timeout {return false;}
@@ -238,6 +240,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          #run_timeout_func
          // TODO remove pub update_indices at some point
          fn update_indices_priv(&mut self) {
+            #![allow(clippy::all)]
             #update_indices_body
          }
 
@@ -246,14 +249,17 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
             self.update_indices_priv();
          }
          fn type_constraints() {
+            #![allow(clippy::all)]
             #(#type_constraints)*
          }
          #summary_fn
          
          pub fn relation_sizes_summary(&self) -> String {
+            #![allow(clippy::all)]
             #relation_sizes_body
          }
          pub fn scc_times_summary(&self) -> String {
+            #![allow(clippy::all)]
             #scc_times_summary_body
          }
       }
@@ -272,7 +278,8 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    };
    if !is_ascent_run {res} else {
       quote! {
-         {
+         {{
+            #![allow(clippy::all)]
             #res
             let mut __run_res: #struct_name #ty_generics = #struct_name::default();
             #[allow(unused_imports)]
@@ -281,7 +288,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
                #run_code
             }
             __run_res
-         }
+         }}
       }
    }
 }
