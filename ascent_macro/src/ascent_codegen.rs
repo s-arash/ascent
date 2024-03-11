@@ -212,19 +212,12 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let relation_initializations_for_default_impl = 
       if is_ascent_run {vec![]} else {relation_initializations};
    let summary = mir_summary(mir);
+
+   let (ty_impl_generics, ty_ty_generics, ty_where_clause) = mir.signatures.split_ty_generics_for_impl();
+   let (impl_impl_generics, impl_ty_generics, impl_where_clause) = mir.signatures.split_impl_generics_for_impl();
+
    let ty_signature = &mir.signatures.declaration;
-   let impl_signature = &mir.signatures.implementation;
-   
-   let (ty_impl_generics, ty_ty_generics, ty_where_clause) = ty_signature.generics.split_for_impl();
-   let (impl_impl_generics, impl_ty_generics, impl_where_clause) = if let Some(impl_signature) = impl_signature {
-      let (impl_generics, _, _) = impl_signature.impl_generics.split_for_impl();
-      let (_, ty_generics, where_clause) = impl_signature.generics.split_for_impl();
-      (impl_generics, ty_generics, where_clause)
-   } else {
-      ty_signature.generics.split_for_impl()
-   };
-   
-   if let Some(impl_signature) = impl_signature {
+   if let Some(impl_signature) = &mir.signatures.implementation {
       assert_eq!(ty_signature.ident, impl_signature.ident, "The identifiers of struct and impl must match");
    }
 

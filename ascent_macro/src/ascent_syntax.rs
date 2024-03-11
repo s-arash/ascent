@@ -5,7 +5,7 @@ use syn::ImplGenerics;
 use syn::{
    braced, parenthesized, parse2, punctuated::Punctuated, spanned::Spanned, Attribute, Error, Expr, ExprMacro,
    ExprPath, GenericParam, Generics, Ident, ItemMacro2, MacroDelimiter, Pat, Result, Token, Type, Visibility,
-   WhereClause,
+   WhereClause, TypeGenerics
 };
 use syn::token::{Comma, Gt, Lt};
 use syn::parse::{Parse, ParseStream, ParseBuffer, Parser};
@@ -45,6 +45,23 @@ mod kw {
 pub(crate) struct Signatures {
    pub(crate) declaration: TypeSignature,
    pub(crate) implementation: Option<ImplSignature>,
+}
+
+impl Signatures {
+   pub fn split_ty_generics_for_impl(&self) -> (ImplGenerics<'_>, TypeGenerics<'_>, Option<&'_ WhereClause>) {
+      self.declaration.generics.split_for_impl()
+   }
+
+   pub fn split_impl_generics_for_impl(&self) -> (ImplGenerics<'_>, TypeGenerics<'_>, Option<&'_ WhereClause>) {
+      let Some(signature) = &self.implementation else {
+         return self.split_ty_generics_for_impl();
+      };
+
+      let (impl_generics, _, _) = signature.impl_generics.split_for_impl();
+      let (_, ty_generics, where_clause) = signature.generics.split_for_impl();
+
+      (impl_generics, ty_generics, where_clause)
+   }
 }
 
 impl Parse for Signatures {
