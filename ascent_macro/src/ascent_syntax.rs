@@ -49,9 +49,7 @@ pub(crate) struct Signatures {
 
 impl Parse for Signatures {
    fn parse(input: ParseStream) -> Result<Self> {
-      let attributes = Attribute::parse_inner(input)?;
-      let mut struct_attrs = Attribute::parse_outer(input)?;
-      let declaration = TypeSignature{ attrs: std::mem::take(&mut struct_attrs), .. TypeSignature::parse(input)? };
+      let declaration = TypeSignature::parse(input)?;
       let implementation = if input.peek(Token![impl]) {
          Some(ImplSignature::parse(input)?)
       } else {
@@ -531,7 +529,9 @@ impl Parse for AscentProgram {
       let attributes = Attribute::parse_inner(input)?;
       let mut struct_attrs = Attribute::parse_outer(input)?;
       let signatures = if input.peek(Token![pub]) || input.peek(Token![struct]) {
-         Some(Signatures::parse(input)?)
+         let mut signatures = Signatures::parse(input)?;
+         signatures.declaration.attrs = std::mem::take(&mut struct_attrs);
+         Some(signatures)
       } else {
          None
       };

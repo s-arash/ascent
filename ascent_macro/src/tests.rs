@@ -254,7 +254,6 @@ fn test_generic_ty_where_clause(){
       struct AscentProgram<T> where T: Clone + Hash + Eq;
       relation dummy(T);
    };
-   // write_to_scratchpad(input);
    write_to_scratchpad(input);
 }
 
@@ -265,18 +264,18 @@ fn test_generic_ty_with_divergent_impl_generics(){
       impl<T: Clone + Hash + Eq> AscentProgram<T>;
       relation dummy(T);
    };
-   // write_to_scratchpad(input);
    write_to_scratchpad(input);
 }
 
 #[test]
 fn test_generic_ty_with_divergent_impl_generics_where_clause(){
    let input = quote!{
+      /// Type DOC COMMENT
       struct AscentProgram<T>;
       impl<T> AscentProgram<T> where T: Clone + Hash + Eq;
+      /// dummy REL DOC COMEMNT
       relation dummy(T);
    };
-   // write_to_scratchpad(input);
    write_to_scratchpad(input);
 }
 
