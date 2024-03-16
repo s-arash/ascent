@@ -19,6 +19,7 @@ pub trait Lattice: PartialOrd + Sized {
    ///
    /// Returns true if `self` was changed.
    fn meet_mut(&mut self, other: Self) -> bool {
+      #[allow(clippy::neg_cmp_op_on_partial_ord)]
       let res = !(*self <= other);
       crate::util::update(self, |x| x.meet(other));
       res
@@ -28,6 +29,7 @@ pub trait Lattice: PartialOrd + Sized {
    ///
    /// Returns true if `self` was changed.
    fn join_mut(&mut self, other: Self) -> bool {
+      #[allow(clippy::neg_cmp_op_on_partial_ord)]
       let res = !(*self >= other);
       crate::util::update(self, |x| x.join(other));
       res

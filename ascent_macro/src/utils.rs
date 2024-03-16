@@ -153,7 +153,7 @@ pub fn token_stream_replace_macro_idents(input: TokenStream, ident_replacements:
       for tt in ts {
          if let Some(dollar) = last_dollar.take() {
             let is_match = match &tt {
-               TokenTree::Ident(after_dollor_ident) => ident_replacements.get(after_dollor_ident),
+               TokenTree::Ident(after_dollar_ident) => ident_replacements.get(after_dollar_ident),
                _ => None
             };
             if let Some(replacement) = is_match {
@@ -202,7 +202,7 @@ pub fn token_stream_replace_macro_ident(input: TokenStream, ident: &Ident, repla
       for tt in ts {
          if let Some(dollar) = last_dollar.take() {
             let is_match = match &tt {
-               TokenTree::Ident(after_dollor_ident) => ident == after_dollor_ident,
+               TokenTree::Ident(after_dollar_ident) => ident == after_dollar_ident,
                _ => false
             };
             if is_match {

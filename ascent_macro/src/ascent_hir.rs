@@ -5,7 +5,7 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::ToTokens;
 use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned, parse_quote, Path, parse::Parser, parse_quote_spanned, parenthesized};
 
-use crate::{AscentProgram, ascent_syntax::{Declaration, RelationNode, rule_node_summary, DsAttributeContents}, utils::{expr_to_ident, into_set, is_wild_card, tuple, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
+use crate::{AscentProgram, ascent_syntax::{RelationNode, rule_node_summary, DsAttributeContents, Signatures}, utils::{expr_to_ident, into_set, is_wild_card, tuple, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
 use crate::ascent_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
 
 #[derive(Clone)]
@@ -61,7 +61,7 @@ pub(crate) struct AscentIr {
    // pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
    pub relations_metadata: HashMap<RelationIdentity, RelationMetadata>,
    pub rules: Vec<IrRule>,
-   pub declaration: Declaration,
+   pub signatures: Signatures,
    pub config: AscentConfig,
    pub is_parallel: bool,
 }
@@ -261,7 +261,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
          relations_ir_relations.entry(extra_rel.relation.clone()).or_default().insert(extra_rel.clone());
       }
    }
-   let declaration = prog.declaration.clone().unwrap_or_else(|| parse2(quote! {pub struct AscentProgram;}).unwrap());
+   let signatures = prog.signatures.clone().unwrap_or_else(|| parse2(quote! {pub struct AscentProgram;}).unwrap());
    Ok(AscentIr {
       rules: ir_rules.into_iter().map(|(rule, extra_rels)| rule).collect_vec(),
       relations_ir_relations,
@@ -269,7 +269,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       lattices_full_indices,
       relations_metadata: relations_metadata,
       // relations_no_indices,
-      declaration,
+      signatures,
       config,
       is_parallel
    })

@@ -191,7 +191,8 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelFullIndexWrite for CRelFullIndex<
       // unsafe {
       //    crate::internal::INDEX_INSERT_TOTAL_TIME += before.elapsed();
       // }
-      
+
+      #[allow(clippy::let_and_return)]
       res
    }
 }
@@ -222,8 +223,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Send + Sync> C
 
    fn c_iter_all(&'a self) -> Self::AllIteratorType {
       use rayon::prelude::*;
-      let res: rayon::iter::Map<DashMapViewParIter<'a, K, V, BuildHasherDefault<FxHasher>>, for<'aa, 'bb> fn((&'aa K, &'bb V)) -> (&'aa K, rayon::iter::Once<&'bb V>)> 
-         = DashMapViewParIter::new(self.unwrap_frozen()).map(|(k, v)| (k, rayon::iter::once(v)));
+      let res: Self::AllIteratorType = DashMapViewParIter::new(self.unwrap_frozen()).map(|(k, v)| (k, rayon::iter::once(v)));
       res
    }
 }

@@ -1,6 +1,7 @@
 extern crate proc_macro;
 use ascent_base::util::update;
 use proc_macro2::{Span, TokenStream, TokenTree, Delimiter};
+use syn::{ImplGenerics, TypeGenerics};
 use syn::{
    braced, parenthesized, parse2, punctuated::Punctuated, spanned::Spanned, Attribute, Error, Expr, ExprMacro,
    ExprPath, GenericParam, Generics, Ident, ItemMacro2, MacroDelimiter, Pat, Path, Result, Token, Type, Visibility,
@@ -40,9 +41,43 @@ mod kw {
    syn::custom_keyword!(expr);
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct Signatures {
+   pub(crate) declaration: TypeSignature,
+   pub(crate) implementation: Option<ImplSignature>,
+}
 
-#[derive(Clone, Parse)]
-pub struct Declaration {
+impl Signatures {
+   pub fn split_ty_generics_for_impl(&self) -> (ImplGenerics<'_>, TypeGenerics<'_>, Option<&'_ WhereClause>) {
+      self.declaration.generics.split_for_impl()
+   }
+
+   pub fn split_impl_generics_for_impl(&self) -> (ImplGenerics<'_>, TypeGenerics<'_>, Option<&'_ WhereClause>) {
+      let Some(signature) = &self.implementation else {
+         return self.split_ty_generics_for_impl();
+      };
+
+      let (impl_generics, _, _) = signature.impl_generics.split_for_impl();
+      let (_, ty_generics, where_clause) = signature.generics.split_for_impl();
+
+      (impl_generics, ty_generics, where_clause)
+   }
+}
+
+impl Parse for Signatures {
+   fn parse(input: ParseStream) -> Result<Self> {
+      let declaration = TypeSignature::parse(input)?;
+      let implementation = if input.peek(Token![impl]) {
+         Some(ImplSignature::parse(input)?)
+      } else {
+         None
+      };
+      Ok(Signatures { declaration, implementation })
+   }
+}
+
+#[derive(Clone, Parse, Debug)]
+pub struct TypeSignature {
    // We don't actually use the Parse impl to parse attrs.
    #[call(Attribute::parse_outer)]
    pub attrs: Vec<Attribute>,
@@ -51,7 +86,16 @@ pub struct Declaration {
    pub ident: Ident,
    #[call(parse_generics_with_where_clause)]
    pub generics: Generics,
-   pub where_clause: Option<WhereClause>,
+   pub semi: Token![;]
+}
+
+#[derive(Clone, Parse, Debug)]
+pub struct ImplSignature {
+   pub impl_kw: Token![impl],
+   pub impl_generics: Generics,
+   pub ident: Ident,
+   #[call(parse_generics_with_where_clause)]
+   pub generics: Generics,
    pub semi: Token![;]
 }
 
@@ -459,7 +503,7 @@ pub(crate) fn rule_node_summary(rule: &RuleNode) -> String {
 
 #[derive(Parse)]
 pub struct MacroDefParam {
-   dollor: Token![$],
+   dollar: Token![$],
    name: Ident,
    colon: Token![:],
    kind: MacroParamKind
@@ -492,7 +536,7 @@ pub struct MacroDefNode {
 pub(crate) struct AscentProgram {
    pub rules : Vec<RuleNode>,
    pub relations : Vec<RelationNode>,
-   pub declaration: Option<Declaration>,
+   pub signatures: Option<Signatures>,
    pub attributes: Vec<syn::Attribute>,
    pub macros: Vec<MacroDefNode>
 }
@@ -501,9 +545,13 @@ impl Parse for AscentProgram {
    fn parse(input: ParseStream) -> Result<Self> {
       let attributes = Attribute::parse_inner(input)?;
       let mut struct_attrs = Attribute::parse_outer(input)?;
-      let declaration = if input.peek(Token![pub]) || input.peek(Token![struct]) {
-         Some(Declaration{ attrs: std::mem::take(&mut struct_attrs), .. Declaration::parse(input)?})
-      } else {None};
+      let signatures = if input.peek(Token![pub]) || input.peek(Token![struct]) {
+         let mut signatures = Signatures::parse(input)?;
+         signatures.declaration.attrs = std::mem::take(&mut struct_attrs);
+         Some(signatures)
+      } else {
+         None
+      };
       let mut rules = vec![];
       let mut relations = vec![];
       let mut macros = vec![];
@@ -525,7 +573,7 @@ impl Parse for AscentProgram {
             rules.push(RuleNode::parse(input)?);
          }
       }
-      Ok(AscentProgram{rules, relations, declaration, attributes, macros})
+      Ok(AscentProgram{rules, relations, signatures, attributes, macros})
    }
 }
 
@@ -798,10 +846,10 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
             let mut new_cond_clauses = vec![];
             for arg_ind in 0..cl.args.len() {
                let expr = cl.args[arg_ind].unwrap_expr_ref();
-               let expr_has_vars_from_same_caluse =
+               let expr_has_vars_from_same_clause =
                   expr_get_vars(&expr).iter()
                   .any(|var| if let Some(cl_ind) = grounded_vars.get(&var) {*cl_ind == i} else {false});
-               if expr_has_vars_from_same_caluse {
+               if expr_has_vars_from_same_clause {
                   let new_ident = fresh_ident(&expr_to_ident(expr).map(|e| e.to_string()).unwrap_or_else(|| "expr_replaced".to_string()), expr.span());
                   new_cond_clauses.push(CondClause::If(
                      parse2(quote_spanned! {expr.span()=> if #new_ident.eq(&(#expr))}).unwrap()

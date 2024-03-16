@@ -210,11 +210,22 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let relation_initializations_for_default_impl = 
       if is_ascent_run {vec![]} else {relation_initializations};
    let summary = mir_summary(mir);
-   let (impl_generics, ty_generics, where_clause) = mir.declaration.generics.split_for_impl();
-   let vis = &mir.declaration.visibility;
-   let struct_name = &mir.declaration.ident;
-   let generics = &mir.declaration.generics;
-   let struct_attrs = &mir.declaration.attrs;
+
+   let (ty_impl_generics, ty_ty_generics, ty_where_clause) = mir.signatures.split_ty_generics_for_impl();
+   let (impl_impl_generics, impl_ty_generics, impl_where_clause) = mir.signatures.split_impl_generics_for_impl();
+
+   let ty_signature = &mir.signatures.declaration;
+   if let Some(impl_signature) = &mir.signatures.implementation {
+      assert_eq!(ty_signature.ident, impl_signature.ident, "The identifiers of struct and impl must match");
+   }
+
+   let ty_ty_generics_str = quote!(#ty_ty_generics).to_string();
+   let impl_ty_generics_str = quote!(#impl_ty_generics).to_string();
+   assert_eq!(ty_ty_generics_str, impl_ty_generics_str, "The generic parameters of struct ({ty_ty_generics_str}) and impl ({impl_ty_generics_str}) must match");
+
+   let vis = &ty_signature.visibility;
+   let struct_name = &ty_signature.ident;
+   let struct_attrs = &ty_signature.attrs;
    let summary_fn = if is_ascent_run { quote! {
       pub fn summary(&self) -> &'static str {#summary}
    }} else { quote! {
@@ -235,7 +246,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       #(#rel_codegens)*
 
       #(#struct_attrs)*
-      #vis struct #struct_name #generics {
+      #vis struct #struct_name #ty_impl_generics #ty_where_clause {
          #(#relation_fields)*
          scc_times: [std::time::Duration; #sccs_count],
          scc_iters: [usize; #sccs_count],
@@ -243,7 +254,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          pub update_time_nanos: std::sync::atomic::AtomicU64,
          pub update_indices_duration: std::time::Duration,
       }
-      impl #impl_generics #struct_name #ty_generics #where_clause {
+      impl #impl_impl_generics #struct_name #impl_ty_generics #impl_where_clause {
          #run_func
 
          #run_timeout_func
@@ -271,7 +282,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
             #scc_times_summary_body
          }
       }
-      impl #impl_generics Default for #struct_name #ty_generics #where_clause {
+      impl #impl_impl_generics Default for #struct_name #impl_ty_generics #impl_where_clause {
          fn default() -> Self {
             let mut _self = #struct_name {
                #(#field_defaults)*
@@ -290,7 +301,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       quote! {
          {
             #res
-            let mut __run_res: #struct_name #ty_generics = #struct_name::default();
+            let mut __run_res: #struct_name #ty_ty_generics = #struct_name::default();
             #[allow(unused_imports, noop_method_call, suspicious_double_ref_op)]
             {
                ascent::internal::comment("running...");
@@ -418,7 +429,7 @@ fn rel_ds_macro_input(rel: &RelationIdentity, mir: &AscentMir) -> TokenStream {
       .map(|ir_rel| rel_index_to_macro_input(&ir_rel.indices));
    let args = &mir.relations_metadata[rel].ds_macro_args;
    let par: Ident = if mir.is_parallel { parse_quote_spanned! {span=> par} } else { parse_quote_spanned! {span=> ser} };
-   let name = Ident::new(&format!("{}_{}", mir.declaration.ident, rel.name), span);
+   let name = Ident::new(&format!("{}_{}", mir.signatures.declaration.ident, rel.name), span);
    quote! {
       #name,
       #field_types,
