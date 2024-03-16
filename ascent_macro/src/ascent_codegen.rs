@@ -323,36 +323,6 @@ fn rel_ind_common_type(rel: &RelationIdentity, mir: &AscentMir) -> Type {
    }
 }
 
-// TODO remove
-fn rel_index_type_old(rel: &IrRelation, mir: &AscentMir) -> Type {
-   let span = rel.relation.name.span();
-
-   let key_type = rel.key_type();
-   let value_type = rel.value_type();
-
-   let is_lat_full_index = rel.relation.is_lattice && &mir.lattices_full_indices[&rel.relation] == rel;
-   
-   let ty = if !mir.is_parallel {
-      if rel.is_full_index() || is_lat_full_index {quote_spanned!{span=>
-         ascent::internal::RelFullIndexType<#key_type, #value_type>
-      }} else if rel.relation.is_lattice {quote_spanned!{span=>
-         ascent::internal::LatticeIndexType<#key_type, #value_type>
-      }} else { quote_spanned!{span=>
-         ascent::internal::RelIndexType1<#key_type, #value_type>
-      }}
-   } else {
-      if rel.is_full_index() || is_lat_full_index {quote_spanned!{span=>
-         ascent::internal::CRelFullIndex<#key_type, #value_type>
-      }} else if rel.is_no_index() {quote_spanned!{span=>
-         ascent::internal::CRelNoIndex<#value_type>
-      }} else {quote_spanned!{span=>
-         ascent::internal::CRelIndex<#key_type, #value_type>
-      }}
-   };
-   
-   syn::parse2(ty).unwrap()
-}
-
 fn rel_index_type(rel: &IrRelation, mir: &AscentMir) -> Type {
    let span = rel.relation.name.span();
    let key_type = rel.key_type();
@@ -392,15 +362,6 @@ fn rel_index_type(rel: &IrRelation, mir: &AscentMir) -> Type {
 
 fn rel_type(rel: &RelationIdentity, mir: &AscentMir) -> Type {
    let field_types = tuple_type(&rel.field_types);
-
-   // TODO remove
-   let _rel_type_old = if !mir.is_parallel { 
-      quote! {::std::vec::Vec<#field_types>} 
-   } else if !rel.is_lattice {
-      quote! {::ascent::boxcar::Vec<#field_types>} 
-   } else {
-      quote! {::ascent::boxcar::Vec<::std::sync::RwLock<#field_types>>} 
-   };
 
    if rel.is_lattice {
       if mir.is_parallel {
@@ -463,12 +424,10 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
         Either::Left(rel) => (rel_ind_common_var_name(rel), rel_ind_common_type(rel, mir)),
         Either::Right(rel_ind) => (rel_ind.ir_name(), rel_index_type(rel_ind, mir)),
       };
-      // let ir_name = rel.ir_name();
       let delta_var_name = ir_relation_version_var_name(&ir_name, MirRelationVersion::Delta);
       let total_var_name = ir_relation_version_var_name(&ir_name, MirRelationVersion::Total);
       let new_var_name = ir_relation_version_var_name(&ir_name, MirRelationVersion::New);
       let total_field = &ir_name;
-      // let ty = rel_index_type(&rel, mir);
       move_total_to_delta.push(quote_spanned! {ir_name.span()=>
          let mut #delta_var_name: #ty = ::std::mem::take(&mut #_self.#total_field);
          let mut #total_var_name : #ty = Default::default();
@@ -520,7 +479,6 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
          Either::Right(rel_ind) => (rel_ind.ir_name(), rel_index_type(rel_ind, mir)),
       };
       let total_var_name = ir_relation_version_var_name(&ir_name, MirRelationVersion::Total);
-      // let ty = rel_index_type(&rel, mir);
       let total_field = &ir_name;
 
       if mir.is_parallel {
@@ -530,8 +488,6 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
       }
 
       move_total_to_delta.push(quote_spanned! {ir_name.span()=>
-         // #[allow(non_snake_case)]
-         // let #total_var_name : &mut #ty = &mut _self.#total_field;
          let #total_var_name: #ty = std::mem::take(&mut #_self.#total_field);
       });
 
@@ -732,11 +688,7 @@ fn compile_update_indices_function_body(mir: &AscentMir) -> proc_macro2::TokenSt
          update_indices.push(quote_spanned! {r.name.span()=>
             let selection_tuple = #selection_tuple;
             let rel_ind = #_ref #_self.#ind_name;
-            // let rel_common_ind = #_ref #_self.#ind_common;
             #rel_index_write_trait::#index_insert_fn(#_pre_ref rel_ind #to_rel_index, selection_tuple, #entry_val);
-            // #rel_index_write_trait::index_insert(rel_ind #to_rel_index, selection_tuple, #entry_val);
-            // rel_ind #to_rel_index.#index_insert_fn(selection_tuple, #entry_val);
-
          });
 
       }
@@ -833,10 +785,7 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
       let rule_cp2_compiled = compile_mir_rule_inner(&rule_cp2, scc, mir, par_iter_to_ind, head_update_code        , clause_ind);
 
       if let [MirBodyItem::Clause(bcl1), MirBodyItem::Clause(bcl2)] = &rule.body_items[clause_ind..clause_ind+2]{
-
          let rel1_var_name = expr_for_rel(&bcl1.rel, mir);
-         
-         // let rel2_full_index = &mir.relations_full_indices[&bcl2.rel.relation];
          let rel2_var_name = expr_for_rel(&bcl2.rel, mir);
 
          return quote_spanned!{bcl1.rel_args_span=>
@@ -861,9 +810,6 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
 
       match bitem {
          MirBodyItem::Clause(bclause) => {
-            if doing_simple_join {
-               // println!("doing simple join for {}", mir_rule_summary(rule));
-            }
             let (clause_ind, bclause) = 
                if doing_simple_join {(clause_ind + 1, rule.body_items[clause_ind + 1].unwrap_clause())} 
                else {(clause_ind, bclause)};
@@ -877,13 +823,6 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
             let clause_vars = bclause.vars();
             let common_vars = clause_vars.iter().filter(|(_i,v)| pre_clause_vars.contains(v)).collect::<Vec<_>>();
             let common_vars_no_indices = common_vars.iter().map(|(_i,v)| v.clone()).collect::<Vec<_>>();
-
-            // let mut new_vars_assignments = vec![];
-            // for (i,var) in clause_vars.iter(){
-            //    if common_vars_no_indices.contains(var) {continue;}
-            //    let i_ind = syn::Index{index: *i as u32, span: var.span()};
-            //    new_vars_assignments.push(quote_spanned! {var.span()=> let #var = &__row.#i_ind;});
-            // }
 
             let cloning_needed = true;
 
@@ -901,10 +840,6 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
             for cond in bclause.cond_clauses.iter().rev() {
                conds_then_next_loop = compile_cond_clause(cond, conds_then_next_loop);
             }
-
-            // we need to clone if the relation appears in the head of the rule and we are not the last clause.
-            // let cloning_needed = rule.body_items[(clause_ind + 1)..].iter().any(|bi| !matches!(bi, MirBodyItem::Cond(_))) &&
-            //                      rule.head_clause.iter().any(|hcl| &hcl.rel.name == bclause_rel_name);
 
             fn maybe_clone(cloning_needed: bool, span: Span) -> proc_macro2::TokenStream {
                if cloning_needed {quote_spanned! {span=> .clone()}} 
@@ -1070,78 +1005,6 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
 }
 
 fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
-   
-   // TODO remove if not used
-   // let mut struct_defs = vec![];
-   // let mut rel_data_vars = vec![];
-
-   // fn rel_name_to_struct_name(rel_name: &Ident) -> Ident {
-   //    Ident::new(&format!("__{}Data", rel_name), rel_name.span())
-   // };
-
-   // fn rel_name_to_data_var_name(rel_name: &Ident) -> Ident {
-   //    Ident::new(&format!("__{}_data", rel_name), rel_name.span())
-   // };
-
-   // for rel in rule.head_clause.iter().map(|hcl| &hcl.rel).collect::<HashSet<_>>() {
-   //    let mut fields = vec![];
-   //    let mut var_assignments = vec![];
-   //    for (i, rel_ind) in scc.dynamic_relations.get(rel).into_iter().flatten().enumerate() {
-   //       let var_name = ir_relation_version_var_name(&rel_ind.ir_name(), New);
-   //       // let ty = rel_index_type(rel_ind);
-   //       let ty = Ident::new(&format!("T{}", i), rel.name.span());
-
-   //       var_assignments.push(quote!{
-   //          #var_name: &mut #var_name,
-   //       });
-   //       fields.push(quote!{
-   //          #var_name: &'a mut #ty,
-   //       });
-   //    }
-
-   //    let mut update_indices = vec![];
-   //    for (i, rel_ind) in scc.dynamic_relations.get(rel).into_iter().flatten().enumerate(){
-   //       if rel_ind.is_full_index() {continue};
-   //       let var_name = ir_relation_version_var_name(&rel_ind.ir_name(), New);
-   //       let args_tuple : Vec<Expr> = rel_ind.indices.iter().map(|&i| {
-   //          let i_ind = syn::Index::from(i);
-   //          syn::parse2(quote_spanned!{rel.name.span()=> __new_row.#i_ind.clone()}).unwrap()
-   //       }).collect();
-   //       let args_tuple = tuple(&args_tuple);
-   //       let entry_val = index_get_entry_val_for_insert(
-   //          &rel_ind, &parse_quote_spanned!{rel.name.span()=> __new_row}, &parse_quote_spanned!{rel.name.span()=> __new_row_ind});
-   //       update_indices.push(quote! {
-   //          ::ascent::internal::RelIndexWrite::index_insert(&mut #var_name, #args_tuple, #entry_val);
-   //       });
-   //    }
-
-   //    let types = (0..fields.len()).map(|i| {
-   //       Ident::new(&format!("T{}", i), rel.name.span())
-   //    }).collect_vec();
-   //    let struct_name = rel_name_to_struct_name(&rel.name);
-   //    let rel_name = &rel.name;
-   //    struct_defs.push(quote! {
-   //       #[allow(non_camel_case_types)]
-   //       struct #struct_name<'a, TRel, #(#types),*> {
-   //          #rel_name : TRel,
-   //          #(#fields)*
-   //       }
-   //    });
-   //    let rel_data_var_name = rel_name_to_data_var_name(&rel.name);
-   //    let rel_data_var_instantiation_code = quote! {
-   //       #struct_name { #rel_name: &mut _self.#rel_name, #(#var_assignments)* }
-   //    };
-   //    if true || !mir.is_parallel {
-   //       rel_data_vars.push(quote! {
-   //          let mut #rel_data_var_name = #rel_data_var_instantiation_code;
-   //       });
-   //    } else {
-   //       rel_data_vars.push(quote! {
-   //          let #rel_data_var_name = std::sync::Mutex::new(#rel_data_var_instantiation_code);
-   //       });
-   //    }
-   // }
-
    let mut add_rows = vec![];
 
    let set_changed_true_code = if !mir.is_parallel {
@@ -1153,7 +1016,6 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
    for hcl in rule.head_clause.iter() {
 
       let head_rel_name = Ident::new(&hcl.rel.name.to_string(), hcl.span);
-      // let rel_data_var_name = rel_name_to_data_var_name(&head_rel_name);
       let hcl_args_converted = hcl.args.iter().cloned().map(convert_head_arg).collect_vec();
       let new_row_tuple = tuple_spanned(&hcl_args_converted, hcl.args_span);
       
@@ -1178,7 +1040,6 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
             } else {
                expr_for_c_rel_write(&MirRelation::from(rel_ind.clone(), New), mir)
             };
-            // let var_name = ir_relation_version_var_name(&rel_ind.ir_name(), New);
             let args_tuple : Vec<Expr> = rel_ind.indices.iter().map(|&i| {
                let i_ind = syn::Index::from(i);
                syn::parse2(quote_spanned!{hcl.span=> __new_row.#i_ind.clone()}).unwrap()
@@ -1192,16 +1053,11 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
                &rel_ind, &parse_quote_spanned!{hcl.span=> __new_row}, &parse_quote_spanned!{hcl.span=> __new_row_ind});
             update_indices.push(quote_spanned! {hcl.span=>
                #rel_index_write_trait::#index_insert_fn(#new_ref #var_name, #args_tuple, #entry_val);
-               // #var_name.#index_insert_fn(#args_tuple, #entry_val);
-
             });
          }
       }
 
       let head_rel_full_index = &mir.relations_full_indices[head_relation];
-      // let head_rel_full_index_var_name_new = ir_relation_version_var_name(&head_rel_full_index.ir_name(), New);
-      // let head_rel_full_index_var_name_delta = ir_relation_version_var_name(&head_rel_full_index.ir_name(), Delta);
-      // let head_rel_full_index_var_name_total = ir_relation_version_var_name(&head_rel_full_index.ir_name(), Total);
 
       let expr_for_rel_maybe_mut = if mir.is_parallel { expr_for_c_rel_write } else { expr_for_rel_write };
       let head_rel_full_index_expr_new = expr_for_rel_maybe_mut(&MirRelation::from(head_rel_full_index.clone(), New), mir);
@@ -1239,8 +1095,6 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
                if #rel_full_index_write_trait::insert_if_not_present(#new_ref #head_rel_full_index_expr_new, 
                   &__new_row, ())
                {
-                  // let __new_row_ind = _self.#head_rel_name.len();
-                  // _self.#head_rel_name.push(__new_row);
                   #push_code
                   #(#update_indices)*
                   #set_changed_true_code
@@ -1350,23 +1204,6 @@ fn ind_val_option_to_iter_func_name_for_rel(rel: &MirRelation) -> proc_macro2::T
    }
 }
 
-// TODO
-fn expr_for_rel_OLD(rel: &MirRelation) -> proc_macro2::TokenStream {
-   if rel.version == MirRelationVersion::TotalDelta {
-      let total_var_name = ir_relation_version_var_name(&rel.ir_name, MirRelationVersion::Total);
-      let delta_var_name = ir_relation_version_var_name(&rel.ir_name, MirRelationVersion::Delta);
-      quote! {
-         ascent::internal::RelIndexCombined::new(& #total_var_name, #delta_var_name)
-      }
-   } else {
-      let var = rel.var_name();
-      quote! {
-         #var
-      }
-   }
-}
-
-// TODO clean up
 fn expr_for_rel(rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream {
    fn expr_for_rel_inner(ir_name: &Ident, version: MirRelationVersion, mir: &AscentMir, mir_rel: &MirRelation) -> (TokenStream, bool) {
       let var = ir_relation_version_var_name(&ir_name, version);
@@ -1379,13 +1216,10 @@ fn expr_for_rel(rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream 
    }
 
    if rel.version == MirRelationVersion::TotalDelta {
-      // let borrow = if rel.relation.is_lattice {quote!{&}} else {quote!{}};
-      let borrow = if true {quote!{&}} else {quote!{}};
-
       let total_expr = expr_for_rel_inner(&rel.ir_name, MirRelationVersion::Total, mir, rel).0;
       let delta_expr = expr_for_rel_inner(&rel.ir_name, MirRelationVersion::Delta, mir, rel).0;
       quote! {
-         ascent::internal::RelIndexCombined::new(#borrow #total_expr, #borrow #delta_expr)
+         ascent::internal::RelIndexCombined::new(& #total_expr, & #delta_expr)
       }
    } else {
       let (res, borrowed) = expr_for_rel_inner(&rel.ir_name, rel.version, mir, rel);
@@ -1393,7 +1227,6 @@ fn expr_for_rel(rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream 
    }
 }
 
-// TODO clean up
 fn expr_for_rel_write(mir_rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream {
    let var = mir_rel.var_name();
    if mir_rel.relation.is_lattice {

@@ -90,8 +90,6 @@ use crate::internal::{RelIndexType1, RelIndexMerge, Freezable, RelFullIndexType}
 use crate::to_rel_index::ToRelIndex;
 
 impl<K, V, Rel> ToRelIndex<Rel> for RelIndexType1<K, V> {
-   // type Rel = RelFullIndexType<K, V>;
-   
    type RelIndex<'a> = &'a Self where Self: 'a, Rel: 'a;
    #[inline(always)]
    fn to_rel_index<'a>(&'a self, _rel: &'a Rel) -> Self::RelIndex<'a> { self }

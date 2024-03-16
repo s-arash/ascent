@@ -5,7 +5,7 @@ Ascent is a logic programming language (similar to Datalog) embedded in Rust via
 
 For more information, check out [the CC paper](https://s-arash.github.io/ascent/cc22main-p95-seamless-deductive-inference-via-macros.pdf) on Ascent.
 
-In addition, [the OOPSLA paper](https://dl.acm.org/doi/pdf/10.1145/3622840) describes the "Bring Your Own Data Structures to Datalog" aspect of Ascent.
+In addition, [this OOPSLA paper](https://dl.acm.org/doi/pdf/10.1145/3622840) describes the "Bring Your Own Data Structures to Datalog" aspect of Ascent.
 
 ## Examples
 

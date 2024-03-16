@@ -12,7 +12,7 @@ separator = "0.4.1"
 
 
 [dependencies]
-ascent = { path = "../../ascent", version = "0.5.0" }
+ascent = { path = "../../ascent" }
 itertools = "0.12"
 rustc-hash = "1.1"
 derive_more = "0.99"

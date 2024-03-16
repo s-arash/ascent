@@ -1,4 +1,5 @@
 use std::alloc::System;
+use std::borrow::Borrow;
 
 use ascent::ascent;
 use ascent::internal::Instant;
@@ -11,6 +12,7 @@ static GLOBAL: TrackingAllocator<System> = TrackingAllocator(System);
 
 type Symbol = &'static str;
 
+// examples adapted from Souffle's eqrel paper (https://souffle-lang.github.io/pdf/pact19.pdf)
 ascent! {
    #![measure_rule_times]
    /// Steensgaard analysis using `eqrel`
@@ -100,15 +102,15 @@ fn main() {
    let mut prog = Steensgaard::default();
 
    prog.alloc =
-      read_csv::<(String, String)>(&get_path("alloc.facts")).map(|(x, y)| (x.leak() as _, y.leak() as _)).collect_vec();
+      read_csv::<(String, String)>(&get_path("alloc.facts")).map(|(x, y)| (leak(x), leak(y))).collect_vec();
    prog.assign = read_csv::<(String, String)>(&get_path("assign.facts"))
-      .map(|(x, y)| (x.leak() as _, y.leak() as _))
+      .map(|(x, y)| (leak(x), leak(y)))
       .collect_vec();
    prog.load = read_csv::<(String, String, String)>(&get_path("load.facts"))
-      .map(|(x, y, z)| (x.leak() as _, y.leak() as _, z.leak() as _))
+      .map(|(x, y, z)| (leak(x), leak(y), leak(z)))
       .collect_vec();
    prog.store = read_csv::<(String, String, String)>(&get_path("store.facts"))
-      .map(|(x, y, z)| (x.leak() as _, y.leak() as _, z.leak() as _))
+      .map(|(x, y, z)| (leak(x), leak(y), leak(z)))
       .collect_vec();
 
    prog.run();
@@ -127,15 +129,15 @@ fn main() {
    let mut prog = SteensgaardExplicit::default();
 
    prog.alloc =
-      read_csv::<(String, String)>(&get_path("alloc.facts")).map(|(x, y)| (x.leak() as _, y.leak() as _)).collect_vec();
+      read_csv::<(String, String)>(&get_path("alloc.facts")).map(|(x, y)| (leak(x), leak(y))).collect_vec();
    prog.assign = read_csv::<(String, String)>(&get_path("assign.facts"))
-      .map(|(x, y)| (x.leak() as _, y.leak() as _))
+      .map(|(x, y)| (leak(x), leak(y)))
       .collect_vec();
    prog.load = read_csv::<(String, String, String)>(&get_path("load.facts"))
-      .map(|(x, y, z)| (x.leak() as _, y.leak() as _, z.leak() as _))
+      .map(|(x, y, z)| (leak(x), leak(y), leak(z)))
       .collect_vec();
    prog.store = read_csv::<(String, String, String)>(&get_path("store.facts"))
-      .map(|(x, y, z)| (x.leak() as _, y.leak() as _, z.leak() as _))
+      .map(|(x, y, z)| (leak(x), leak(y), leak(z)))
       .collect_vec();
 
    prog.run();
@@ -143,4 +145,9 @@ fn main() {
    println!("mem use: {:.2} Mib", (tracking_alloc::max_alloc() - mem_use_before) as f64 / 2f64.powi(20));
    println!("everything took: {:?}", start_time.elapsed());
    println!("vpt size: {}", prog.vpt.len());
+}
+
+fn leak<T: Borrow<TB> + 'static, TB: ?Sized>(x: T) -> &'static TB {
+   let leaked: &'static T = Box::leak(Box::new(x));
+   leaked.borrow()
 }

@@ -185,9 +185,6 @@ impl<K: Eq + Hash, V> RelIndexWrite for HashBrownRelFullIndexType<K, V>{
    #[inline(always)]
    fn index_insert(&mut self, key: Self::Key, value: V) {
       self.insert(key, value);
-      // TODO undo this
-      // assert!(hm.insert(key, tuple_index).is_none(), 
-      //    "inserting duplicate index into RelFullIndexType, index:{}", tuple_index);
    }
 }
 
