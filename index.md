@@ -5,11 +5,13 @@ Ascent is a logic programming language (similar to Datalog) embedded in Rust via
 
 For more information, check out [the CC paper](https://s-arash.github.io/ascent/cc22main-p95-seamless-deductive-inference-via-macros.pdf) on Ascent.
 
+In addition, [this OOPSLA paper](https://dl.acm.org/doi/pdf/10.1145/3622840) describes the "Bring Your Own Data Structures to Datalog" aspect of Ascent.
+
 ## Examples
 
 ### Computing all the connected nodes in a graph
 ```Rust
-ascent!{
+ascent! {
    relation edge(i32, i32);
    relation path(i32, i32);
    
@@ -28,12 +30,12 @@ ascent!{
 3. Add `ascent` as a dependency in `Cargo.toml`:
    ```toml
    [dependencies]
-   ascent = "0.4"
+   ascent = "*"
    ```
 4. Write some Ascent code in `main.rs`. Here is a complete example:
    ```rust
    use ascent::ascent;
-   ascent!{
+   ascent! {
       relation edge(i32, i32);
       relation path(i32, i32);
       
@@ -61,7 +63,7 @@ Ascent supports computing fixed points of user-defined lattices. The `lattice` k
 This feature enables writing programs not expressible in Datalog. For example we can use this feature to compute the lengths of shortest paths between nodes in a graph.
 
 ```Rust
-ascent!{
+ascent! {
    lattice shortest_path(i32, i32, Dual<u32>);
    relation edge(i32, i32, u32);
 
@@ -73,13 +75,13 @@ ascent!{
 }
 ```
 
-In this example, `Dual<T>` is the dual of the lattice T. We use `Dual<T>` because we are interested in shortest paths, given two path lengths `l1` and `l2` for any given pair of nodes, we only store `min(l1, l2)`.
+In this example, `Dual<T>` is the dual of the lattice `T`. We use `Dual<T>` because we are interested in shortest paths, given two path lengths `l1` and `l2` for any given pair of nodes, we only store `min(l1, l2)`.
 
-### Conditions and Generative clauses
+### Conditions and Generative Clauses
 The syntax is designed to be familiar to Rust users. In this example, `edge` is populated with non-reflexive edges from `node`. Note that any type that implements `Clone + Eq + Hash` can be used as a relation column.
 
 ```Rust
-ascent!{
+ascent! {
    relation node(i32, Rc<Vec<i32>>);
    relation edge(i32, i32);
    
@@ -100,7 +102,7 @@ use ascent::aggregators::*;
 type Student = u32;
 type Course = u32;
 type Grade = u16;
-ascent!{
+ascent! {
    relation student(Student);
    relation course_grade(Student, Course, Grade);
    relation avg_grade(Student, Grade);
@@ -115,17 +117,23 @@ You can define your own aggregators if the provided aggregators are not sufficie
 
 ```Rust
 fn second_highest<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
-   where N: Ord + Clone
+where N: Ord + Clone
 ```
 Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
 
+### Parallel Ascent
+
+Ascent is capable of producing parallel code. The macros `ascent_par!` and `ascent_run_par!` produce parallelized code. 
+Naturally, column types must be `Send + Sync` to work in parallel Ascent. 
+
+Parallel Ascent utilizes [`rayon`](https://crates.io/crates/rayon), so the parallelism level can be controlled either via `rayon`'s [`ThreadPoolBuilder`](https://docs.rs/rayon/latest/rayon/struct.ThreadPoolBuilder.html) or using the `RAYON_NUM_THREADS` environment variable (see [here](https://github.com/rayon-rs/rayon/blob/master/FAQ.md#how-many-threads-will-rayon-spawn) for more info).
 ### `ascent_run!`
 
 In addition to `ascent!`, we provide the `ascent_run!` macro. Unlike `ascent!`, this macro evaluates the ascent program when invoked. The main advantage of `ascent_run!` is that local variables are in scope inside the Ascent program. For example, we can define a function for discovering the (optionally reflexive) transitive closure of a relation like so:
 
 ```Rust
 fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
-   ascent_run!{
+   ascent_run! {
       relation r(i32, i32) = r;
       relation tc(i32, i32);
       tc(x, y) <-- r(x, y);
@@ -141,14 +149,52 @@ In the above example, we initialize the relation `r` directly to shorten the pro
 It may be useful to define macros that expand to either body items or head items. Ascent allows you to do this.
 
 You can find more about macros in Ascent macros [here](MACROS.MD).
+
+### BYODS
+BYODS (short for Bring Your Own Data Structures to Datalog) is an extension of Ascent that enables relations to be backed by custom data structures. This feature allows improving the algorithmic complexity of Ascent programs by optimizing the data structures used to back relations. For example, a program that requires transitive relation computation of a large graph could improve its performance by choosing a union-find based data structure for the transitive closure relation:
+
+```Rust
+ascent! {
+   #[ds(trrel_uf)]
+   relation path(Node, Node);
+   
+   path(x, y) <-- edge(x, y);
+}
+```
+
+The `#[ds(trrel_uf)]` attibute directs the Ascent compiler to use the data structure provider defined in the module `trrrel_uf` for the `path` relation. See [BYODS.MD](BYODS.MD) for more information on BYODS.
+
+(Note: custom data structure providers like `trrel_uf` have not been merged into the master branch yet.)
+
+
 ### Misc
-- `#![measure_rule_times]` causes execution times of individual rules to be measured. Example: 
+- **`#![measure_rule_times]`** causes execution times of individual rules to be measured. Example: 
    ```Rust
    ascent! {
       #![measure_rule_times]
       // ...
    }
+   let mut prog = AscentProgram::default();
+   prog.run();
+   println!("{}", prog.scc_times_summary());
    ```
-- With `#![generate_run_timeout]`, a `run_timeout` function is generated that stops after
+   Note that **`scc_times_summary()`** is generated for all Ascent programs. With `#![measure_rule_times]`
+   it reports execution times of individual rules too.
+
+- With **`#![generate_run_timeout]`**, a `run_timeout` function is generated that stops after
   the given amount of time.
-- The feature `wasm-bindgen` allows Ascent programs to run in WASM environments.
+
+- The feature **`wasm-bindgen`** allows Ascent programs to run in WASM environments.
+
+- **`struct`** declarations can be added to the top of `ascent!` definitions. This allows changing the
+  name and visibility of the generated type and introduction of type/lifetime parameters and constraints.
+   ```Rust
+   ascent! {
+      struct GenericTC<N: Clone + Eq + Hash>;
+      relation edge(N, N);
+      // ...
+   }
+   ```
+
+   *Hint*: If you get a "private type ... in public interface (error E0446)" warning, you can fix it by
+   making the generated Ascent type private, as done in the above example.
