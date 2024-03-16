@@ -2,9 +2,11 @@ name: Rust
 
 on:
   push:
-    branches: [ master, ci, lattices, wasm-support, macro-in-macro, rel-index-trait, par ]
+    branches: [ master, ci, par, byods ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, byods ]
+    paths-ignore:
+      - '**/*.MD'
 
 env:
   CARGO_TERM_COLOR: always
@@ -66,6 +68,22 @@ jobs:
       working-directory: ./ascent_macro
       run: cargo test test  
   
+  byods-rels:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      
+      - name: cargo test
+        working-directory: ./byods/rels-ascent
+        run: cargo test
+     
   dependency-check:
     runs-on: ubuntu-latest
     
