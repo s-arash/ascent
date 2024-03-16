@@ -1,10 +1,11 @@
 extern crate proc_macro;
 use ascent_base::util::update;
 use proc_macro2::{Span, TokenStream};
+use syn::ImplGenerics;
 use syn::{
    braced, parenthesized, parse2, punctuated::Punctuated, spanned::Spanned, Attribute, Error, Expr, ExprMacro,
    ExprPath, GenericParam, Generics, Ident, ItemMacro2, MacroDelimiter, Pat, Result, Token, Type, Visibility,
-   WhereClause,
+   WhereClause, TypeGenerics
 };
 use syn::token::{Comma, Gt, Lt};
 use syn::parse::{Parse, ParseStream, ParseBuffer, Parser};
@@ -40,9 +41,43 @@ mod kw {
    syn::custom_keyword!(expr);
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct Signatures {
+   pub(crate) declaration: TypeSignature,
+   pub(crate) implementation: Option<ImplSignature>,
+}
 
-#[derive(Clone, Parse)]
-pub struct Declaration {
+impl Signatures {
+   pub fn split_ty_generics_for_impl(&self) -> (ImplGenerics<'_>, TypeGenerics<'_>, Option<&'_ WhereClause>) {
+      self.declaration.generics.split_for_impl()
+   }
+
+   pub fn split_impl_generics_for_impl(&self) -> (ImplGenerics<'_>, TypeGenerics<'_>, Option<&'_ WhereClause>) {
+      let Some(signature) = &self.implementation else {
+         return self.split_ty_generics_for_impl();
+      };
+
+      let (impl_generics, _, _) = signature.impl_generics.split_for_impl();
+      let (_, ty_generics, where_clause) = signature.generics.split_for_impl();
+
+      (impl_generics, ty_generics, where_clause)
+   }
+}
+
+impl Parse for Signatures {
+   fn parse(input: ParseStream) -> Result<Self> {
+      let declaration = TypeSignature::parse(input)?;
+      let implementation = if input.peek(Token![impl]) {
+         Some(ImplSignature::parse(input)?)
+      } else {
+         None
+      };
+      Ok(Signatures { declaration, implementation })
+   }
+}
+
+#[derive(Clone, Parse, Debug)]
+pub struct TypeSignature {
    // We don't actually use the Parse impl to parse attrs.
    #[call(Attribute::parse_outer)]
    pub attrs: Vec<Attribute>,
@@ -51,7 +86,16 @@ pub struct Declaration {
    pub ident: Ident,
    #[call(parse_generics_with_where_clause)]
    pub generics: Generics,
-   pub where_clause: Option<WhereClause>,
+   pub semi: Token![;]
+}
+
+#[derive(Clone, Parse, Debug)]
+pub struct ImplSignature {
+   pub impl_kw: Token![impl],
+   pub impl_generics: Generics,
+   pub ident: Ident,
+   #[call(parse_generics_with_where_clause)]
+   pub generics: Generics,
    pub semi: Token![;]
 }
 
@@ -492,7 +536,7 @@ pub struct MacroDefNode {
 pub(crate) struct AscentProgram {
    pub rules : Vec<RuleNode>,
    pub relations : Vec<RelationNode>,
-   pub declaration: Option<Declaration>,
+   pub signatures: Option<Signatures>,
    pub attributes: Vec<syn::Attribute>,
    pub macros: Vec<MacroDefNode>
 }
@@ -501,9 +545,13 @@ impl Parse for AscentProgram {
    fn parse(input: ParseStream) -> Result<Self> {
       let attributes = Attribute::parse_inner(input)?;
       let mut struct_attrs = Attribute::parse_outer(input)?;
-      let declaration = if input.peek(Token![pub]) || input.peek(Token![struct]) {
-         Some(Declaration{ attrs: std::mem::take(&mut struct_attrs), .. Declaration::parse(input)?})
-      } else {None};
+      let signatures = if input.peek(Token![pub]) || input.peek(Token![struct]) {
+         let mut signatures = Signatures::parse(input)?;
+         signatures.declaration.attrs = std::mem::take(&mut struct_attrs);
+         Some(signatures)
+      } else {
+         None
+      };
       let mut rules = vec![];
       let mut relations = vec![];
       let mut macros = vec![];
@@ -525,7 +573,7 @@ impl Parse for AscentProgram {
             rules.push(RuleNode::parse(input)?);
          }
       }
-      Ok(AscentProgram{rules, relations, declaration, attributes, macros})
+      Ok(AscentProgram{rules, relations, signatures, attributes, macros})
    }
 }
 
