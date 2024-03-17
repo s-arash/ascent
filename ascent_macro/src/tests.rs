@@ -1,11 +1,9 @@
 #![cfg(test)]
-use std::{clone, cmp::max, rc::Rc};
-
 use petgraph::dot::{Config, Dot};
-use proc_macro2::{TokenStream, TokenTree, Group, Span};
-use syn::{Ident, parse2};
+use proc_macro2::TokenStream;
+use syn::parse2;
 
-use crate::{ascent_impl, utils::token_stream_replace_macro_ident};
+use crate::ascent_impl;
 
 
 #[test]
@@ -416,7 +414,7 @@ fn write_to_scratchpad_base(tokens: TokenStream, prefix: TokenStream, is_ascent_
    let code = code.unwrap();
    let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
    let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
-   std::fs::write("src/scratchpad.rs", prefix.to_string());
+   std::fs::write("src/scratchpad.rs", prefix.to_string()).unwrap();
    std::fs::write("src/scratchpad.rs", code_in_template).unwrap();
    std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
    code
@@ -434,6 +432,7 @@ fn write_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
    write_to_scratchpad_base(tokens, quote!{}, false, true)
 }
 
+#[allow(unused)]
 fn write_ascent_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
    write_to_scratchpad_base(tokens, quote!{}, true, false)
 }
@@ -544,50 +543,6 @@ fn test_macro_in_macro() {
 
    write_to_scratchpad(inp);
 }
-
-#[test]
-fn test_token_stream_replace_macro_ident() {
-   let macro_def: syn::ItemMacro2 = syn::parse_quote!{
-      macro foo($i: ident) {
-         println!("{}", $i);
-      }
-   };
-
-   fn tt_print_idents(tt: &TokenTree) {
-      match tt {
-         proc_macro2::TokenTree::Group(grp) => {
-            ts_print_idents(&grp.stream());
-         },
-         proc_macro2::TokenTree::Ident(ident) => println!("{}", ident),
-         proc_macro2::TokenTree::Punct(punct) => println!("punct {}", punct),
-         proc_macro2::TokenTree::Literal(_) => (),
-      }
-   }
-
-   fn ts_print_idents(ts: &TokenStream) {
-      for tt in ts.clone() {
-         tt_print_idents(&tt);
-      }
-   }
-
-   let ts = quote! {
-      println!("{}", $i);
-   };
-
-   fn ident(name: &str) -> Ident {Ident::new("i", Span::call_site())}
-
-   let test_cases = [
-      (quote!{{println!("{}", $i);}}, "i", quote! { "hello"}, quote!{ {println!("{}", "hello");}}),
-      (quote!{{println!("{}{}{}", $$i, $j, $$);}}, "i", quote! { "hello"}, quote!{ {println!("{}{}{}", $"hello", $j, $$);}}),
-      (quote!{ foo($$$j, $i, $$i)}, "i", quote! { "hello"}, quote!{ foo($$$j, "hello", $"hello")}),
-   ];
-
-   for (ts, var, replacement, expected) in test_cases {
-      assert_eq!(token_stream_replace_macro_ident(ts, &ident(var), &replacement).to_string(), expected.to_string());
-   }
-
-}
-
 
 #[test]
 fn test_macro_item() {

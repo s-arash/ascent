@@ -1,12 +1,12 @@
-use std::{collections::{BTreeSet, HashSet}, fmt::Display};
+#![deny(warnings)]
+use std::collections::HashSet;
 
-use itertools::{Iterate, Itertools, Either};
+use itertools::{Itertools, Either};
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::ToTokens;
 use syn::{Expr, Type, parse2, spanned::Spanned, parse_quote, parse_quote_spanned};
 
-use crate::{ascent_hir::{IrRelation, IndexValType}, ascent_syntax::{CondClause, RelationIdentity}, syn_utils::pattern_get_vars, utils::TokenStreamExtensions};
-use crate::utils::{exp_cloned, expr_to_ident, pat_to_ident, tuple, tuple_spanned, tuple_type};
+use crate::{ascent_hir::{IrRelation, IndexValType}, ascent_syntax::{CondClause, RelationIdentity}, utils::TokenStreamExtensions};
+use crate::utils::{exp_cloned, expr_to_ident, tuple, tuple_spanned, tuple_type};
 use crate::ascent_mir::{AscentMir, MirBodyItem, MirRelation, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name, mir_rule_summary, mir_summary};
 use crate::ascent_mir::MirRelationVersion::*;
 
@@ -43,8 +43,6 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       }
       for ind in rel_indices.iter(){
          let name = &ind.ir_name();
-         let index_type: Vec<Type> = ind.indices.iter().map(|&i| rel.field_types[i].clone()).collect();
-         let index_type = tuple_type(&index_type);
          let rel_index_type = rel_index_type(ind, mir);
          relation_fields.push(quote!{
             // #[allow(non_snake_case)]
@@ -58,8 +56,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let mut rule_time_fields = vec![];
    let mut rule_time_fields_defaults = vec![];
    for i in 0..mir.sccs.len(){
-      let name = scc_time_field_name(i);
-      for (rule_ind, rule) in mir.sccs[i].rules.iter().enumerate() {
+      for (rule_ind, _rule) in mir.sccs[i].rules.iter().enumerate() {
          let name = rule_time_field_name(i, rule_ind);
          rule_time_fields.push(quote!{
             pub #name: std::time::Duration,
@@ -72,10 +69,9 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
 
    
    let mut sccs_compiled = vec![];
-   for (i, scc) in sccs_ordered.iter().enumerate() {
+   for (i, _scc) in sccs_ordered.iter().enumerate() {
       let msg = format!("scc {}", i);
       let scc_compiled = compile_mir_scc(mir, i);
-      let scc_time_field_name = scc_time_field_name(i);
       sccs_compiled.push(quote!{
          ascent::internal::comment(#msg);
          {
@@ -128,7 +124,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          });
       }
    }
-   if relation_initializations.len() > 0 {
+   if !relation_initializations.is_empty() {
       relation_initializations.push(quote! {
          _self.update_indices_priv();
       })
@@ -338,6 +334,7 @@ fn rel_index_type(rel: &IrRelation, mir: &AscentMir) -> Type {
             quote_spanned!{ span=>ascent::internal::LatticeIndexType<#key_type, #value_type> }
          }
       } else {
+         // parallel
          if is_lat_full_index {
             quote_spanned! { span=>ascent::internal::CRelFullIndex<#key_type, #value_type> }
          } else if rel.is_no_index() {
@@ -371,7 +368,7 @@ fn rel_type(rel: &RelationIdentity, mir: &AscentMir) -> Type {
       }
    } else {
       let macro_path = &mir.relations_metadata[rel].ds_macro_path;
-      let macro_input = rel_ds_macro_input(&rel, mir);
+      let macro_input = rel_ds_macro_input(rel, mir);
       parse_quote_spanned! {macro_path.span()=> #macro_path::rel!(#macro_input) }
    }
 }
@@ -400,9 +397,6 @@ fn rel_ds_macro_input(rel: &RelationIdentity, mir: &AscentMir) -> TokenStream {
    }
 }
 
-fn scc_time_field_name(i: usize) -> Ident {
-   Ident::new(&format!("scc{}_duration", i), Span::call_site())
-}
 fn rule_time_field_name(scc_ind: usize, rule_ind: usize) ->Ident {
    Ident::new(&format!("rule{}_{}_duration", scc_ind, rule_ind), Span::call_site())
 }
@@ -435,7 +429,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
       });
 
       match rel {
-         Either::Left(rel_ind_common) => {
+         Either::Left(_rel_ind_common) => {
             shift_delta_to_total_new_to_delta.push(quote_spanned!{ir_name.span()=>
                ::ascent::internal::RelIndexMerge::merge_delta_to_total_new_to_delta(&mut #new_var_name, &mut #delta_var_name, &mut #total_var_name);
             });
@@ -612,13 +606,12 @@ fn compile_scc_times_summary_body(mir: &AscentMir) -> proc_macro2::TokenStream {
    let mut res = vec![];
    for i in 0..mir.sccs.len(){
       let i_str = format!("{}", i);
-      let scc_time_field_name = scc_time_field_name(i);
       res.push(quote!{
          writeln!(&mut res, "scc {}: iterations: {}, time: {:?}", #i_str, self.scc_iters[#i], self.scc_times[#i]).unwrap();
       });
       if mir.config.include_rule_times {
          let mut sum_of_rule_times = quote!{ std::time::Duration::ZERO };
-         for (rule_ind, rule) in mir.sccs[i].rules.iter().enumerate() {
+         for (rule_ind, _rule) in mir.sccs[i].rules.iter().enumerate() {
             let rule_time_field = rule_time_field_name(i, rule_ind);
             sum_of_rule_times = quote!{ #sum_of_rule_times + self.#rule_time_field};
          }
@@ -651,8 +644,6 @@ fn compile_scc_times_summary_body(mir: &AscentMir) -> proc_macro2::TokenStream {
 }
 
 fn compile_update_indices_function_body(mir: &AscentMir) -> proc_macro2::TokenStream {
-   // let _self = quote!{ self }; // making sure it gets the correct span
-   
    let par = mir.is_parallel;
    let mut res = vec![];
    if par {
@@ -683,7 +674,7 @@ fn compile_update_indices_function_body(mir: &AscentMir) -> proc_macro2::TokenSt
          }).collect_vec();
          let selection_tuple = tuple_spanned(&selection_tuple, r.name.span());
          let entry_val = index_get_entry_val_for_insert(
-            &ind, &parse_quote_spanned!{r.name.span()=> tuple}, &parse_quote_spanned!{r.name.span()=> _i});
+            ind, &parse_quote_spanned!{r.name.span()=> tuple}, &parse_quote_spanned!{r.name.span()=> _i});
          let _pre_ref = if r.is_lattice {quote!()} else {_ref.clone()};
          update_indices.push(quote_spanned! {r.name.span()=>
             let selection_tuple = #selection_tuple;
@@ -772,7 +763,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> proc_macro
    }
 }
 
-fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_iter_to_ind: usize, head_update_code: proc_macro2::TokenStream, clause_ind: usize) 
+fn compile_mir_rule_inner(rule: &MirRule, _scc: &MirScc, mir: &AscentMir, par_iter_to_ind: usize, head_update_code: proc_macro2::TokenStream, clause_ind: usize) 
 -> proc_macro2::TokenStream 
 {
    if Some(clause_ind) == rule.simple_join_start_index && rule.reorderable {
@@ -781,8 +772,8 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
       rule_cp1.reorderable = false;
       rule_cp2.reorderable = false;
       rule_cp2.body_items.swap(clause_ind, clause_ind + 1);
-      let rule_cp1_compiled = compile_mir_rule_inner(&rule_cp1, scc, mir, par_iter_to_ind, head_update_code.clone(), clause_ind);
-      let rule_cp2_compiled = compile_mir_rule_inner(&rule_cp2, scc, mir, par_iter_to_ind, head_update_code        , clause_ind);
+      let rule_cp1_compiled = compile_mir_rule_inner(&rule_cp1, _scc, mir, par_iter_to_ind, head_update_code.clone(), clause_ind);
+      let rule_cp2_compiled = compile_mir_rule_inner(&rule_cp2, _scc, mir, par_iter_to_ind, head_update_code        , clause_ind);
 
       if let [MirBodyItem::Clause(bcl1), MirBodyItem::Clause(bcl2)] = &rule.body_items[clause_ind..clause_ind+2]{
          let rel1_var_name = expr_for_rel(&bcl1.rel, mir);
@@ -803,9 +794,9 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
       let bitem = &rule.body_items[clause_ind];
       let doing_simple_join = rule.simple_join_start_index == Some(clause_ind);
       let next_loop = if doing_simple_join {
-         compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, clause_ind + 2)
+         compile_mir_rule_inner(rule, _scc, mir, par_iter_to_ind, head_update_code, clause_ind + 2)
       } else {
-         compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, clause_ind + 1)
+         compile_mir_rule_inner(rule, _scc, mir, par_iter_to_ind, head_update_code, clause_ind + 1)
       };
 
       match bitem {
@@ -828,7 +819,7 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
 
             let matched_val_ident = Ident::new("__val", bclause.rel_args_span);
             let new_vars_assignments = clause_var_assignments(
-               &bclause.rel, clause_vars.iter().filter(|(i, var)| !common_vars_no_indices.contains(var)).cloned(),
+               &bclause.rel, clause_vars.iter().filter(|(_i, var)| !common_vars_no_indices.contains(var)).cloned(),
                &matched_val_ident, &parse_quote!{_self.#bclause_rel_name}, cloning_needed, mir
             );
 
@@ -841,14 +832,8 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
                conds_then_next_loop = compile_cond_clause(cond, conds_then_next_loop);
             }
 
-            fn maybe_clone(cloning_needed: bool, span: Span) -> proc_macro2::TokenStream {
-               if cloning_needed {quote_spanned! {span=> .clone()}} 
-               else {quote! { }}
-            }
             let span = bclause.rel_args_span;
-            let row_maybe_clone = maybe_clone(cloning_needed, bclause.rel_args_span);
             
-            // let matching_dot_iter = dot_iter_for_rel_index(&bclause.rel, quote_spanned!{bclause.rel_args_span=> __matching});
             let matching_dot_iter = quote_spanned!{bclause.rel_args_span=> __matching};
 
             let (index_get, iter_all) = if clause_ind < par_iter_to_ind {
@@ -857,7 +842,6 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
                (quote_spanned! {span=> index_get}, quote_spanned! {span=> iter_all})
             };
 
-            // TODO cleanup
             // The special case where the first clause has indices, but there are no expressions
             // in the args of the first clause
             if doing_simple_join {
@@ -868,7 +852,6 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
                let cl1_vars = cl1.vars();
 
                let cl1_rel_name = &cl1.rel.relation.name;
-               let cl2_rel_name = &cl2.rel.relation.name;
 
                let mut cl1_join_vars_assignments = vec![];
                for (tuple_ind, &i) in cl1.rel.indices.iter().enumerate() {
@@ -876,17 +859,10 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
                   let tuple_ind = syn::Index{index: tuple_ind as u32, span: var.span()};
                   cl1_join_vars_assignments.push(quote_spanned! {var.span()=> let #var = __cl1_joined_columns.#tuple_ind;});
                }
-               let cl2_vars = cl2.args.iter().filter_map(expr_to_ident).collect_vec();
 
-               // let mut cl1_vars_assignments = vec![];
-               // for (i,var) in cl1_vars.iter(){
-               //    let i_ind = syn::Index{index: *i as u32, span: var.span()};
-               //    if cl1.rel.indices.contains(i) {continue;}
-               //    cl1_vars_assignments.push(quote_spanned! {var.span()=> let #var = &__row.#i_ind;});
-               // }
                let cl1_matched_val_ident = syn::Ident::new("cl1_val", cl1.rel_args_span);
                let cl1_vars_assignments = clause_var_assignments(
-                  &cl1.rel, cl1_vars.iter().filter(|(i, var)| !cl1.rel.indices.contains(i)).cloned(),
+                  &cl1.rel, cl1_vars.iter().filter(|(i, _var)| !cl1.rel.indices.contains(i)).cloned(),
                   &cl1_matched_val_ident, &parse_quote!{_self.#cl1_rel_name}, cloning_needed, mir
                );
                let cl1_vars_assignments = vec![cl1_vars_assignments];
@@ -897,12 +873,7 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
                
                let cl1_tuple_indices_iter = quote_spanned!(cl1.rel_args_span=> __cl1_tuple_indices);
 
-               let cl1_cloning_needed = true;
-               let cl1_row_maybe_clone = maybe_clone(cl1_cloning_needed, cl1.rel_args_span);
-
-               
                let mut cl1_conds_then_rest = quote_spanned! {bclause.rel_args_span=>
-                  // for __val in #matching_dot_iter.clone() {
                   #matching_dot_iter.clone().for_each(|__val|  {
                      // TODO we may be doing excessive cloning
                      #new_vars_assignments
@@ -917,7 +888,6 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
                      let __cl1_joined_columns = __cl1_joined_columns.tuple_of_borrowed();
                      #(#cl1_join_vars_assignments)*
                      if let Some(__matching) = #cl2_var_name.#index_get(&#joined_args_tuple_for_cl2) {
-                        // for cl1_val in #cl1_tuple_indices_iter{
                         #cl1_tuple_indices_iter.for_each(|cl1_val| {
                            #(#cl1_vars_assignments)*
                            #cl1_conds_then_rest
@@ -928,7 +898,6 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
             } else {
                quote_spanned! {bclause.rel_args_span=>
                   if let Some(__matching) = #rel_version_exp.#index_get( &#selected_args_tuple) {
-                     // for __val in #matching_dot_iter {
                      #matching_dot_iter.for_each(|__val|  {
                         // TODO we may be doing excessive cloning
                         #new_vars_assignments
@@ -963,11 +932,7 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
                agg.bound_args.iter()
                .map(|arg| (agg.rel_args.iter()
                         .find_position(|rel_arg| expr_to_ident(rel_arg) == Some(arg.clone())).unwrap().0, arg.clone()));
-            // let agg_args_tuple = agg_args_tuple_indices.clone().map(|(ind, arg)| {
-            //    let tuple_ind = syn::Index::from(ind);
-            //    parse2(quote_spanned! {arg.span()=> &__row.#tuple_ind}).unwrap()
-            // }).collect_vec();
-            // let agg_args_tuple = tuple_spanned(&agg_args_tuple, agg.span);
+            
             let agg_args_tuple = tuple_spanned(&agg.bound_args.iter().map(|v| parse_quote!{#v}).collect_vec(), agg.span);
 
             let vars_assignments = clause_var_assignments(
@@ -977,8 +942,6 @@ fn compile_mir_rule_inner(rule: &MirRule, scc: &MirScc, mir: &AscentMir, par_ite
             );
 
             let agg_func = &agg.aggregator;
-            let matching_iter = quote_spanned!{agg.span => __matching};
-            let to_iter_func = ind_val_option_to_iter_func_name_for_rel(&mir_relation);
             let _self = quote!{ _self };
             quote_spanned! {agg.span=>
                let __aggregated_rel = #rel_expr;
@@ -1050,7 +1013,7 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
             }
             let args_tuple = tuple(&args_tuple);
             let entry_val = index_get_entry_val_for_insert(
-               &rel_ind, &parse_quote_spanned!{hcl.span=> __new_row}, &parse_quote_spanned!{hcl.span=> __new_row_ind});
+               rel_ind, &parse_quote_spanned!{hcl.span=> __new_row}, &parse_quote_spanned!{hcl.span=> __new_row_ind});
             update_indices.push(quote_spanned! {hcl.span=>
                #rel_index_write_trait::#index_insert_fn(#new_ref #var_name, #args_tuple, #entry_val);
             });
@@ -1086,7 +1049,6 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
       }};
 
       if !hcl.rel.is_lattice { 
-         let head_rel_name_string = head_rel_name.to_string();
          let add_row = quote_spanned!{hcl.span=>
             let __new_row: #row_type = #new_row_tuple;
 
@@ -1194,19 +1156,9 @@ fn convert_head_arg(arg: Expr) -> Expr {
    }
 }
 
-fn ind_val_option_to_iter_func_name_for_rel(rel: &MirRelation) -> proc_macro2::TokenStream {
-   if rel.is_full_index {
-      quote! {ascent::internal::rel_full_ind_val_option_to_iter}
-   } else if !rel.relation.is_lattice {
-      quote! {ascent::internal::rel_ind_val_option_to_iter}
-   } else {
-      quote! {ascent::internal::lat_ind_val_option_to_iter}
-   }
-}
-
 fn expr_for_rel(rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream {
-   fn expr_for_rel_inner(ir_name: &Ident, version: MirRelationVersion, mir: &AscentMir, mir_rel: &MirRelation) -> (TokenStream, bool) {
-      let var = ir_relation_version_var_name(&ir_name, version);
+   fn expr_for_rel_inner(ir_name: &Ident, version: MirRelationVersion, _mir: &AscentMir, mir_rel: &MirRelation) -> (TokenStream, bool) {
+      let var = ir_relation_version_var_name(ir_name, version);
       if mir_rel.relation.is_lattice {
          (quote! { & #var }, true)
       } else {
@@ -1227,7 +1179,7 @@ fn expr_for_rel(rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream 
    }
 }
 
-fn expr_for_rel_write(mir_rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream {
+fn expr_for_rel_write(mir_rel: &MirRelation, _mir: &AscentMir) -> proc_macro2::TokenStream {
    let var = mir_rel.var_name();
    if mir_rel.relation.is_lattice {
       quote!{ #var }
@@ -1237,7 +1189,7 @@ fn expr_for_rel_write(mir_rel: &MirRelation, mir: &AscentMir) -> proc_macro2::To
    }
 }
 
-fn expr_for_c_rel_write(mir_rel: &MirRelation, mir: &AscentMir) -> proc_macro2::TokenStream {
+fn expr_for_c_rel_write(mir_rel: &MirRelation, _mir: &AscentMir) -> proc_macro2::TokenStream {
    let var = mir_rel.var_name();
    if mir_rel.relation.is_lattice {
       quote!{ #var }
@@ -1258,14 +1210,12 @@ fn clause_var_assignments(
    let mut assignments = vec![];
 
    let mut any_vars = false;
-   let mut vars_count = 0;
    for (ind_in_tuple, var) in vars {
       let var_type_ascription = {
          let ty = &rel.relation.field_types[ind_in_tuple];
          quote! { : & #ty}
       };
       any_vars = true;
-      vars_count += 1;
       match &rel.val_type {
          IndexValType::Reference => {
             let ind = syn::Index::from(ind_in_tuple);
@@ -1274,11 +1224,10 @@ fn clause_var_assignments(
             })
          },
          IndexValType::Direct(inds) => {
-            let ind = inds.iter().enumerate().find(|(i, ind)| **ind == ind_in_tuple).unwrap().0;
+            let ind = inds.iter().enumerate().find(|(_i, ind)| **ind == ind_in_tuple).unwrap().0;
             let ind = syn::Index::from(ind);
 
             assignments.push(quote! {
-               // let #var = &#val_ident.#ind;
                let #var #var_type_ascription = #val_ident.#ind;
             })
          },

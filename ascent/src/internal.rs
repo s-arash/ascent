@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 pub use instant::Instant;
 
-use ascent_base::{Lattice};
+use ascent_base::Lattice;
 use rustc_hash::FxHasher;
 
 pub use crate::rel_index_read::RelIndexCombined;

@@ -1,15 +1,16 @@
-use std::{collections::{HashMap, HashSet}, ops::Index, rc::Rc};
+#![deny(warnings)]
+use std::{collections::{HashMap, HashSet}, rc::Rc};
 
 use itertools::Itertools;
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::ToTokens;
-use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned, parse_quote, Path, parse::Parser, parse_quote_spanned, parenthesized};
+use syn::{Attribute, Error, Expr, Pat, Type, parse2, spanned::Spanned, parse_quote, Path};
 
-use crate::{AscentProgram, ascent_syntax::{RelationNode, rule_node_summary, DsAttributeContents, Signatures}, utils::{expr_to_ident, into_set, is_wild_card, tuple, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
-use crate::ascent_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, IfLetClause, RelationIdentity, RuleNode};
+use crate::{AscentProgram, ascent_syntax::{RelationNode, DsAttributeContents, Signatures}, utils::{expr_to_ident, is_wild_card, tuple_type}, syn_utils::{expr_get_vars, pattern_get_vars}};
+use crate::ascent_syntax::{BodyClauseArg, BodyItemNode, CondClause, GeneratorNode, RelationIdentity, RuleNode};
 
 #[derive(Clone)]
 pub(crate) struct AscentConfig {
+   #[allow(dead_code)]
    pub attrs: Vec<Attribute>,
    pub include_rule_times: bool,
    pub generate_run_partial: bool,
@@ -25,7 +26,7 @@ impl AscentConfig {
    pub fn new(attrs: Vec<Attribute>, is_parallel: bool) -> syn::Result<AscentConfig> {
       let include_rule_times = attrs.iter().any(|attr| attr.path.is_ident(Self::MEASURE_RULE_TIMES_ATTR));
       let generate_run_partial = attrs.iter().any(|attr| attr.path.is_ident(Self::GENERATE_RUN_TIMEOUT_ATTR));
-      let inter_rule_parallelism = attrs.iter().filter(|attr| attr.path.is_ident(Self::INTER_RULE_PARALLELISM_ATTR)).next();
+      let inter_rule_parallelism = attrs.iter().find(|attr| attr.path.is_ident(Self::INTER_RULE_PARALLELISM_ATTR));
 
       let recognized_attrs = 
          [Self::MEASURE_RULE_TIMES_ATTR, Self::GENERATE_RUN_TIMEOUT_ATTR, Self::INTER_RULE_PARALLELISM_ATTR, REL_DS_ATTR];
@@ -36,10 +37,8 @@ impl AscentConfig {
                                recognized_attrs.join(", "))));
          }
       }
-      if let Some(inter_rule_parallelism_attr) = inter_rule_parallelism {
-         if !is_parallel {
-            return Err(Error::new_spanned(inter_rule_parallelism, "attribute only allowed in parallel Ascent"));
-         }
+      if inter_rule_parallelism.is_some() && !is_parallel {
+         return Err(Error::new_spanned(inter_rule_parallelism, "attribute only allowed in parallel Ascent"));
       }
       let default_ds = get_ds_attr(&attrs)?.unwrap_or_else(|| 
          DsAttributeContents { path: parse_quote! {::ascent::rel}, args: TokenStream::default() }
@@ -80,6 +79,7 @@ pub(crate) struct IrRule {
    pub simple_join_start_index: Option<usize>
 }
 
+#[allow(unused)]
 pub(crate) fn ir_rule_summary(rule: &IrRule) -> String {
    fn bitem_to_str(bi: &IrBodyItem) -> String {
       match bi {
@@ -132,6 +132,7 @@ pub(crate) struct IrBodyClause {
 }
 
 impl IrBodyClause {
+   #[allow(dead_code)]
    pub fn selected_args(&self) -> Vec<Expr> {
       self.rel.indices.iter().map(|&i| self.args[i].clone()).collect()
    }
@@ -167,7 +168,7 @@ impl IrRelation {
       {
          IndexValType::Reference
       } else {
-         IndexValType::Direct((0..relation.field_types.len()).filter(|i| !indices.contains(&i)).collect_vec())
+         IndexValType::Direct((0..relation.field_types.len()).filter(|i| !indices.contains(i)).collect_vec())
       };
       IrRelation { relation, indices, val_type }
    }
@@ -215,16 +216,13 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
 
       if rel.is_lattice {
          let indices = (0 .. rel_identity.field_types.len() - 1).collect_vec();
-         let ir_name = ir_name_for_rel_indices(&rel_identity.name, &indices);
          let lat_full_index = IrRelation::new(rel_identity.clone(), indices);
          relations_ir_relations.entry(rel_identity.clone()).or_default().insert(lat_full_index.clone());
          lattices_full_indices.insert(rel_identity.clone(), lat_full_index);
       }
 
       let full_indices = (0 .. rel_identity.field_types.len()).collect_vec();
-      let ir_name = ir_name_for_rel_indices(&rel_identity.name, &full_indices);
       let rel_full_index = IrRelation::new(rel_identity.clone(),full_indices);
-      let rel_no_index = IrRelation::new(rel_identity.clone(), vec![]);
 
       relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_full_index.clone());
       // relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_no_index.clone());
@@ -237,7 +235,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       relations_metadata.insert(
          rel_identity.clone(),
          RelationMetadata {
-            initialization: rel.initialization.clone().map(|i| Rc::new(i)),
+            initialization: rel.initialization.clone().map(Rc::new),
             attributes: Rc::new(rel.attrs.iter().filter(|attr| attr.path.get_ident().map_or(true, |ident| !RECOGNIIZED_REL_ATTRS.iter().any(|ra| ident == ra))).cloned().collect_vec()),
             ds_macro_path: ds_attribute.path,
             ds_macro_args: ds_attribute.args
@@ -263,11 +261,11 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
    }
    let signatures = prog.signatures.clone().unwrap_or_else(|| parse2(quote! {pub struct AscentProgram;}).unwrap());
    Ok(AscentIr {
-      rules: ir_rules.into_iter().map(|(rule, extra_rels)| rule).collect_vec(),
+      rules: ir_rules.into_iter().map(|(rule, _extra_rels)| rule).collect_vec(),
       relations_ir_relations,
       relations_full_indices,
       lattices_full_indices,
-      relations_metadata: relations_metadata,
+      relations_metadata,
       // relations_no_indices,
       signatures,
       config,
@@ -285,7 +283,7 @@ fn get_ds_attr(attrs: &[Attribute]) -> syn::Result<Option<DsAttributeContents>> 
          let res = syn::parse2::<DsAttributeContents>(attr.tokens.clone())?;
          Ok(Some(res))
       },
-      [attr1, attr2, ..] => Err(Error::new(attr2.bracket_token.span, "multiple `ds` attributes specified")),
+      [_attr1, attr2, ..] => Err(Error::new(attr2.bracket_token.span, "multiple `ds` attributes specified")),
    }
 }
 
@@ -327,7 +325,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
                }
                for cond_cl in bcl.cond_clauses.iter(){
                   let cond_expr = cond_cl.expr();
-                  let expr_idents = expr_get_vars(&cond_expr);
+                  let expr_idents = expr_get_vars(cond_expr);
                   if !expr_idents.iter().all(|v| self_vars.contains(v)){
                      first_two_clauses_simple = false;
                      break;
@@ -353,11 +351,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
                   }
                }
             }
-            let ir_name = ir_name_for_rel_indices(&bcl.rel, &indices);
             let relation = prog_get_relation(prog, &bcl.rel, bcl.args.len())?;
-            // if relation.is_lattice {
-            //    first_two_items_simple_clauses = false;
-            // }
 
             for cond_clause in bcl.cond_clauses.iter() {
                extend_grounded_vars(&mut grounded_vars, cond_clause.bound_vars())?;
@@ -383,7 +377,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
          },
          BodyItemNode::Agg(ref agg) => {
             extend_grounded_vars(&mut grounded_vars, pattern_get_vars(&agg.pat))?;
-            let indices = agg.rel_args.iter().enumerate().filter(|(i, expr)| {
+            let indices = agg.rel_args.iter().enumerate().filter(|(_i, expr)| {
                if is_wild_card(expr) {
                   return false;
                } else if let Some(ident) = expr_to_ident(expr) {
@@ -392,7 +386,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
                   }
                }
                true
-            }).map(|(i, expr)| i).collect_vec();
+            }).map(|(i, _expr)| i).collect_vec();
             let relation = prog_get_relation(prog, &agg.rel, agg.rel_args.len())?;
             
             let ir_rel = IrRelation::new(relation.into(), indices);
@@ -413,7 +407,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
    let mut head_clauses = vec![];
    for hcl_node in rule.head_clauses.iter(){
       let hcl_node = hcl_node.clause();
-      let rel = prog.relations.iter().filter(|r| hcl_node.rel == r.name.to_string()).next();
+      let rel = prog.relations.iter().find(|r| hcl_node.rel == r.name);
       let rel = match rel {
          Some(rel) => rel,
          None => return Err(Error::new(hcl_node.rel.span(), format!("relation {} not defined", hcl_node.rel))),
@@ -457,7 +451,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
 }
 
 pub fn ir_name_for_rel_indices(rel: &Ident, indices: &[usize]) -> Ident {
-   let indices_str = if indices.len() == 0 {format!("none")} else {indices.iter().join("_")};
+   let indices_str = if indices.is_empty() {format!("none")} else {indices.iter().join("_")};
    let name = format!("{}_indices_{}", rel, indices_str);
    Ident::new(&name, rel.span())
 }
@@ -478,7 +472,7 @@ pub fn get_indices_given_grounded_variables(args: &[Expr], vars: &[Ident]) -> Ve
 }
 
 pub(crate) fn prog_get_relation<'a>(prog: &'a AscentProgram, name: &Ident, arity: usize) -> syn::Result<&'a RelationNode> {
-   let relation = prog.relations.iter().filter(|r| *name == r.name.to_string()).next();
+   let relation = prog.relations.iter().find(|r| name == &r.name);
    match relation {
       Some(rel) => {
          if rel.field_types.len() != arity {

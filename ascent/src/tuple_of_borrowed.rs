@@ -27,6 +27,7 @@ macro_rules! impl_tuple_of_borrowed {
     ($($i: literal),*) => { paste!{
         impl<'a, $([<T $i>]),*> TupleOfBorrowed for &'a ($([<T $i>]),*) {
             type Tuple = ($(&'a [<T $i>]),*);
+            #[allow(clippy::unused_unit)]
             #[inline(always)]
             fn tuple_of_borrowed(self) -> Self::Tuple {
                 ($(&self.$i),*)
@@ -56,7 +57,3 @@ impl_tuple_of_borrowed!(0, 1, 2, 3, 4, 5, 6, 7, 8);
 impl_tuple_of_borrowed!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
 impl_tuple_of_borrowed!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 impl_tuple_of_borrowed!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
-// impl_tuple_of_borrowed!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
-// impl_tuple_of_borrowed!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
-// impl_tuple_of_borrowed!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14);
-// impl_tuple_of_borrowed!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);

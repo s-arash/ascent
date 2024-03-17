@@ -118,7 +118,7 @@ impl<T: Lattice + Clone> Lattice for Rc<T> {
    fn meet(mut self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
-         Some(cmp) => if cmp.is_le() {self.clone()} else {other.clone()},
+         Some(cmp) => if cmp.is_le() {self.clone()} else {other},
          None => { 
             if let Some(self_owned) = Rc::get_mut(&mut self){
                self_owned.meet_mut(other.deref().clone());
@@ -133,7 +133,7 @@ impl<T: Lattice + Clone> Lattice for Rc<T> {
    fn join(mut self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
-         Some(cmp) => if cmp.is_ge() {self.clone()} else {other.clone()},
+         Some(cmp) => if cmp.is_ge() {self.clone()} else {other},
          None => { 
             if let Some(self_owned) = Rc::get_mut(&mut self){
                self_owned.join_mut(other.deref().clone());
@@ -150,7 +150,7 @@ impl<T: Lattice + Clone> Lattice for Arc<T> {
    fn meet(mut self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
-         Some(cmp) => if cmp.is_le() {self.clone()} else {other.clone()},
+         Some(cmp) => if cmp.is_le() {self.clone()} else {other},
          None => { 
             if let Some(self_owned) = Arc::get_mut(&mut self){
                self_owned.meet_mut(other.deref().clone());
@@ -166,7 +166,7 @@ impl<T: Lattice + Clone> Lattice for Arc<T> {
    fn join(mut self, other: Self) -> Self {
       let cmp = self.partial_cmp(&other);
       match cmp {
-         Some(cmp) => if cmp.is_ge() {self.clone()} else {other.clone()},
+         Some(cmp) => if cmp.is_ge() {self.clone()} else {other},
          None => {
             if let Some(self_owned) = Arc::get_mut(&mut self){
                self_owned.join_mut(other.deref().clone());

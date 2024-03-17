@@ -1,20 +1,21 @@
-use std::borrow::Borrow;
-use std::collections::HashMap;
-use std::{collections::HashSet};
-
-use itertools::Itertools;
-use proc_macro2::{Ident, Span, TokenStream, TokenTree, Group};
+#![deny(warnings)]
+use std::collections::HashSet;
+use std::ops::{Deref, DerefMut};
+use proc_macro2::{Ident, TokenStream, TokenTree, Group};
 
 use quote::ToTokens;
 use syn::visit_mut::VisitMut;
-use syn::{Block, Stmt, ExprMacro, ItemMacro2};
-use syn::parse::{Parse, ParseBuffer};
-use syn::{Expr, Pat, Path, Type, parse::ParseStream, parse2, punctuated::Punctuated, spanned::Spanned};
+use syn::{Block, Stmt, ExprMacro};
+use syn::{Expr, Pat, Path};
 use crate::utils::{collect_set, into_set};
 use duplicate::duplicate_item;
 use ascent_base::util::update;
 
+#[cfg(test)]
+use syn::parse2;
 
+// TODO maybe remove?
+#[allow(unused)]
 pub fn block_get_vars(block: &Block) -> Vec<Ident> {
    let mut bound_vars = HashSet::new();
    let mut used_vars = vec![];
@@ -44,7 +45,7 @@ pub fn pattern_get_vars(pat: &Pat) -> Vec<Ident> {
       Pat::Macro(_) => {},
       Pat::Or(or_pat) => {
          let cases_vars = or_pat.cases.iter().map(pattern_get_vars).map(into_set);
-         let intersection = cases_vars.fold1(|case_vars, accu| collect_set(case_vars.intersection(&accu).cloned()));
+         let intersection = cases_vars.reduce(|case_vars, accu| collect_set(case_vars.intersection(&accu).cloned()));
          if let Some(intersection) = intersection {
             res.extend(intersection);
          }
@@ -102,18 +103,13 @@ pub fn pattern_visit_vars_mut(pat: &mut Pat, visitor: &mut dyn FnMut(&mut Ident)
       Pat::Lit(_) => {},
       Pat::Macro(_) => {},
       Pat::Or(or_pat) => {
-         // let cases_vars = or_pat.cases.iter().map(pattern_get_vars).map(into_set);
-         // let intersection = cases_vars.fold1(|case_vars, accu| collect_set(case_vars.intersection(&accu).cloned()));
-         // if let Some(intersection) = intersection {
-         //    (intersection);
-         // }
          for case in or_pat.cases.iter_mut() {
             visit!(case)
          }
       },
       Pat::Path(_) => {},
       Pat::Range(_) => {},
-      Pat::Reference(ref_pat) => (visit!(&mut ref_pat.pat)),
+      Pat::Reference(ref_pat) => visit!(&mut ref_pat.pat),
       Pat::Rest(_) => {},
       Pat::Slice(slice_pat) => {
          for sub_pat in slice_pat.elems.iter_mut(){
@@ -173,8 +169,8 @@ pub fn stmt_get_vars(stmt: &Stmt) -> (Vec<Ident>, Vec<Ident>) {
          if let Some(init) = &l.init {used_vars.extend(expr_get_vars(&init.1))}
       },
       Stmt::Item(_) => {},
-      Stmt::Expr(e) => used_vars.extend(expr_get_vars(&e)),
-      Stmt::Semi(e, _) => used_vars.extend(expr_get_vars(&e))
+      Stmt::Expr(e) => used_vars.extend(expr_get_vars(e)),
+      Stmt::Semi(e, _) => used_vars.extend(expr_get_vars(e))
    }
    (bound_vars, used_vars)
 }
@@ -229,8 +225,6 @@ pub fn block_visit_free_vars(block: &Block, visitor: &mut dyn FnMut(&Ident)) {
  )]
 /// visits free variables in the expr
 pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft([Ident]))) {
-   use std::ops::DerefMut;
-   use std::ops::Deref;
    macro_rules! visit {
       ($e: expr) => { expr_visit_free_vars_mbm(reft([$e]), visitor)};
    }
@@ -276,7 +270,7 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
          let input_vars : HashSet<_> = c.inputs.iter().flat_map(pattern_get_vars).collect();
          visit_except!(reft([c.body]), input_vars);
       },
-      Expr::Continue(c) => {}
+      Expr::Continue(_c) => {}
       Expr::Field(f) => visit!(f.base),
       Expr::ForLoop(f) => {
          let pat_vars: HashSet<_> = pattern_get_vars(&f.pat).into_iter().collect();
@@ -299,7 +293,7 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
       Expr::Let(l) => visit!(l.expr),
       Expr::Lit(_) => {}
       Expr::Loop(l) => block_visit_free_vars_mbm(reft([l.body]), visitor),
-      Expr::Macro(m) => {
+      Expr::Macro(_m) => {
          eprintln!("WARNING: cannot determine free variables of macro invocations. macro invocation:\n{}", 
                    expr.to_token_stream())
       },
@@ -333,7 +327,7 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
             expr_visit_free_vars_mbm(to, visitor)
          };
       }
-      Expr::Reference(r) => (visit!(r.expr)),
+      Expr::Reference(r) => visit!(r.expr),
       Expr::Repeat(r) => {
          visit!(r.expr);
          visit!(r.len)
@@ -449,7 +443,7 @@ pub fn token_stream_replace_ident(ts: TokenStream, visitor: &mut dyn FnMut(&mut 
    for tt in ts.into_iter() {
       new_tts.push(token_tree_replace_ident(tt, visitor));
    }
-   TokenStream::from_iter(new_tts.into_iter())
+   TokenStream::from_iter(new_tts)
 }
 
 pub fn token_stream_visit_idents(ts: TokenStream, visitor: &mut impl FnMut(&Ident)) {

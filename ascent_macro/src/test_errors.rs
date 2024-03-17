@@ -1,9 +1,5 @@
 #![cfg(test)]
-use std::{clone, cmp::max, rc::Rc};
-
-use proc_macro2::TokenStream;
-
-use crate::{ascent_impl};
+use crate::ascent_impl;
 
 
 #[test]

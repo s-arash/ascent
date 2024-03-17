@@ -1,7 +1,3 @@
-// #![feature(hash_raw_entry)]
-#![allow(mixed_script_confusables)]
-// #![feature(adt_const_params)]
-
 pub mod internal;
 pub mod rel;
 pub mod aggregators;
