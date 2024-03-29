@@ -1,3 +1,4 @@
+#[doc(hidden)]
 #[macro_export]
 macro_rules! eqrel_binary_rel {
    (($col1: ty, $col2: ty), $indices: expr, ser, ()) => {
@@ -13,6 +14,7 @@ macro_rules! eqrel_binary_rel {
 }
 pub use eqrel_binary_rel as rel;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! eqrel_binary_rel_full_ind {
    (($col1: ty, $col2: ty), $indices: expr, ser, (), $key: ty, $val: ty) => {
@@ -26,6 +28,7 @@ macro_rules! eqrel_binary_rel_full_ind {
 }
 pub use eqrel_binary_rel_full_ind as rel_full_ind;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! eqrel_binary_rel_ind {
    (($col1: ty, $col2: ty), $indices: expr, ser, (), [0], $key: ty, $val: ty) => {
@@ -51,6 +54,7 @@ macro_rules! eqrel_binary_rel_ind {
 }
 pub use eqrel_binary_rel_ind as rel_ind;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! eqrel_binary_rel_ind_common {
    (($col1: ty, $col2: ty), $indices: expr, ser, ()) => {

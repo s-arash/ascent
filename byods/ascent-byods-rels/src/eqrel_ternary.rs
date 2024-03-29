@@ -1,3 +1,4 @@
+#[doc(hidden)]
 #[macro_export]
 macro_rules! eqrel_ternary_rel {
    (($col0: ty, $col1: ty, $col2: ty), $indices: expr, ser, ()) => {
@@ -6,6 +7,7 @@ macro_rules! eqrel_ternary_rel {
 }
 pub use eqrel_ternary_rel as rel;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! eqrel_rel_ternary_full_ind {
    (($col0: ty, $col1: ty, $col2: ty), $indices: expr, ser, (), $key: ty, $val: ty) => {
@@ -14,6 +16,7 @@ macro_rules! eqrel_rel_ternary_full_ind {
 }
 pub use eqrel_rel_ternary_full_ind as rel_full_ind;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! eqrel_ternary_rel_ind {
    (($col0: ty, $col1: ty, $col2: ty), $indices: expr, ser, (), [], $key: ty, $val: ty) => {
@@ -43,6 +46,7 @@ macro_rules! eqrel_ternary_rel_ind {
 }
 pub use eqrel_ternary_rel_ind as rel_ind;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! eqrel_ternary_rel_ind_common {
    (($col0: ty, $col1: ty, $col2: ty), $indices: expr, ser, ()) => {
@@ -56,7 +60,7 @@ use ascent::internal::{RelIndexRead, RelIndexReadAll, RelIndexWrite, RelIndexMer
 use ascent::to_rel_index::ToRelIndex;
 
 use itertools::Itertools;
-use rustc_hash::{FxHasher};
+use rustc_hash::FxHasher;
 use crate::eqrel_ind::{EqRelIndCommon, ref_to_singleton_tuple_ref};
 use crate::iterator_from_dyn::IteratorFromDyn;
 use crate::rel_boilerplate::NoopRelIndexWrite;

@@ -2,6 +2,7 @@
 
 pub use crate::eqrel::rel_codegen as rel_codegen;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! trrel_rel {
    ($name: ident, ($col0: ty, $col1: ty), $indices: expr, ser, ()) => {
@@ -15,6 +16,7 @@ macro_rules! trrel_rel {
 }
 pub use trrel_rel as rel;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! trrel_rel_full_ind {
    ($name: ident, ($col0: ty, $col1: ty), $indices: expr, ser, (), $key: ty, $val: ty) => {
@@ -28,6 +30,7 @@ macro_rules! trrel_rel_full_ind {
 }
 pub use trrel_rel_full_ind as rel_full_ind;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! trrel_rel_ind {
    ($name: ident, ($col0: ty, $col1: ty), $indices: expr, ser, (), [0], $key: ty, $val: ty) => {
@@ -68,6 +71,7 @@ macro_rules! trrel_rel_ind {
 }
 pub use trrel_rel_ind as rel_ind;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! trrel_rel_ind_common {
    ($name: ident, ($col0: ty, $col1: ty), $indices: expr, ser, ()) => {
@@ -86,6 +90,7 @@ macro_rules! trrel_rel_ind_common {
 }
 pub use trrel_rel_ind_common as rel_ind_common;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! inds_contain {
    ([], $ind: tt) => {
@@ -99,6 +104,7 @@ macro_rules! inds_contain {
    };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! arrs_eq {
    ([], []) => { true };

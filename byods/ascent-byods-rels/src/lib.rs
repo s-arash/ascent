@@ -22,7 +22,6 @@ pub mod trrel_binary_ind;
 pub mod binary_rel;
 #[doc(hidden)]
 pub mod ceqrel_ind;
-#[doc(hidden)]
 pub mod trrel_union_find;
 #[doc(hidden)]
 pub mod trrel_union_find_binary_ind;

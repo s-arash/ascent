@@ -7,6 +7,7 @@ use ascent::rel_index_read::{RelIndexRead, RelIndexReadAll};
 use crate::iterator_from_dyn::IteratorFromDyn;
 
 
+/// a helper trait for implementing binary relation data structures
 pub trait ByodsBinRel: RelIndexMerge + Default {
    type T0;
    type T1;

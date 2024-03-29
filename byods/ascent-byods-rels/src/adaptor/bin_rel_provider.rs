@@ -1,5 +1,6 @@
-/// Re-export macros in this module for your binary relation data structure provider
-
+//! Re-export macros in this module for your binary relation data structure provider
+//! implementd via [`ByodsBinRel`](crate::adaptor::bin_rel::ByodsBinRel)
+#[doc(hidden)]
 #[macro_export]
 macro_rules! bin_rel_provider_rel {
    ($name: ident, ($col0: ty, $col1: ty), $indices: expr, ser, ()) => {
@@ -8,6 +9,7 @@ macro_rules! bin_rel_provider_rel {
 }
 pub use bin_rel_provider_rel as rel;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! bin_rel_provider_full_ind {
    ($name: ident, ($col0: ty, $col1: ty), $indices: expr, ser, (), $key: ty, $val: ty) => {
@@ -16,6 +18,7 @@ macro_rules! bin_rel_provider_full_ind {
 }
 pub use bin_rel_provider_full_ind as rel_full_ind;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! bin_rel_provider_ind {
    ($name: ident, ($col0: ty, $col1: ty), $indices: expr, ser, (), [0], $key: ty, $val: ty) => {
@@ -30,6 +33,7 @@ macro_rules! bin_rel_provider_ind {
 }
 pub use bin_rel_provider_ind as rel_ind;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! bin_rel_provider_rel_codegen {
    ( $($tt: tt)* ) => { };
@@ -44,6 +48,7 @@ pub(crate) mod test {
 
    use crate::adaptor::bin_rel::ByodsBinRel;
 
+   #[doc(hidden)]
    #[macro_export]
    macro_rules! bin_rel_provider_ind_common {
       ($name: ident, ($col0: ty, $col1: ty), $indices: expr, ser, ()) => {

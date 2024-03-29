@@ -1,5 +1,6 @@
-//! reflexive transitive relations for Ascent, supported by `TrRelUnionFind`
+//! reflexive transitive relations for Ascent, supported by [`TrRelUnionFind`](crate::trrel_union_find::TrRelUnionFind)
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! trrel_uf_ind_common {
    ($name: ident, ($col0: ty, $col1: ty), $indices: expr, ser, ()) => {

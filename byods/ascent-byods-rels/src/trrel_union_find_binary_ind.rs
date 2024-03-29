@@ -9,8 +9,8 @@ use crate::adaptor::bin_rel::ByodsBinRel;
 use crate::binary_rel::{MapRelIndexAdaptor, self};
 use crate::iterator_from_dyn::IteratorFromDyn;
 use crate::trrel_union_find::TrRelUnionFind;
-use crate::trrel_binary::{MyHashSet};
-use crate::utils::{move_hash_map_of_hash_set_contents_disjoint};
+use crate::trrel_binary::MyHashSet;
+use crate::utils::move_hash_map_of_hash_set_contents_disjoint;
 
 type NewSet<T> = HashSet<(T, T), BuildHasherDefault<FxHasher>>;
 pub enum TrRelIndCommon<T: Clone + Hash + Eq> {

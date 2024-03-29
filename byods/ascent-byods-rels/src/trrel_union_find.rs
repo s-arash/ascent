@@ -1,3 +1,6 @@
+//! A data structure for union-find based reflexive transitive relations. 
+//! 
+//! This is the backing data strcuture for [`trrel_uf`](crate::trrel_uf) in Ascent.
 use ascent::internal::Instant;
 use hashbrown::{HashMap, HashSet};
 use std::fmt::Debug;

@@ -11,7 +11,7 @@ use self::elems::{Elems, FindResult, Id};
 ///
 /// - `Elems` stores elements as a `Vec`
 /// - `Elem` IDs are determined by their index in the `Vec`
-/// - [`Id`] and [`Rank`] happen to be integers
+/// - [`Id`] and `Rank` happen to be integers
 pub mod elems {
    use std::{
       cell::Cell,

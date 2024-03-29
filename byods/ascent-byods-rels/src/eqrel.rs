@@ -1,13 +1,15 @@
 //! equivalence relations for Ascent
 
+#[doc(hidden)]
 #[macro_export]
-macro_rules! rel_codegen {
+macro_rules! eqrel_rel_codegen {
    ( $($tt: tt)* ) => { };
 }
-pub use rel_codegen;
+pub use eqrel_rel_codegen as rel_codegen;
 
+#[doc(hidden)]
 #[macro_export]
-macro_rules! rel {
+macro_rules! eqrel_rel {
    ($name: ident, ($col1: ty, $col2: ty), $($rest: tt)*) => {
       $crate::eqrel_binary::rel!(($col1, $col2), $($rest)*)
    };
@@ -15,10 +17,11 @@ macro_rules! rel {
       $crate::eqrel_ternary::rel!(($col1, $col2, $col3), $($rest)*)
    };
 }
-pub use rel;
+pub use eqrel_rel as rel;
 
+#[doc(hidden)]
 #[macro_export]
-macro_rules! rel_full_ind {
+macro_rules! eqrel_rel_full_ind {
    ($name: ident, ($col1: ty, $col2: ty), $($rest: tt)*) => {
       $crate::eqrel_binary::rel_full_ind!(($col1, $col2), $($rest)*)
    };
@@ -26,10 +29,11 @@ macro_rules! rel_full_ind {
       $crate::eqrel_ternary::rel_full_ind!(($col1, $col2, $col3), $($rest)*)
    };
 }
-pub use rel_full_ind;
+pub use eqrel_rel_full_ind as rel_full_ind;
 
+#[doc(hidden)]
 #[macro_export]
-macro_rules! rel_ind {
+macro_rules! eqrel_rel_ind {
    ($name: ident, ($col1: ty, $col2: ty), $($rest: tt)*) => {
       $crate::eqrel_binary::rel_ind!(($col1, $col2), $($rest)*)
    };
@@ -37,10 +41,11 @@ macro_rules! rel_ind {
       $crate::eqrel_ternary::rel_ind!(($col1, $col2, $col3), $($rest)*)
    };
 }
-pub use rel_ind;
+pub use eqrel_rel_ind as rel_ind;
 
+#[doc(hidden)]
 #[macro_export]
-macro_rules! rel_ind_common {
+macro_rules! eqrel_rel_ind_common {
    ($name: ident, ($col1: ty, $col2: ty), $($rest: tt)*) => {
       $crate::eqrel_binary::rel_ind_common!(($col1, $col2), $($rest)*)
    };
@@ -48,4 +53,4 @@ macro_rules! rel_ind_common {
       $crate::eqrel_ternary::rel_ind_common!(($col1, $col2, $col3), $($rest)*)
    };
 }
-pub use rel_ind_common;
+pub use eqrel_rel_ind_common as rel_ind_common;

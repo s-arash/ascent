@@ -18,9 +18,6 @@ use crate::utils::move_hash_set_contents_disjoint;
 #[global_allocator]
 static GLOBAL: TrackingAllocator = TrackingAllocator(System);
 
-mod my_rel {
-   pub use ascent::rel::*;
-}
 
 #[allow(dead_code)]
 // #[test]

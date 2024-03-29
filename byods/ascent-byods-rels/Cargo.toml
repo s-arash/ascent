@@ -2,6 +2,14 @@
 name = "ascent-byods-rels"
 version.workspace = true
 edition = "2021"
+authors = ["Arash Sahebolamri"]
+description = "data structures for Ascent relations, made possible by Ascent's BYODS feature"
+keywords = ["logic-programming", "program-analysis", "Datalog", "Ascent", "BYODS", "data-structure", "union-find"]
+categories = ["data structures"]
+homepage = "https://s-arash.github.io/ascent/"
+repository = "https://github.com/s-arash/ascent"
+license = "MIT"
+readme = "../../README.MD"
 
 [dev-dependencies]
 proptest = "1"
