@@ -1,6 +1,6 @@
 [package]
 name = "ascent_base"
-version = "0.5.0"
+version.workspace = true
 edition = "2021"
 authors = ["Arash Sahebolamri"]
 repository = "https://github.com/s-arash/ascent"

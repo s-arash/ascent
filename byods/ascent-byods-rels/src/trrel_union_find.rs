@@ -81,9 +81,6 @@ impl<T: Clone + Hash + Eq> TrRelUnionFind<T> {
 
    pub(crate) fn get_dominant_id_mut(&mut self, id: usize) -> usize {
       let (res, depth) = self.get_dominant_id_mut_with_depth(id);
-      if depth >= 5 {
-         // println!("depth for id {} is {}", id, depth);
-      }
       unsafe {
          DEPTH_COUNT += 1;
          DEPTH_SUM += depth;

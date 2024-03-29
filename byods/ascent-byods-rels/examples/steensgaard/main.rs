@@ -5,7 +5,8 @@ use ascent::ascent;
 use ascent::internal::Instant;
 use itertools::Itertools;
 
-use rels_ascent::tracking_alloc::{self, TrackingAllocator};
+use ascent_byods_rels::eqrel;
+use ascent_byods_rels::tracking_alloc::{self, TrackingAllocator};
 
 #[global_allocator]
 static GLOBAL: TrackingAllocator<System> = TrackingAllocator(System);
@@ -26,7 +27,7 @@ ascent! {
    // x.f := y;
    relation store(Symbol, Symbol, Symbol);
 
-   #[ds(rels_ascent::eqrel)]
+   #[ds(eqrel)]
    relation vpt(Symbol, Symbol);
 
    // assignments
@@ -101,8 +102,9 @@ fn main() {
    let start_time = Instant::now();
    let mut prog = Steensgaard::default();
 
-   prog.alloc =
-      read_csv::<(String, String)>(&get_path("alloc.facts")).map(|(x, y)| (leak(x), leak(y))).collect_vec();
+   prog.alloc = read_csv::<(String, String)>(&get_path("alloc.facts"))
+      .map(|(x, y)| (leak(x), leak(y)))
+      .collect_vec();
    prog.assign = read_csv::<(String, String)>(&get_path("assign.facts"))
       .map(|(x, y)| (leak(x), leak(y)))
       .collect_vec();
@@ -128,8 +130,9 @@ fn main() {
    let start_time = Instant::now();
    let mut prog = SteensgaardExplicit::default();
 
-   prog.alloc =
-      read_csv::<(String, String)>(&get_path("alloc.facts")).map(|(x, y)| (leak(x), leak(y))).collect_vec();
+   prog.alloc = read_csv::<(String, String)>(&get_path("alloc.facts"))
+      .map(|(x, y)| (leak(x), leak(y)))
+      .collect_vec();
    prog.assign = read_csv::<(String, String)>(&get_path("assign.facts"))
       .map(|(x, y)| (leak(x), leak(y)))
       .collect_vec();

@@ -1,6 +1,6 @@
 [package]
 name = "ascent_macro"
-version = "0.5.0"
+version.workspace = true
 edition = "2021"
 authors = ["Arash Sahebolamri"]
 repository = "https://github.com/s-arash/ascent"
@@ -15,7 +15,7 @@ proc-macro = true
 [dependencies]
 syn = { version = "1.0.109", features = ["derive", "full", "extra-traits", "visit-mut"] } 
 quote = "1.0"
-ascent_base = { version = "=0.5.0", path = "../ascent_base" }
+ascent_base = { workspace = true }
 proc-macro2 = "1.0"
 itertools = "0.12.0"
 petgraph = "0.6.0"
@@ -24,6 +24,6 @@ lazy_static = "1.4.0"
 duplicate = "0.4"
 
 [dev-dependencies]
-ascent = { path = "../ascent" }
+ascent = { workspace = true }
 rayon = "1.5"
 crossbeam = "0.8"

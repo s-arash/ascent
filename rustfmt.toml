@@ -1,6 +1,18 @@
 # https://github.com/rust-lang/rustfmt/blob/master/Configurations.md
 tab_spaces = 3
-fn_call_width = 120
-chain_width = 120
+fn_call_width = 100
+chain_width = 100
 max_width = 120
 fn_single_line = true
+fn_params_layout = "compressed"
+match_arm_blocks = false
+newline_style = "Unix"
+overflow_delimited_expr = true
+reorder_modules = false
+single_line_if_else_max_width = 100
+single_line_let_else_max_width = 100
+struct_lit_width = 100
+struct_variant_width = 100
+trailing_semicolon = false
+unstable_features = true
+use_small_heuristics = "Max"

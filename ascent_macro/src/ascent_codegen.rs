@@ -45,7 +45,6 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          let name = &ind.ir_name();
          let rel_index_type = rel_index_type(ind, mir);
          relation_fields.push(quote!{
-            // #[allow(non_snake_case)]
             pub #name: #rel_index_type,
          });
          field_defaults.push(quote! {#name : Default::default(),});
