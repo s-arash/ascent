@@ -8,9 +8,9 @@ use ascent::internal::RelFullIndexRead;
 use ascent::internal::RelFullIndexWrite;
 use ascent::internal::RelIndexMerge;
 use ascent::internal::RelIndexWrite;
-use ascent::rel_index_read::RelIndexRead;
-use ascent::rel_index_read::RelIndexReadAll;
-use ascent::to_rel_index::ToRelIndex;
+use ascent::internal::RelIndexRead;
+use ascent::internal::RelIndexReadAll;
+use ascent::internal::ToRelIndex;
 
 use hashbrown::HashMap;
 use rustc_hash::FxHasher;

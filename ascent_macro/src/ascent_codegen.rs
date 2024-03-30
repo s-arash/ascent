@@ -145,10 +145,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
 
    let run_usings = quote! {
       use core::cmp::PartialEq;
-      use ascent::internal::RelIndexRead;
-      use ascent::internal::RelIndexReadAll;
-      use ascent::to_rel_index::ToRelIndex0;
-      use ascent::tuple_of_borrowed::TupleOfBorrowed;
+      use ascent::internal::{RelIndexRead, RelIndexReadAll, ToRelIndex0, TupleOfBorrowed};
       #more_usings
       #par_usings
    };
@@ -705,7 +702,7 @@ fn compile_update_indices_function_body(mir: &AscentMir) -> proc_macro2::TokenSt
    }
 
    quote! {
-      use ascent::to_rel_index::ToRelIndex0;
+      use ascent::internal::ToRelIndex0;
       use #rel_index_write_trait;
       #(#res)*
    }

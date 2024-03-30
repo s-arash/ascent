@@ -77,50 +77,6 @@ ascent! {
 
 In this example, `Dual<T>` is the dual of the lattice `T`. We use `Dual<T>` because we are interested in shortest paths, given two path lengths `l1` and `l2` for any given pair of nodes, we only store `min(l1, l2)`.
 
-### Conditions and Generative Clauses
-The syntax is designed to be familiar to Rust users. In this example, `edge` is populated with non-reflexive edges from `node`. Note that any type that implements `Clone + Eq + Hash` can be used as a relation column.
-
-```Rust
-ascent! {
-   relation node(i32, Rc<Vec<i32>>);
-   relation edge(i32, i32);
-   
-   edge(x, y) <--
-      node(x, neighbors),
-      for &y in neighbors.iter(),
-      if x != y;
-}
-```
-
-### Negation and Aggregation
-Ascent supports stratified negation and aggregation. Aggregators are defined in `ascent::aggregators`. You can find `sum`, `min`, `max`, `count`, and `mean` there.
-
-In the following example, the average grade of students is stored in `avg_grade`:
-
-```Rust
-use ascent::aggregators::*;
-type Student = u32;
-type Course = u32;
-type Grade = u16;
-ascent! {
-   relation student(Student);
-   relation course_grade(Student, Course, Grade);
-   relation avg_grade(Student, Grade);
-
-   avg_grade(s, avg as Grade) <--
-      student(s),
-      agg avg = mean(g) in course_grade(s, _, g);
-}
-```
-
-You can define your own aggregators if the provided aggregators are not sufficient. For example, an aggregator for getting the 2nd highest value of a column can have the following signature: 
-
-```Rust
-fn second_highest<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
-where N: Ord + Clone
-```
-Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
-
 ### Parallel Ascent
 
 Ascent is capable of producing parallel code. The macros `ascent_par!` and `ascent_run_par!` produce parallelized code. 
@@ -144,16 +100,18 @@ fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
 ```
 In the above example, we initialize the relation `r` directly to shorten the program.
 
-
-### Macro definitions
-It may be useful to define macros that expand to either body items or head items. Ascent allows you to do this.
-
-You can find more about macros in Ascent macros [here](MACROS.MD).
-
 ### BYODS
-BYODS (short for Bring Your Own Data Structures to Datalog) is an extension of Ascent that enables relations to be backed by custom data structures. This feature allows improving the algorithmic complexity of Ascent programs by optimizing the data structures used to back relations. For example, a program that requires transitive relation computation of a large graph could improve its performance by choosing a union-find based data structure for the transitive closure relation:
+BYODS (short for [Bring Your Own Data Structures to Datalog](https://dl.acm.org/doi/pdf/10.1145/3622840)) is an extension of Ascent that enables relations to be backed by custom data structures. This feature allows improving the algorithmic complexity of Ascent programs by optimizing the data structures used to back relations. For example, a program that requires transitive closure computation of a large graph could improve its performance by choosing a union-find based data structure for the transitive closure relation:
+
+in `Cargo.toml`:
+```toml
+[dependencies]
+ascent-byods-rels = "*"
+ascent = "*"
+```
 
 ```Rust
+use ascent_byods_rels::trrel_uf;
 ascent! {
    #[ds(trrel_uf)]
    relation path(Node, Node);
@@ -162,10 +120,59 @@ ascent! {
 }
 ```
 
-The `#[ds(trrel_uf)]` attibute directs the Ascent compiler to use the data structure provider defined in the module `trrrel_uf` for the `path` relation. See [BYODS.MD](BYODS.MD) for more information on BYODS.
+The `#[ds(trrel_uf)]` attribute directs the Ascent compiler to use the data structure provider defined in the module `trrel_uf` for the `path` relation.
+You can find a complete example of BYODS dramatically speeding up Ascent computations [here](./byods/ascent-byods-rels/examples/steensgaard/main.rs).
 
-(Note: custom data structure providers like `trrel_uf` have not been merged into the master branch yet.)
+See [BYODS.MD](BYODS.MD) for more information on BYODS.
 
+### Conditions and Generative Clauses
+The syntax is designed to be familiar to Rust users. In this example, `edge` is populated with non-reflexive edges from `node`. Note that any type that implements `Clone + Eq + Hash` can be used as a relation column.
+
+```Rust
+ascent! {
+   relation node(i32, Rc<Vec<i32>>);
+   relation edge(i32, i32);
+   
+   edge(x, y) <--
+      node(x, neighbors),
+      for &y in neighbors.iter(),
+      if x != y;
+}
+```
+
+### Negation and Aggregation
+Ascent supports stratified negation and aggregation. Aggregators are defined in `ascent::aggregators`. You can find `sum`, `min`, `max`, `count`, and `mean` there.
+
+In the following example, the average grade of students is stored in `avg_grade`:
+
+```Rust
+use ascent::aggregators::mean;
+type Student = u32;
+type Course = u32;
+type Grade = u16;
+ascent! {
+   relation student(Student);
+   relation course_grade(Student, Course, Grade);
+   relation avg_grade(Student, Grade);
+
+   avg_grade(s, avg as Grade) <--
+      student(s),
+      agg avg = mean(g) in course_grade(s, _, g);
+}
+```
+
+You can define your own aggregators if the provided aggregators are not sufficient. For example, an aggregator for getting the 2nd highest value of a column can have the following signature: 
+
+```Rust
+fn second_highest<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
+where N: Ord + Clone
+```
+Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
+
+### Macro definitions
+It may be useful to define macros that expand to either body items or head items. Ascent allows you to do this.
+
+You can find more about macros in Ascent macros [here](MACROS.MD).
 
 ### Misc
 - **`#![measure_rule_times]`** causes execution times of individual rules to be measured. Example: 

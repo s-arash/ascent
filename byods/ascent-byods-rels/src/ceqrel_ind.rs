@@ -7,8 +7,8 @@ use std::sync::Mutex;
 
 use ascent::internal::{RelFullIndexRead, RelIndexRead, RelIndexReadAll, RelIndexWrite, RelIndexMerge, RelFullIndexWrite, CRelIndexWrite, CRelFullIndexWrite, Freezable};
 use ascent::rayon::prelude::{ParallelIterator, IntoParallelRefIterator};
-use ascent::rel_index_read::{CRelIndexRead, CRelIndexReadAll};
-use ascent::to_rel_index::{ToRelIndex, ToRelIndex0};
+use ascent::internal::{CRelIndexRead, CRelIndexReadAll};
+use ascent::internal::{ToRelIndex, ToRelIndex0};
 use rustc_hash::FxHasher;
 use ascent::rayon;
 

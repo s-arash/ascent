@@ -1,5 +1,4 @@
-// Provides definitions required for the `ascent` macro. Not intended for direct use.
-#![doc(hidden)]
+//! Provides definitions required for the `ascent` macro(s), plus traits that custom relations need to implement.
 
 pub use crate::convert::*;
 
@@ -33,6 +32,9 @@ pub use crate::c_rel_full_index::CRelFullIndex;
 pub use crate::c_lat_index::CLatIndex;
 pub use crate::c_rel_no_index::CRelNoIndex;
 pub use crate::c_rel_index::DashMapViewParIter;
+
+pub use crate::to_rel_index::{ToRelIndex0, ToRelIndex};
+pub use crate::tuple_of_borrowed::TupleOfBorrowed;
 
 pub use crate::c_rel_index::shards_count;
 

@@ -1,4 +1,5 @@
 #![allow(clippy::useless_format, clippy::redundant_static_lifetimes, clippy::get_first)]
+#![cfg_attr(not(test), deny(unused_crate_dependencies))]
 mod tests;
 mod ascent_mir;
 mod utils;
@@ -51,6 +52,9 @@ pub fn ascent(input: TokenStream) -> TokenStream {
    }
 }
 
+/// Similar to `ascent`, allows writing logic programs in Rust.
+/// 
+/// The difference is that `ascent_par` generates parallelized code. 
 #[proc_macro]
 pub fn ascent_par(input: TokenStream) -> TokenStream {
    let res = ascent_impl(input.into(), false, true);
@@ -88,6 +92,7 @@ pub fn ascent_run(input: TokenStream) -> TokenStream {
    }
 }
 
+/// The parallelized version of `ascent_run`
 #[proc_macro]
 pub fn ascent_run_par(input: TokenStream) -> TokenStream {
    let res = ascent_impl(input.into(), true, true);

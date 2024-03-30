@@ -1,0 +1,21 @@
+# This (separate Cargo.toml) file is needed because cargo release would not work in dryrun mode otherwise
+
+[workspace]
+
+[package]
+name = "ascent-byods-rels-examples"
+version = "0.0.1"
+edition = "2021"
+publish = false
+autobins = false
+
+[dependencies]
+ascent = { path = "../../../ascent" }
+ascent-byods-rels = { path = ".." }
+itertools = "0.12"
+serde = "1.0"
+csv = "1.0"
+
+[[bin]]
+name = "steensgaard"
+path = "steensgaard/main.rs"

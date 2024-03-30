@@ -94,7 +94,7 @@ where
 }
 
 fn main() {
-   let path = "./examples/steensgaard/openjdk_javalang_steensgaard/";
+   let path = "./steensgaard/openjdk_javalang_steensgaard/";
    let get_path = |x: &str| format!("{path}{x}");
 
    println!("Running eqrel version.");

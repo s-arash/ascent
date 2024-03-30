@@ -57,7 +57,7 @@ pub use eqrel_ternary_rel_ind_common as rel_ind_common;
 
 
 use ascent::internal::{RelIndexRead, RelIndexReadAll, RelIndexWrite, RelIndexMerge, RelFullIndexWrite, RelFullIndexRead};
-use ascent::to_rel_index::ToRelIndex;
+use ascent::internal::ToRelIndex;
 
 use itertools::Itertools;
 use rustc_hash::FxHasher;

@@ -1,3 +1,9 @@
+## 0.6.0
+
+- BYODS (Bring Your Own Data Structures to Datalog): this version allows relations in Ascent programs to
+be backed by custom data structures (for improved algorithmic efficiency, modified semantics, etc.). 
+- Introduction of the crate [`ascent-byods-rels`](https://crates.io/crates/ascent-byods-rels), which contains a number of such data structures (for equivalence and transitive relations).
+
 ## 0.5.0
 
 - Parallel evaluation: with introduction of `ascent_par!` and `ascent_run_par!` macros, Ascent programs can utilize multiple CPU cores to speed up evaluation.

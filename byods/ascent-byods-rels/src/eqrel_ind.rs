@@ -5,8 +5,9 @@ use std::marker::PhantomData;
 use std::mem::transmute;
 use std::rc::Rc;
 
-use ascent::internal::{RelFullIndexRead, RelIndexRead, RelIndexReadAll, RelIndexWrite, RelIndexMerge, RelFullIndexWrite};
-use ascent::to_rel_index::ToRelIndex;
+use ascent::internal::{
+   RelFullIndexRead, RelFullIndexWrite, RelIndexMerge, RelIndexRead, RelIndexReadAll, RelIndexWrite, ToRelIndex,
+};
 use rustc_hash::FxHasher;
 
 #[cfg(test)]

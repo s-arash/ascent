@@ -1,6 +1,6 @@
 use std::hash::{Hash, BuildHasherDefault};
 
-use ascent::rel_index_read::{RelIndexRead, RelIndexReadAll};
+use ascent::internal::{RelIndexRead, RelIndexReadAll};
 use hashbrown::hash_map::Iter;
 use hashbrown::HashMap;
 use rustc_hash::FxHasher;

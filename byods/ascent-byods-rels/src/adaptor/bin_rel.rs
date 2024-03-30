@@ -2,7 +2,7 @@ use std::iter::{Map, once, Once};
 use std::marker::PhantomData;
 
 use ascent::internal::{RelIndexMerge, RelIndexWrite, RelFullIndexWrite, RelFullIndexRead};
-use ascent::rel_index_read::{RelIndexRead, RelIndexReadAll};
+use ascent::internal::{RelIndexRead, RelIndexReadAll};
 
 use crate::iterator_from_dyn::IteratorFromDyn;
 
@@ -213,7 +213,7 @@ impl<'a, TBinRel: ByodsBinRel> RelIndexReadAll<'a> for ByodsBinRelIndNone<'a, TB
 }
 
 
-use ascent::to_rel_index::ToRelIndex;
+use ascent::internal::ToRelIndex;
 use crate::rel_boilerplate::NoopRelIndexWrite;
 macro_rules! to_rel_ind {
    ($name: ident, $key: ty, $val: ty) => {paste::paste!{

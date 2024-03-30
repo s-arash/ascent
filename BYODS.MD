@@ -4,7 +4,7 @@ With BYODS, any relation in an Ascent program can be tagged with a data structur
 
 ```Rust
 ascent! {
-    #[ds(rels_ascent::eqrel)]
+    #[ds(ascent_byods_rels::eqrel)]
     relation rel(u32, u32);
     // ...
 }
@@ -12,7 +12,7 @@ ascent! {
 
 In the above example, relation `rel` is backed by the `eqrel` data structure provider, which makes `rel` an equivalence relation.
 
-In the above example, `rels_ascent::eqrel` is the path of the module containing the macros required of a data structure provider. You can define your own data structure providers. To see what macros are required of a data structure provider, see `ascent::rel`, which is the default data structure provider.
+In the above example, `ascent_byods_rels::eqrel` is the path of the module containing the macros required of a data structure provider. You can define your own data structure providers. To see what macros are required of a data structure provider, see `ascent::rel`, which is the default data structure provider.
 
 The most important macros of a data structure privider are `rel_ind` and `rel_ind_common`. 
 

@@ -3,7 +3,7 @@ use std::iter::Map;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 use ascent::internal::{RelIndexMerge, RelIndexReadAll, RelIndexRead, RelFullIndexWrite, RelIndexWrite, RelFullIndexRead};
-use ascent::to_rel_index::ToRelIndex;
+use ascent::internal::ToRelIndex;
 use hashbrown::HashMap;
 use rustc_hash::FxHasher;
 use crate::binary_rel::BinaryRel;

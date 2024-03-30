@@ -3,7 +3,7 @@ use std::iter::{Map, once};
 
 use ascent::internal::{RelIndexRead, RelIndexReadAll, RelFullIndexRead, RelIndexWrite, RelFullIndexWrite, RelIndexMerge};
 use derive_more::{DerefMut, Deref};
-use hashbrown::{HashMap};
+use hashbrown::HashMap;
 use rustc_hash::FxHasher;
 
 use crate::iterator_from_dyn::IteratorFromDyn;
@@ -492,7 +492,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexWrite for TrRel2I
 }
 
 use std::marker::PhantomData;
-use ascent::to_rel_index::ToRelIndex;
+use ascent::internal::ToRelIndex;
 use crate::rel_boilerplate::NoopRelIndexWrite;
 
 macro_rules! to_trrel2 {

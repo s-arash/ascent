@@ -1,3 +1,5 @@
+//! The default data structure provider for Ascent relations
+
 macro_rules! _rel_type_template {
    ($field_types: ty, $indices: expr, $par: ident) => {};
 }
@@ -6,12 +8,14 @@ macro_rules! _rel_ind_template {
    ($field_types: ty, $indices: expr, $par: ident, $ind: expr) => {};
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! rel_codegen {
    ( $($tt: tt)* ) => { };
 }
 pub use rel_codegen;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! rel {
    ($name: ident, $field_types: ty, $indices: expr, ser, ()) => {
@@ -23,6 +27,7 @@ macro_rules! rel {
 }
 pub use rel;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! rel_ind_common {
    ($name: ident, $field_types: ty, $indices: expr, ser, ()) => {
@@ -34,6 +39,7 @@ macro_rules! rel_ind_common {
 }
 pub use rel_ind_common;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! rel_full_ind {
    ($name: ident, $field_types: ty, $indices: expr, ser, (), $key: ty, $val: ty) => {
@@ -45,6 +51,7 @@ macro_rules! rel_full_ind {
 }
 pub use rel_full_ind;
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! rel_ind {
    ($name: ident, $field_types: ty, $indices: expr, ser, (), $ind: expr, $key: ty, $val: ty) => {

@@ -92,9 +92,13 @@ jobs:
         with:
           toolchain: stable
 
-      - name: cargo check (including examples)
+      - name: cargo check
         working-directory: ./byods/ascent-byods-rels
         run: cargo check --examples
+
+      - name: cargo check (examples)
+        working-directory: ./byods/ascent-byods-rels/examples
+        run: cargo check --bins
 
       - name: cargo test
         working-directory: ./byods/ascent-byods-rels
