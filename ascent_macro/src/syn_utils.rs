@@ -34,7 +34,6 @@ pub fn block_get_vars(block: &Block) -> Vec<Ident> {
 pub fn pattern_get_vars(pat: &Pat) -> Vec<Ident> {
    let mut res = vec![];
    match pat {
-      Pat::Box(pat_box) => res.extend(pattern_get_vars(&pat_box.pat)),
       Pat::Ident(pat_ident) => {
          res.push(pat_ident.ident.clone()); 
          if let Some(subpat) = &pat_ident.subpat {
@@ -70,7 +69,7 @@ pub fn pattern_get_vars(pat: &Pat) -> Vec<Ident> {
          }
       }
       Pat::TupleStruct(tuple_strcut_pat) => {
-         for elem_pat in tuple_strcut_pat.pat.elems.iter(){
+         for elem_pat in tuple_strcut_pat.elems.iter(){
             res.extend(pattern_get_vars(elem_pat));
          }
       },
@@ -93,7 +92,6 @@ pub fn pattern_visit_vars_mut(pat: &mut Pat, visitor: &mut dyn FnMut(&mut Ident)
       };
    }
    match pat {
-      Pat::Box(pat_box) => visit!(&mut pat_box.pat),
       Pat::Ident(pat_ident) => {
          visitor(&mut pat_ident.ident); 
          if let Some(subpat) = &mut pat_ident.subpat {
@@ -127,7 +125,7 @@ pub fn pattern_visit_vars_mut(pat: &mut Pat, visitor: &mut dyn FnMut(&mut Ident)
          }
       }
       Pat::TupleStruct(tuple_strcut_pat) => {
-         for elem_pat in tuple_strcut_pat.pat.elems.iter_mut(){
+         for elem_pat in tuple_strcut_pat.elems.iter_mut(){
             visit!(elem_pat);
          }
       },
@@ -142,10 +140,12 @@ pub fn pattern_visit_vars_mut(pat: &mut Pat, visitor: &mut dyn FnMut(&mut Ident)
 
 #[test]
 fn test_pattern_get_vars(){
+   use syn::parse::Parser;
+
    let pattern = quote! {
       SomePair(x, (y, z))
    };
-   let pat : syn::Pat = parse2(pattern).unwrap();
+   let pat = Pat::parse_single.parse2(pattern).unwrap();
    assert_eq!(collect_set(["x", "y", "z"].iter().map(ToString::to_string)), 
               pattern_get_vars(&pat).into_iter().map(|id| id.to_string()).collect());
 
@@ -166,11 +166,19 @@ pub fn stmt_get_vars(stmt: &Stmt) -> (Vec<Ident>, Vec<Ident>) {
    match stmt {
       Stmt::Local(l) => {
          bound_vars.extend(pattern_get_vars(&l.pat));
-         if let Some(init) = &l.init {used_vars.extend(expr_get_vars(&init.1))}
+         if let Some(init) = &l.init {
+            used_vars.extend(expr_get_vars(&init.expr));
+            if let Some(diverge) = &init.diverge {
+               used_vars.extend(expr_get_let_bound_vars(&diverge.1));
+            }
+         }
       },
       Stmt::Item(_) => {},
-      Stmt::Expr(e) => used_vars.extend(expr_get_vars(e)),
-      Stmt::Semi(e, _) => used_vars.extend(expr_get_vars(e))
+      Stmt::Expr(e, _) => used_vars.extend(expr_get_vars(e)),
+      Stmt::Macro(m) => {
+         eprintln!("WARNING: cannot determine variables of macro invocations. macro invocation:\n{}", 
+            m.to_token_stream());
+      }
    }
    (bound_vars, used_vars)
 }
@@ -178,22 +186,38 @@ pub fn stmt_get_vars(stmt: &Stmt) -> (Vec<Ident>, Vec<Ident>) {
 pub fn stmt_visit_free_vars_mut(stmt: &mut Stmt, visitor: &mut dyn FnMut(&mut Ident)) {
    match stmt {
       Stmt::Local(l) => {
-         if let Some(init) = &mut l.init {expr_visit_free_vars_mut(&mut init.1, visitor)}
+         if let Some(init) = &mut l.init {
+            expr_visit_free_vars_mut(&mut init.expr, visitor);
+            if let Some(diverge) = &mut init.diverge {
+               expr_visit_free_vars_mut(&mut diverge.1, visitor);
+            }
+         }
       },
       Stmt::Item(_) => {},
-      Stmt::Expr(e) |
-      Stmt::Semi(e, _) => expr_visit_free_vars_mut(e, visitor)
+      Stmt::Expr(e, _) => expr_visit_free_vars_mut(e, visitor),
+      Stmt::Macro(m) => {
+         eprintln!("WARNING: cannot determine free variables of macro invocations. macro invocation:\n{}", 
+            m.to_token_stream());
+      }
    }
 }
 
 pub fn stmt_visit_free_vars(stmt: &Stmt, visitor: &mut dyn FnMut(& Ident)) {
    match stmt {
       Stmt::Local(l) => {
-         if let Some(init) = &l.init {expr_visit_free_vars(&init.1, visitor)}
+         if let Some(init) = &l.init {
+            expr_visit_free_vars(&init.expr, visitor);
+            if let Some(diverge) = &init.diverge {
+               expr_visit_free_vars(&diverge.1, visitor);
+            }
+         }
       },
       Stmt::Item(_) => {},
-      Stmt::Expr(e) |
-      Stmt::Semi(e, _) => expr_visit_free_vars(e, visitor)
+      Stmt::Expr(e, _) => expr_visit_free_vars(e, visitor),
+      Stmt::Macro(m) => {
+         eprintln!("WARNING: cannot determine free variables of macro invocations. macro invocation:\n{}", 
+            m.to_token_stream());
+      }
    }
 }
 
@@ -246,10 +270,6 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
          visit!(assign.left);
          visit!(assign.right)
       },
-      Expr::AssignOp(assign_op) => {
-         visit!(assign_op.left);
-         visit!(assign_op.right)
-      },
       Expr::Async(a) => block_visit_free_vars_mbm(reft([a.block]), visitor),
       Expr::Await(a) => visit!(a.base),
       Expr::Binary(b) => {
@@ -257,7 +277,6 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
          visit!(b.right)
       }
       Expr::Block(b) => block_visit_free_vars_mbm(reft([b.block]), visitor),
-      Expr::Box(e) => expr_visit_free_vars_mbm(e.expr.deref_mbm(), visitor),
       Expr::Break(b) => if let Some(b_e) = reft([b.expr]) {expr_visit_free_vars_mbm(b_e, visitor)},
       Expr::Call(c) => {
          visit!(c.func);
@@ -320,11 +339,11 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
          }
       }
       Expr::Range(r) => {
-         if let Some(from) = reft([r.from]) {
-            expr_visit_free_vars_mbm(from, visitor)
+         if let Some(start) = reft([r.start]) {
+            expr_visit_free_vars_mbm(start, visitor)
          };
-         if let Some(to) = reft([r.to]) {
-            expr_visit_free_vars_mbm(to, visitor)
+         if let Some(end) = reft([r.end]) {
+            expr_visit_free_vars_mbm(end, visitor)
          };
       }
       Expr::Reference(r) => visit!(r.expr),
@@ -350,7 +369,6 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
             expr_visit_free_vars_mbm(e, visitor)
          }
       }
-      Expr::Type(t) => visit!(t.expr),
       Expr::Unary(u) => visit!(u.expr),
       Expr::Unsafe(u) => block_visit_free_vars_mbm(reft([u.block]), visitor),
       Expr::Verbatim(_) => {}

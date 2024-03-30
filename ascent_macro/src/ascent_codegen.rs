@@ -1128,10 +1128,7 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
       }
    }
    (
-      quote!{
-         // #(#struct_defs)*
-         // #(#rel_data_vars)*
-      }, 
+      quote!{}, 
       quote!{#(#add_rows)*}
    )
 }

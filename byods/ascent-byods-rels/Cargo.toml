@@ -4,8 +4,8 @@ version.workspace = true
 edition = "2021"
 authors = ["Arash Sahebolamri"]
 description = "data structures for Ascent relations, made possible by Ascent's BYODS feature"
-keywords = ["Datalog", "Ascent", "BYODS", "data-structure", "union-find"]
-categories = ["data structures"]
+keywords = ["Datalog", "Ascent", "BYODS", "data-structures", "union-find"]
+categories = ["data-structures"]
 homepage = "https://s-arash.github.io/ascent/"
 repository = "https://github.com/s-arash/ascent"
 license = "MIT"
@@ -16,7 +16,10 @@ autoexamples = false
 ascent = { workspace = true }
 itertools = "0.12"
 rustc-hash = "1.1"
-derive_more = "0.99"
+derive_more = "0.99.17"
+# syn is a dependency of derive_more 0.99, and the minimum version is buggy, so choosing a well-behaved
+# version. Should be removed when derive_more switches to syn v2.0.
+syn = "1.0.109" 
 paste = "1.0"
 hashbrown = { version = "0.14", features = ["raw", "rayon"] }
 
