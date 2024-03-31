@@ -1,5 +1,6 @@
 # Logic programming in Rust
-[![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml) [![Crates.io](https://img.shields.io/crates/v/ascent?color=blue)](https://crates.io/crates/ascent)
+[![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml) 
+[![Crates.io](https://img.shields.io/crates/v/ascent?color=blue)](https://crates.io/crates/ascent)
 
 Ascent is a logic programming language (similar to Datalog) embedded in Rust via macros.
 
@@ -83,6 +84,37 @@ Ascent is capable of producing parallel code. The macros `ascent_par!` and `asce
 Naturally, column types must be `Send + Sync` to work in parallel Ascent. 
 
 Parallel Ascent utilizes [`rayon`](https://crates.io/crates/rayon), so the parallelism level can be controlled either via `rayon`'s [`ThreadPoolBuilder`](https://docs.rs/rayon/latest/rayon/struct.ThreadPoolBuilder.html) or using the `RAYON_NUM_THREADS` environment variable (see [here](https://github.com/rayon-rs/rayon/blob/master/FAQ.md#how-many-threads-will-rayon-spawn) for more info).
+
+### BYODS
+
+[![ascent-byods-rels on crates.io](https://img.shields.io/crates/v/ascent-byods-rels?label=ascent-byods-rels&color=blue)](https://crates.io/crates/ascent-byods-rels)
+
+BYODS (short for [Bring Your Own Data Structures to Datalog](https://dl.acm.org/doi/pdf/10.1145/3622840)) is a feature of Ascent that enables relations to be backed by custom data structures. This feature allows improving the algorithmic complexity of Ascent programs by optimizing the data structures used to back relations. For example, a program that requires transitive closure computation of a large graph could improve its performance by choosing a union-find based data structure `trrel_uf` (defined in [`ascent-byods-rels`](https://crates.io/crates/ascent-byods-rels)) for the transitive closure relation:
+
+in `Cargo.toml`:
+```toml
+[dependencies]
+ascent-byods-rels = "*"
+ascent = "*"
+```
+
+```Rust
+use ascent_byods_rels::trrel_uf;
+ascent! {
+   relation edge(Node, Node);
+   
+   #[ds(trrel_uf)] // Makes the relation transitive
+   relation path(Node, Node);
+   
+   path(x, y) <-- edge(x, y);
+}
+```
+
+The `#[ds(trrel_uf)]` attribute directs the Ascent compiler to use the data structure provider defined in the module `trrel_uf` for the `path` relation.
+You can find a complete example of BYODS dramatically speeding up Ascent computations [here](./byods/ascent-byods-rels/examples/steensgaard/main.rs).
+
+See [BYODS.MD](BYODS.MD) for more information on BYODS.
+
 ### `ascent_run!`
 
 In addition to `ascent!`, we provide the `ascent_run!` macro. Unlike `ascent!`, this macro evaluates the ascent program when invoked. The main advantage of `ascent_run!` is that local variables are in scope inside the Ascent program. For example, we can define a function for discovering the (optionally reflexive) transitive closure of a relation like so:
@@ -100,31 +132,7 @@ fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
 ```
 In the above example, we initialize the relation `r` directly to shorten the program.
 
-### BYODS
-BYODS (short for [Bring Your Own Data Structures to Datalog](https://dl.acm.org/doi/pdf/10.1145/3622840)) is an extension of Ascent that enables relations to be backed by custom data structures. This feature allows improving the algorithmic complexity of Ascent programs by optimizing the data structures used to back relations. For example, a program that requires transitive closure computation of a large graph could improve its performance by choosing a union-find based data structure for the transitive closure relation:
-
-in `Cargo.toml`:
-```toml
-[dependencies]
-ascent-byods-rels = "*"
-ascent = "*"
-```
-
-```Rust
-use ascent_byods_rels::trrel_uf;
-ascent! {
-   #[ds(trrel_uf)]
-   relation path(Node, Node);
-   
-   path(x, y) <-- edge(x, y);
-}
-```
-
-The `#[ds(trrel_uf)]` attribute directs the Ascent compiler to use the data structure provider defined in the module `trrel_uf` for the `path` relation.
-You can find a complete example of BYODS dramatically speeding up Ascent computations [here](./byods/ascent-byods-rels/examples/steensgaard/main.rs).
-
-See [BYODS.MD](BYODS.MD) for more information on BYODS.
-
+We also provide `ascent_run_par!`, the parallel version of `ascent_run!`.
 ### Conditions and Generative Clauses
 The syntax is designed to be familiar to Rust users. In this example, `edge` is populated with non-reflexive edges from `node`. Note that any type that implements `Clone + Eq + Hash` can be used as a relation column.
 
