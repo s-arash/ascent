@@ -1,3 +1,6 @@
+#[path ="../tracking_alloc.rs"]
+mod tracking_alloc;
+
 use std::alloc::System;
 use std::borrow::Borrow;
 
@@ -6,7 +9,7 @@ use ascent::internal::Instant;
 use itertools::Itertools;
 
 use ascent_byods_rels::eqrel;
-use ascent_byods_rels::tracking_alloc::{self, TrackingAllocator};
+use tracking_alloc::TrackingAllocator;
 
 #[global_allocator]
 static GLOBAL: TrackingAllocator<System> = TrackingAllocator(System);

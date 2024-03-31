@@ -33,8 +33,6 @@ pub mod ceqrel_ind;
 pub mod trrel_union_find;
 #[doc(hidden)]
 pub mod trrel_union_find_binary_ind;
-#[doc(hidden)]
-pub mod tracking_alloc;
 
 pub mod uf;
 pub mod trrel;

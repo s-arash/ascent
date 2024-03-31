@@ -6,12 +6,6 @@ use std::alloc::GlobalAlloc;
 #[derive(Default)]
 pub struct TrackingAllocator<Alloc = std::alloc::System>(pub Alloc);
 
-impl TrackingAllocator<std::alloc::System> {
-   pub const fn new() -> Self {
-      Self(std::alloc::System)
-   }
-}
-
 pub static mut MAX_ALLOC: usize = 0;
 pub static mut CURRENT_ALLOC: usize = 0;
 
@@ -57,6 +51,7 @@ pub fn max_alloc() -> usize {
    unsafe { MAX_ALLOC }
 }
 
+#[allow(dead_code)]
 pub fn reset_max_alloc() {
    unsafe {
       MAX_ALLOC = CURRENT_ALLOC;

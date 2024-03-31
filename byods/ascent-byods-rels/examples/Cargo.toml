@@ -15,7 +15,20 @@ ascent-byods-rels = { path = ".." }
 itertools = "0.12"
 serde = "1.0"
 csv = "1.0"
+separator = "0.4.1"
 
 [[bin]]
 name = "steensgaard"
 path = "steensgaard/main.rs"
+
+[[bin]]
+name = "blockchain"
+path = "blockchain.rs"
+
+[[bin]]
+name = "bench_trrel"
+path = "bench_trrel.rs"
+
+[[bin]]
+name = "bench_trrel_uf"
+path = "bench_trrel_uf.rs"

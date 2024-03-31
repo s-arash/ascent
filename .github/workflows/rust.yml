@@ -94,7 +94,7 @@ jobs:
 
       - name: cargo check
         working-directory: ./byods/ascent-byods-rels
-        run: cargo check --examples
+        run: cargo check
 
       - name: cargo check (examples)
         working-directory: ./byods/ascent-byods-rels/examples
