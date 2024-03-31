@@ -24,14 +24,17 @@ impl AscentConfig {
    const INTER_RULE_PARALLELISM_ATTR: &'static str = "inter_rule_parallelism";
 
    pub fn new(attrs: Vec<Attribute>, is_parallel: bool) -> syn::Result<AscentConfig> {
-      let include_rule_times = attrs.iter().any(|attr| attr.path.is_ident(Self::MEASURE_RULE_TIMES_ATTR));
-      let generate_run_partial = attrs.iter().any(|attr| attr.path.is_ident(Self::GENERATE_RUN_TIMEOUT_ATTR));
-      let inter_rule_parallelism = attrs.iter().find(|attr| attr.path.is_ident(Self::INTER_RULE_PARALLELISM_ATTR));
+      let include_rule_times = attrs.iter().find(|attr| attr.meta.path().is_ident(Self::MEASURE_RULE_TIMES_ATTR))
+         .map(|attr| attr.meta.require_path_only()).transpose()?.is_some();
+      let generate_run_partial = attrs.iter().find(|attr| attr.meta.path().is_ident(Self::GENERATE_RUN_TIMEOUT_ATTR))
+         .map(|attr| attr.meta.require_path_only()).transpose()?.is_some();
+      let inter_rule_parallelism = attrs.iter().find(|attr| attr.meta.path().is_ident(Self::INTER_RULE_PARALLELISM_ATTR))
+         .map(|attr| attr.meta.require_path_only()).transpose()?;
 
       let recognized_attrs = 
          [Self::MEASURE_RULE_TIMES_ATTR, Self::GENERATE_RUN_TIMEOUT_ATTR, Self::INTER_RULE_PARALLELISM_ATTR, REL_DS_ATTR];
       for attr in attrs.iter() {
-         if !recognized_attrs.iter().any(|recognized_attr| attr.path.is_ident(recognized_attr)) {
+         if !recognized_attrs.iter().any(|recognized_attr| attr.meta.path().is_ident(recognized_attr)) {
             return Err(Error::new_spanned(attr, 
                        format!("unrecognized attribute. recognized attributes are: {}",
                                recognized_attrs.join(", "))));
@@ -236,7 +239,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
          rel_identity.clone(),
          RelationMetadata {
             initialization: rel.initialization.clone().map(Rc::new),
-            attributes: Rc::new(rel.attrs.iter().filter(|attr| attr.path.get_ident().map_or(true, |ident| !RECOGNIIZED_REL_ATTRS.iter().any(|ra| ident == ra))).cloned().collect_vec()),
+            attributes: Rc::new(rel.attrs.iter().filter(|attr| attr.meta.path().get_ident().map_or(true, |ident| !RECOGNIIZED_REL_ATTRS.iter().any(|ra| ident == ra))).cloned().collect_vec()),
             ds_macro_path: ds_attribute.path,
             ds_macro_args: ds_attribute.args
          }
@@ -275,15 +278,15 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
 
 fn get_ds_attr(attrs: &[Attribute]) -> syn::Result<Option<DsAttributeContents>> {
    let ds_attrs = attrs.iter()
-      .filter(|attr| attr.path.get_ident().map_or(false, |ident| ident == REL_DS_ATTR))
+      .filter(|attr| attr.meta.path().get_ident().map_or(false, |ident| ident == REL_DS_ATTR))
       .collect_vec();
    match &ds_attrs[..] {
       [] => Ok(None),
       [attr] => {
-         let res = syn::parse2::<DsAttributeContents>(attr.tokens.clone())?;
+         let res = syn::parse2::<DsAttributeContents>(attr.meta.require_list()?.tokens.clone())?;
          Ok(Some(res))
       },
-      [_attr1, attr2, ..] => Err(Error::new(attr2.bracket_token.span, "multiple `ds` attributes specified")),
+      [_attr1, attr2, ..] => Err(Error::new(attr2.bracket_token.span.join(), "multiple `ds` attributes specified")),
    }
 }
 

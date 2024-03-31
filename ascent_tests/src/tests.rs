@@ -930,3 +930,20 @@ fn test_aggregated_lattice() {
    };
    assert_rels_eq!(res.bar, [(0, 9), (1, 9)]);
 }
+
+#[test]
+fn test_ds_attr() {
+   use ascent::rel as my_rel;
+   let res = ascent::ascent_run! {
+      #![ds(my_rel)]
+
+      #[ds(ascent::rel)]
+      relation foo(i32, i32) = vec![(0, 1), (1, 0)];
+
+      relation bar(i32, i32);
+
+      bar(x, y) <-- foo(x, y), if x < y;
+   };
+
+   assert_rels_eq!(res.bar, [(0, 1)]);
+}

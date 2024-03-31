@@ -124,7 +124,7 @@ impl Parse for RelationNode {
       let name : Ident = input.parse()?;
       let content;
       parenthesized!(content in input);
-      let field_types = content.parse_terminated(Type::parse)?;
+      let field_types = content.parse_terminated(Type::parse, Token![,])?;
       let initialization = if input.peek(Token![=]) {
          input.parse::<Token![=]>()?;
          Some(input.parse::<Expr>()?)
@@ -186,6 +186,7 @@ impl Parse for DisjunctionNode {
 #[derive(Parse, Clone)]
 pub struct GeneratorNode {
    pub for_keyword: Token![for],
+   #[call(Pat::parse_multi)]
    pub pattern: Pat,
    pub in_keyword: Token![in],
    pub expr: Expr
@@ -198,7 +199,7 @@ pub struct BodyClauseNode {
    pub cond_clauses: Vec<CondClause>
 }
 
-#[derive(Parse, Clone, PartialEq, Eq)]
+#[derive(Parse, Clone, PartialEq, Eq, Debug)]
 pub enum BodyClauseArg {
    #[peek(Token![?], name = "Pattern arg")]
    Pat(ClauseArgPattern),
@@ -240,9 +241,10 @@ impl ToTokens for BodyClauseArg {
    }
 }
 
-#[derive(Parse, Clone, PartialEq, Eq)]
+#[derive(Parse, Clone, PartialEq, Eq, Debug)]
 pub struct ClauseArgPattern {
    pub huh_token: Token![?],
+   #[call(Pat::parse_multi)]
    pub pattern : Pat,
 }
 
@@ -250,7 +252,8 @@ pub struct ClauseArgPattern {
 pub struct IfLetClause {
    pub if_keyword: Token![if],
    pub let_keyword: Token![let],
-   pub pattern: syn::Pat,
+   #[call(Pat::parse_multi)]
+   pub pattern: Pat,
    pub eq_symbol : Token![=],
    pub exp: syn::Expr,
 }
@@ -264,7 +267,8 @@ pub struct IfClause {
 #[derive(Parse, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct LetClause {
    pub let_keyword: Token![let],
-   pub pattern: syn::Pat,
+   #[call(Pat::parse_multi)]
+   pub pattern: Pat,
    pub eq_symbol : Token![=],
    pub exp: syn::Expr,
 }
@@ -326,7 +330,7 @@ impl Parse for BodyClauseNode{
       let rel : Ident = input.parse()?;
       let args_content;
       parenthesized!(args_content in input);
-      let args = args_content.parse_terminated(BodyClauseArg::parse)?;
+      let args = args_content.parse_terminated(BodyClauseArg::parse, Token![,])?;
       let mut cond_clauses = vec![];
       while let Ok(cl) = input.parse(){
          cond_clauses.push(cl);
@@ -381,7 +385,7 @@ impl Parse for HeadClauseNode{
       let rel : Ident = input.parse()?;
       let args_content;
       parenthesized!(args_content in input);
-      let args = args_content.parse_terminated(Expr::parse)?;
+      let args = args_content.parse_terminated(Expr::parse, Token![,])?;
       Ok(HeadClauseNode{rel, args})
    }
 }
@@ -389,6 +393,7 @@ impl Parse for HeadClauseNode{
 #[derive(Clone, Parse)]
 pub struct AggClauseNode {
    pub agg_kw: kw::agg,
+   #[call(Pat::parse_multi)]
    pub pat: Pat,
    pub eq_token: Token![=],
    pub aggregator: AggregatorNode,
@@ -591,8 +596,8 @@ pub(crate) struct DsAttributeContents {
 
 impl Parse for DsAttributeContents {
    fn parse(input: ParseStream) -> Result<Self> {
-      let content;
-      parenthesized!(content in input);
+      let content = input;
+      // parenthesized!(content in input);
 
       let path = syn::Path::parse_mod_style(&content)?;
       let args = if content.peek(Token![:]) {
@@ -972,7 +977,7 @@ fn rule_expand_macro_invocations(rule: RuleNode, macros: &HashMap<Ident, &MacroD
          BodyItemNode::Disjunction(disj) => {
             let new_disj: Punctuated<Result<_>, _> = punctuated_map(disj.disjuncts, |bis|{
                let new_bis = punctuated_map(bis,|bi| {
-                  body_item_expand_macros(bi, macros, gensym, depth - 1, Some(disj.paren.span))
+                  body_item_expand_macros(bi, macros, gensym, depth - 1, Some(disj.paren.span.join()))
                });
                Ok(flatten_punctuated(punctuated_try_unwrap(new_bis)?))
             });

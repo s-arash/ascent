@@ -1,7 +1,6 @@
 #![cfg(test)]
 use petgraph::dot::{Config, Dot};
 use proc_macro2::TokenStream;
-use syn::parse2;
 
 use crate::ascent_impl;
 
@@ -188,14 +187,14 @@ fn test_macro3() {
 
 #[test]
 fn test_macro_agg() {
-   let inp = quote!{
-      relation foo(i32, i32);
-      lattice bar(i32, i32, i32);
-      relation baz(i32, i32, i32);
+   let inp = quote! {
+      relation foo(i32);
+      relation bar(i32, i32, i32);
+      lattice baz(i32, i32);
 
-      baz(x, y, min_z) <--
-         foo(x, y),
-         agg min_z = min(z) in bar(x, y, z);
+      baz(x, min_z) <--
+         foo(x),
+         agg min_z = min(z) in bar(x, _, z);
    };
    write_to_scratchpad(inp);
 }
@@ -542,17 +541,4 @@ fn test_macro_in_macro() {
    };
 
    write_to_scratchpad(inp);
-}
-
-#[test]
-fn test_macro_item() {
-   let def = quote! {
-      macro foo($x: expr, $y: expr) {
-         $x + $y
-      }
-   };
-
-   let parsed = parse2::<syn::ItemMacro2>(def).unwrap();
-   
-   println!("rules: {}", parsed.rules);
 }

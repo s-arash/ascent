@@ -3,6 +3,9 @@
 
 #![cfg_attr(not(test), deny(unused_crate_dependencies))]
 
+// See Cargo.toml for why this is needed. 
+use syn as _;
+
 mod union_find;
 #[doc(hidden)]
 pub mod eqrel_ind;

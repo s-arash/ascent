@@ -11,7 +11,7 @@ ascent = {path = "../ascent"}
 stopwatch = "0.0.7"
 bencher = "0.1.5"
 derive_more = "0.99.16"
-itertools = "0.10"
+itertools = "0.12"
 quote = "1.0"
 arrayvec = "0.7"
 const-fnv1a-hash = "1.0.1"

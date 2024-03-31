@@ -129,6 +129,7 @@ pub fn pat_to_ident(pat: &Pat) -> Option<Ident> {
 
 pub fn is_wild_card(expr: &Expr) -> bool {
    match expr {
+      Expr::Infer(_) => true,
       Expr::Verbatim(ts) => ts.to_string() == "_",
       _ => false
    }
