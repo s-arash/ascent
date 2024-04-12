@@ -55,6 +55,11 @@ ascent! {
    ```bash
    cargo run
    ```
+
+## Examples
+
+See the [ascent/examples](ascent/examples) directory for a more complete set of examples.
+
 ## Features
 
 ### Lattices
