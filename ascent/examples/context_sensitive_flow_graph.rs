@@ -16,13 +16,13 @@
 use ascent::ascent;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-struct Instr(&'static str);
+pub struct Instr(&'static str);
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-struct Context(&'static str);
+pub struct Context(&'static str);
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-enum Res {
+pub enum Res {
     Ok,
     Err,
 }

@@ -19,13 +19,13 @@ use std::rc::Rc;
 use ascent::ascent;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-struct Letter(&'static str);
+pub struct Letter(&'static str);
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-struct Seq(Letter, Option<Rc<Seq>>);
+pub struct Seq(Letter, Option<Rc<Seq>>);
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-struct Res(&'static str);
+pub struct Res(&'static str);
 
 ascent! {
     // Facts:

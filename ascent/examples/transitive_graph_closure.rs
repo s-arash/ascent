@@ -5,7 +5,7 @@
 use ascent::ascent;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-struct Node(&'static str);
+pub struct Node(&'static str);
 
 ascent! {
     // Facts:

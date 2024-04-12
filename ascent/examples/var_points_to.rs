@@ -33,13 +33,13 @@
 use ascent::ascent;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-struct Var(&'static str);
+pub struct Var(&'static str);
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-struct Obj(&'static str);
+pub struct Obj(&'static str);
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-struct Field(&'static str);
+pub struct Field(&'static str);
 
 ascent! {
     // Facts:

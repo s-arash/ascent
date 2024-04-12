@@ -7,7 +7,7 @@ use std::hash::Hash;
 use ascent::ascent;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-struct Node(&'static str);
+pub struct Node(&'static str);
 
 ascent! {
     struct AscentProgram<N> where N: Clone + Eq + Hash;

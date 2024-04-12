@@ -3,7 +3,7 @@
 use ascent::ascent;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-enum List {
+pub enum List {
     Nil,
     Cons(usize, Box<List>),
 }

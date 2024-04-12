@@ -14,19 +14,19 @@
 use ascent::ascent;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-struct Var(&'static str);
+pub struct Var(&'static str);
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-struct Read(&'static str);
+pub struct Read(&'static str);
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-struct Write(&'static str);
+pub struct Write(&'static str);
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-struct Jump(&'static str);
+pub struct Jump(&'static str);
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-enum Instr {
+pub enum Instr {
     Read(Read),
     Write(Write),
     Jump(Jump),

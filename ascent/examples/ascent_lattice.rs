@@ -2,7 +2,7 @@
 
 use ascent::{ascent, Dual};
 
-type Node = &'static str;
+pub type Node = &'static str;
 
 ascent! {
     // Facts:
