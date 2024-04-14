@@ -80,7 +80,26 @@ jobs:
     - name: Run ascent_tests/src/bin benchmarks
       working-directory: ./ascent_tests
       run: cargo run --release --bin tc && cargo run --release --features par --bin tc
-     
+  
+  examples:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: run examples
+        working-directory: ./ascent
+        run: | 
+          for example in ./examples/*rs
+          do
+            cargo run --example "$(basename "${example%.rs}")" || exit 1
+          done
+
   byods-rels:
     runs-on: ubuntu-latest
 
