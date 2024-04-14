@@ -91,8 +91,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    let mut field_type_names = HashSet::<String>::new();
    let mut lat_field_type_names = HashSet::<String>::new();
 
-   let sorted_relations = mir.relations_ir_relations.keys().sorted_by_key(|rel| &rel.name);
-   for relation in sorted_relations {
+   for relation in mir.relations_ir_relations.keys().sorted_by_key(|rel| &rel.name) {
       use crate::quote::ToTokens;
       for (i,field_type) in relation.field_types.iter().enumerate() {
          let is_lat = relation.is_lattice && i == relation.field_types.len() - 1;
@@ -117,8 +116,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    }
 
    let mut relation_initializations = vec![];
-   let sorted_relations_metadata = mir.relations_metadata.iter().sorted_by_key(|(rel, _)| &rel.name);
-   for (rel, md) in sorted_relations_metadata {
+   for (rel, md) in mir.relations_metadata.iter().sorted_by_key(|(rel, _)| &rel.name) {
       if let Some(ref init) = md.initialization {
          let rel_name = &rel.name;
          relation_initializations.push(quote! {
@@ -414,8 +412,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
    use std::iter::once;
    let sorted_dynamic_relations = scc.dynamic_relations.iter().sorted_by_cached_key(|(rel, _)| rel.name.clone());
    for rel in sorted_dynamic_relations.flat_map(|(rel, indices)| {
-      let sorted_indices = indices.iter().sorted_by_cached_key(|rel| rel.ir_name());
-      once(Either::Left(rel)).chain(sorted_indices.map(Either::Right))
+      once(Either::Left(rel)).chain(indices.iter().sorted_by_cached_key(|rel| rel.ir_name()).map(Either::Right))
    }) {
       let (ir_name, ty) = match rel {
         Either::Left(rel) => (rel_ind_common_var_name(rel), rel_ind_common_type(rel, mir)),
@@ -594,8 +591,7 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
 
 fn compile_relation_sizes_body(mir: &AscentMir) -> proc_macro2::TokenStream {
    let mut write_sizes = vec![];
-   let sorted_relations_ir_relations = mir.relations_ir_relations.keys().sorted_by_key(|r| &r.name);
-   for r in sorted_relations_ir_relations {
+   for r in mir.relations_ir_relations.keys().sorted_by_key(|r| &r.name) {
       let rel_name = &r.name;
       let rel_name_str = r.name.to_string();
       write_sizes.push(quote! {
@@ -675,8 +671,7 @@ fn compile_update_indices_function_body(mir: &AscentMir) -> proc_macro2::TokenSt
       };
 
       let mut update_indices = vec![];
-      let sorted_indices = indices_set.iter().sorted_by_cached_key(|rel| rel.ir_name());
-      for ind in sorted_indices {
+      for ind in indices_set.iter().sorted_by_cached_key(|rel| rel.ir_name()) {
          let ind_name = &ind.ir_name();
          let selection_tuple : Vec<Expr> = ind.indices.iter().map(|&i| {
             let ind = syn::Index::from(i); 
@@ -1006,8 +1001,7 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
       let new_ref = if !mir.is_parallel { quote!{&mut} } else { quote!{&} };
       let mut used_fields = HashSet::new();
       if let Some(rel_indices) = rel_indices {
-         let sorted_rel_indices = rel_indices.iter().sorted_by_cached_key(|rel| rel.ir_name());
-         for rel_ind in sorted_rel_indices {
+         for rel_ind in rel_indices.iter().sorted_by_cached_key(|rel| rel.ir_name()) {
             if rel_ind.is_full_index() {continue};
             let var_name = if !mir.is_parallel {
                expr_for_rel_write(&MirRelation::from(rel_ind.clone(), New), mir)
