@@ -28,9 +28,6 @@ jobs:
     
     - run: cargo --version
 
-    - name: Install cargo-expand
-      run: cargo install cargo-expand
-
     - name: Run ascent_tests tests
       working-directory: ./ascent_tests
       run: cargo test
@@ -61,8 +58,32 @@ jobs:
       # macro tests should be last, because they produce scratchpad.rs, which my not compile
     - name: Run macro tests
       working-directory: ./ascent_macro
-      run: cargo test test  
-  
+      run: cargo test test
+
+  expansion-test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - run: cargo --version
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+          override: true
+          # required by tryexpand:
+          toolchain: 1.74
+    
+    - run: cargo --version
+
+    - name: Install cargo-expand
+      run: cargo install cargo-expand
+
+    - name: Run ascent_tests tests
+      working-directory: ./ascent_tests
+      run: cargo test --features "expansion-tests"
+    
   bench:
     runs-on: ubuntu-latest
 
@@ -74,7 +95,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
           override: true
-          toolchain: 1.66
+          toolchain: 1.70
     
     - name: Run Benchmarks
       working-directory: ./ascent_tests
