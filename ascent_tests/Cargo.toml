@@ -26,3 +26,4 @@ harness = false
 
 [features]
 par = []
+expansion-tests = []
