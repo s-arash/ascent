@@ -11,7 +11,7 @@ ascent! {
     
     relation even(i32);
 
-    even(x) <-- number(x) if x % 2 == 0;
+    even(x) <-- number(x), if x % 2 == 0;
 
     relation odd(i32);
 

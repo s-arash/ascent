@@ -37,7 +37,7 @@ ascent! {
     relation seq(Option<Rc<Seq>>);
     
     seq(None);
-    seq(Some(Rc::new(Seq(l.clone(), s.clone())))) <-- letter(l), seq(s), len(s, n) if *n < 5;
+    seq(Some(Rc::new(Seq(l.clone(), s.clone())))) <-- letter(l), seq(s), len(s, n), if *n < 5;
 
     relation len(Option<Rc<Seq>>, usize);
     

@@ -13,7 +13,7 @@ ascent! {
     
     fib(0, 1) <-- number(0);
     fib(1, 1) <-- number(1);
-    fib(x, y + z) <-- number(x) if *x >= 2, fib(x - 1, y), fib(x - 2, z);
+    fib(x, y + z) <-- number(x), if *x >= 2, fib(x - 1, y), fib(x - 2, z);
 }
 
 fn main() {

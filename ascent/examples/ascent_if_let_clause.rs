@@ -11,7 +11,7 @@ ascent! {
     
     relation some(isize);
 
-    some(y) <-- option(x) if let Some(y) = x;
+    some(y) <-- option(x), if let Some(y) = x;
 }
 
 fn main() {

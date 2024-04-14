@@ -11,8 +11,8 @@ ascent! {
     
     relation divisible(isize, isize);
 
-    divisible(x, 3) <-- number(x) if x % 3 == 0;
-    divisible(x, 5) <-- number(x) if x % 5 == 0;
+    divisible(x, 3) <-- number(x), if x % 3 == 0;
+    divisible(x, 5) <-- number(x), if x % 5 == 0;
 
     relation fizz(isize);
 
