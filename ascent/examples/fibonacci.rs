@@ -19,14 +19,7 @@ ascent! {
 fn main() {
     let mut prog = AscentProgram::default();
     
-    prog.number = vec![
-        (0,),
-        (1,),
-        (2,),
-        (3,),
-        (4,),
-        (5,),
-    ];
+    prog.number = (0..6).map(|n| (n,)).collect();
 
     prog.run();
 
