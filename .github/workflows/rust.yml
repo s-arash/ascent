@@ -30,6 +30,9 @@ jobs:
     
     - run: cargo --version
 
+    - name: Install cargo-expand
+      run: cargo install cargo-expand
+
     - name: Run ascent_tests tests
       working-directory: ./ascent_tests
       run: cargo test
