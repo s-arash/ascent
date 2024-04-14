@@ -12,6 +12,10 @@ ascent! {
     relation some(isize);
 
     some(y) <-- option(x), if let Some(y) = x;
+
+    // The rule above could alternatively also be written
+    // using the following short-hand syntax:
+    some(y) <-- option(?Some(y));
 }
 
 fn main() {
