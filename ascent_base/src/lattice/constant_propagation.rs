@@ -48,6 +48,40 @@ impl<T: PartialEq> Lattice for ConstPropagation<T> {
          (Top, _) => Top,
       }
    }
+   
+   fn meet_mut(&mut self, other: Self) -> bool {
+      use ConstPropagation::*;
+      match (self, other) {
+         (Bottom, _) => false,
+         (Constant(x), Constant(y)) if x == &y => false,
+         (this @ Constant(_), Bottom | Constant(_)) => {
+            *this = Bottom;
+            true
+         },
+         (_, Top) => false,
+         (this @ Top, other) => {
+            *this = other;
+            true 
+         },
+      }
+   }
+   
+   fn join_mut(&mut self, other: Self) -> bool {
+      use ConstPropagation::*;
+      match (self, other) {
+         (_, Bottom) => false,
+         (this @ Bottom, other) => {
+            *this = other;
+            true
+         },
+         (Constant(x), Constant(y)) if x == &y => false,
+         (this @ Constant(_), Constant(_) | Top) => {
+            *this = Top;
+            true
+         },
+         (Top, _) => false,
+      }
+   }
 }
 
 impl<T: Lattice> BoundedLattice for ConstPropagation<T> where ConstPropagation<T>: Lattice {
@@ -61,4 +95,23 @@ fn test_constant_propagation(){
    assert!(const_1 > ConstPropagation::Bottom);
    assert!(const_1 < ConstPropagation::Top);
    assert!(const_1 > ConstPropagation::bottom());
+}
+
+#[test]
+fn test_constant_propagation_lattice(){
+   let const_1 = ConstPropagation::Constant(1);
+
+   let mut x = const_1.clone();
+   assert!(!x.join_mut(const_1.clone()));
+   assert!(!x.meet_mut(const_1.clone()));
+   assert!(!x.join_mut(ConstPropagation::Bottom));
+   assert!(!x.meet_mut(ConstPropagation::Top));
+
+   assert!(x == const_1);
+
+   assert!(x.join_mut(ConstPropagation::Constant(2)));
+
+   assert_eq!(x, ConstPropagation::Top);
+
+   assert!(!x.join_mut(ConstPropagation::Constant(2)));
 }

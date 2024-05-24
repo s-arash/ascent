@@ -72,6 +72,38 @@ impl<const BOUND: usize, T: PartialEq + Eq + Hash + Ord> PartialOrd for BoundedS
 }
 
 impl<const BOUND: usize, T: PartialEq + Eq + Hash + Ord> Lattice for BoundedSet<BOUND, T> {
+   fn meet_mut(&mut self, other: Self) -> bool {
+      match (&mut self.0, other.0){
+         (None, None) => false,
+         (this @ None, Some(set2)) => {
+            *this = Some(set2);
+            true
+         },
+         (Some(_), None) => false,
+         (Some(set1), Some(set2)) => {
+            set1.meet_mut(set2)
+         },
+      }
+   }
+ 
+   fn join_mut(&mut self, other: Self) -> bool {
+      match (&mut self.0, other.0){
+         (None, _) => false,
+         (this @ Some(_), None) => {
+            *this = None;
+            true
+         },
+         (Some(set1), Some(set2)) => {
+            let changed = set1.join_mut(set2);
+            if set1.len() > BOUND {
+               self.0 = None;
+               true
+            } else {
+               changed
+            }
+         },
+      }
+   }
    fn meet(self, other: Self) -> Self {
       match (self.0, other.0){
          (None, None) => BoundedSet(None),
@@ -115,7 +147,13 @@ impl<const BOUND: usize, T: PartialEq + Eq + Hash + Ord> BoundedLattice for Boun
 #[test]
 fn test_bounded_set() {
    let set1 = BoundedSet::<2, i32>::singleton(10);
+
+   let mut set2_by_mut = set1.clone();
+   assert!(set2_by_mut.join_mut(BoundedSet::singleton(11)));
+
    let set2 = set1.join(BoundedSet::singleton(11));
+
+   assert!(set2_by_mut == set2);
    assert_eq!(set2.count(), Some(2));
    assert!(set2.contains(&10));
    assert!(!set2.contains(&20));
