@@ -50,6 +50,18 @@ macro_rules! tuple_lattice_impl{
          }
       }
       impl< $([<T $i>]: Lattice),* > Lattice for Product<($([<T $i>]),*,)> {
+         fn meet_mut(&mut self, other: Self) -> bool {
+            let mut changed = false;
+            $(changed |= self.0.$i.meet_mut(other.0.$i);)*
+            changed
+         }
+
+         fn join_mut(&mut self, other: Self) -> bool {
+            let mut changed = false;
+            $(changed |= self.0.$i.join_mut(other.0.$i);)*
+            changed
+         }
+
          fn meet(self, other: Self) -> Self {
             Product(($(self.0.$i.meet(other.0.$i)),*,))
          }
@@ -132,18 +144,20 @@ fn test_product_of_array_partial_ord() {
 }
 
 impl <const N: usize, T: Lattice> Lattice for Product<[T; N]> {
-   fn meet(mut self, other: Self) -> Self {
-      for (l,r) in self.0.iter_mut().zip(other.0){
-         l.meet_mut(r);
+   fn meet_mut(&mut self, other: Self) -> bool {
+      let mut changed = false;
+      for (l, r) in self.0.iter_mut().zip(other.0){
+         changed |= l.meet_mut(r);
       }
-      self
+      changed
    }
-
-   fn join(mut self, other: Self) -> Self {
-      for (l,r) in self.0.iter_mut().zip(other.0){
-         l.join_mut(r);
+ 
+   fn join_mut(&mut self, other: Self) -> bool {
+      let mut changed = false;
+      for (l, r) in self.0.iter_mut().zip(other.0){
+         changed |= l.join_mut(r);
       }
-      self
+      changed
    }
 }
 

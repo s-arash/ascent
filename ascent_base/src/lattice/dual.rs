@@ -2,7 +2,7 @@ use std::{cmp::Ordering, fmt::Debug, fmt::Display, fmt::Formatter, ops::Deref};
 
 use crate::Lattice;
 
-use super::{BoundedLattice};
+use super::BoundedLattice;
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
 /// A wrapper type that swaps (`<=` and `>=`) for `PartialOrd`s, (`meet` and `join`) for `Lattice`s, 
