@@ -7,6 +7,6 @@ resolver = "2"
 version = "0.6.0"
 
 [workspace.dependencies]
-ascent = { path = "./ascent", version = "0.6.0" }
+ascent = { path = "./ascent", default-features = false, version = "0.6.0" }
 ascent_macro = { path = "./ascent_macro", version = "0.6.0" }
 ascent_base = { path = "./ascent_base", version = "0.6.0" }

@@ -1,4 +1,4 @@
-#![cfg(test)]
+#![cfg(all(test, feature = "par"))]
 #![allow(dead_code)]
 
 use std::sync::Mutex;

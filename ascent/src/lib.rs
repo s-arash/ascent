@@ -9,24 +9,32 @@ pub mod rel;
 pub mod aggregators;
 mod convert;
 mod rel_index_read;
-mod c_rel_index;
 mod exps;
+#[cfg(feature = "par")]
+mod c_rel_index;
+#[cfg(feature = "par")]
+mod c_rel_index_read;
+#[cfg(feature = "par")]
 mod c_rel_full_index;
+#[cfg(feature = "par")]
 mod c_rel_index_combined;
+#[cfg(feature = "par")]
 mod c_lat_index;
+#[cfg(feature = "par")]
 mod c_rel_no_index;
 mod to_rel_index;
 mod tuple_of_borrowed;
 mod rel_index_boilerplate;
 
-pub use ascent_macro::ascent;
-pub use ascent_macro::ascent_run;
-pub use ascent_macro::ascent_par;
-pub use ascent_macro::ascent_run_par;
+pub use ascent_macro::{ascent, ascent_run};
+#[cfg(feature = "par")]
+pub use ascent_macro::{ascent_par, ascent_run_par};
 
 pub use ascent_base::*;
 
 pub use hashbrown;
+#[cfg(feature = "par")]
 pub use dashmap;
 pub use boxcar;
+#[cfg(feature = "par")]
 pub use rayon;

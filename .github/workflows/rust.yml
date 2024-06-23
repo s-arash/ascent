@@ -113,6 +113,10 @@ jobs:
         with:
           toolchain: stable
 
+      - name: cargo check (no-default-features)
+        working-directory: ./byods/ascent-byods-rels
+        run: cargo check --no-default-features
+
       - name: cargo check
         working-directory: ./byods/ascent-byods-rels
         run: cargo check

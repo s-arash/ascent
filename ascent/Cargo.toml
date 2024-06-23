@@ -15,19 +15,21 @@ readme = "../README.MD"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
 ascent_macro = { workspace = true }
 ascent_base = { workspace = true }
+cfg-if = "1.0"
 rustc-hash = "1.1"
-hashbrown = {version = "0.14", features = ["raw", "rayon"]}
+hashbrown = {version = "0.14", features = ["raw"]}
 instant = "0.1"
-dashmap = { version = "5.5", features = ["rayon", "raw-api"] }
-rayon = "1.5"
+dashmap = { version = "5.5", features = ["raw-api", "rayon"], optional = true }
+rayon = { version = "1.5", optional = true }
 boxcar = "0.1.0"
-once_cell = "1.13.1"
+once_cell = { version = "1.13.1", optional = true }
 paste = "1.0"
 
-[dev_dependencies]
+[dev-dependencies]
 
 [features]
+default = ["par"]
 wasm-bindgen = ["instant/wasm-bindgen"]
+par = ["dashmap", "hashbrown/rayon", "once_cell", "rayon"]

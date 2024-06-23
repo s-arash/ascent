@@ -1,7 +1,6 @@
 #![cfg(test)]
 use ascent::ascent;
 use ascent::ascent_run;
-use ascent::ascent_run_par;
 use itertools::Itertools;
 
 use crate::ascent_run_m_par;
