@@ -1,13 +1,13 @@
 #![cfg(test)]
 #![allow(irrefutable_let_patterns)]
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fmt::{Debug};
+use std::fmt::Debug;
 use std::ops::Deref;
 use std::primitive;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{cmp::max, rc::Rc};
-use ascent::{Dual, ascent_par};
+use ascent::Dual;
 use std::hash::Hash;
 
 use ascent::ascent;

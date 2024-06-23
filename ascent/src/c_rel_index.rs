@@ -7,7 +7,7 @@ use rustc_hash::FxHasher;
 use std::hash::{Hash, BuildHasherDefault, BuildHasher};
 
 use crate::internal::{RelIndexWrite, CRelIndexWrite, RelIndexMerge, Freezable};
-use crate::rel_index_read::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
+use crate::internal::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
 
 use rayon::iter::IntoParallelIterator;
 

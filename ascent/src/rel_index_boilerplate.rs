@@ -1,5 +1,5 @@
 use crate::internal::{RelFullIndexWrite, RelIndexWrite, RelFullIndexRead, RelIndexMerge, CRelIndexWrite, CRelFullIndexWrite};
-use crate::rel_index_read::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
+use crate::rel_index_read::{RelIndexRead, RelIndexReadAll};
 
 impl<'a, T> RelIndexWrite for &'a mut T where T: RelIndexWrite {
    type Key = T::Key;
@@ -87,26 +87,31 @@ impl<'a, T> RelFullIndexRead<'a> for &'a T where T:RelFullIndexRead<'a> {
    fn contains_key(&self, key: &Self::Key) -> bool { (**self).contains_key(key) }
 }
 
-impl<'a, T> CRelIndexRead<'a> for &'a T where T: CRelIndexRead<'a> {
-   type Key = T::Key;
-   type Value = T::Value;
-   type IteratorType = T::IteratorType;
+#[cfg(feature = "par")]
+mod par {
+    use crate::internal::{CRelIndexRead, CRelIndexReadAll};
    
-   #[inline(always)]
-   fn c_index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType> {
-      (**self).c_index_get(key)
+   impl<'a, T> CRelIndexRead<'a> for &'a T where T: CRelIndexRead<'a> {
+      type Key = T::Key;
+      type Value = T::Value;
+      type IteratorType = T::IteratorType;
+      
+      #[inline(always)]
+      fn c_index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType> {
+         (**self).c_index_get(key)
+      }
+
    }
 
-}
+   impl<'a, T> CRelIndexReadAll<'a> for &'a T where T: CRelIndexReadAll<'a> {
+      type Key = T::Key;
+      type Value = T::Value;
+      type ValueIteratorType = T::ValueIteratorType;
+      type AllIteratorType = T::AllIteratorType;
 
-impl<'a, T> CRelIndexReadAll<'a> for &'a T where T: CRelIndexReadAll<'a> {
-   type Key = T::Key;
-   type Value = T::Value;
-   type ValueIteratorType = T::ValueIteratorType;
-   type AllIteratorType = T::AllIteratorType;
-
-   #[inline(always)]
-   fn c_iter_all(&'a self) -> Self::AllIteratorType {
-      (**self).c_iter_all()
+      #[inline(always)]
+      fn c_iter_all(&'a self) -> Self::AllIteratorType {
+         (**self).c_iter_all()
+      }
    }
 }

@@ -28,6 +28,7 @@ mod utils;
 pub mod trrel_binary_ind;
 #[doc(hidden)]
 pub mod binary_rel;
+#[cfg(feature = "par")]
 #[doc(hidden)]
 pub mod ceqrel_ind;
 pub mod trrel_union_find;

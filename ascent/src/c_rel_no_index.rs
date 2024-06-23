@@ -2,7 +2,7 @@ use instant::Instant;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::internal::{RelIndexWrite, CRelIndexWrite, RelIndexMerge, Freezable};
-use crate::rel_index_read::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
+use crate::internal::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
 use dashmap::RwLock;
 
 pub struct CRelNoIndex<V> {
