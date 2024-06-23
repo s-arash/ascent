@@ -82,21 +82,21 @@ pub struct TypeSignature {
    #[call(Attribute::parse_outer)]
    pub attrs: Vec<Attribute>,
    pub visibility: Visibility,
-   pub struct_kw: Token![struct],
+   pub _struct_kw: Token![struct],
    pub ident: Ident,
    #[call(parse_generics_with_where_clause)]
    pub generics: Generics,
-   pub semi: Token![;]
+   pub _semi: Token![;]
 }
 
 #[derive(Clone, Parse, Debug)]
 pub struct ImplSignature {
-   pub impl_kw: Token![impl],
+   pub _impl_kw: Token![impl],
    pub impl_generics: Generics,
    pub ident: Ident,
    #[call(parse_generics_with_where_clause)]
    pub generics: Generics,
-   pub semi: Token![;]
+   pub _semi: Token![;]
 }
 
 /// Parse impl on Generics does not parse WhereClauses, hence this function
@@ -114,7 +114,7 @@ pub struct RelationNode{
    pub name: Ident,
    pub field_types : Punctuated<Type, Token![,]>,
    pub initialization: Option<Expr>,
-   pub semi_colon: Token![;],
+   pub _semi_colon: Token![;],
    pub is_lattice: bool,
 }
 impl Parse for RelationNode {
@@ -130,11 +130,11 @@ impl Parse for RelationNode {
          Some(input.parse::<Expr>()?)
       } else {None};
 
-      let semi_colon = input.parse::<Token![;]>()?;
+      let _semi_colon = input.parse::<Token![;]>()?;
       if is_lattice && field_types.empty_or_trailing() {
          return Err(input.error("empty lattice is not allowed"));
       }
-      Ok(RelationNode{attrs: vec![], name, field_types, semi_colon, is_lattice, initialization})
+      Ok(RelationNode{attrs: vec![], name, field_types, _semi_colon, is_lattice, initialization})
    }
 }
 
@@ -188,7 +188,7 @@ pub struct GeneratorNode {
    pub for_keyword: Token![for],
    #[call(Pat::parse_multi)]
    pub pattern: Pat,
-   pub in_keyword: Token![in],
+   pub _in_keyword: Token![in],
    pub expr: Expr
 }
 
@@ -395,14 +395,14 @@ pub struct AggClauseNode {
    pub agg_kw: kw::agg,
    #[call(Pat::parse_multi)]
    pub pat: Pat,
-   pub eq_token: Token![=],
+   pub _eq_token: Token![=],
    pub aggregator: AggregatorNode,
    #[paren]
-   pub agg_arg_paren: syn::token::Paren,
-   #[inside(agg_arg_paren)]
+   pub _agg_arg_paren: syn::token::Paren,
+   #[inside(_agg_arg_paren)]
    #[call(Punctuated::parse_terminated)]
    pub bound_args: Punctuated<Ident, Token![,]>,
-   pub in_kw: Token![in],
+   pub _in_kw: Token![in],
    pub rel : Ident,
    #[paren]
    _rel_arg_paren: syn::token::Paren,
@@ -504,6 +504,7 @@ pub struct MacroDefParam {
 }
 
 #[derive(Parse)]
+#[allow(unused)]
 pub enum MacroParamKind {
    #[peek(kw::ident, name = "ident")]
    Expr(Ident),

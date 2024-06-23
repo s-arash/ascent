@@ -1,6 +1,8 @@
 name: Rust
 
 on:
+  schedule:
+    - cron: '0 22 * * FRI'
   push:
     branches: [ master, ci, par, byods ]
   pull_request:
