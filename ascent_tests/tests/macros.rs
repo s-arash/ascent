@@ -1,0 +1,47 @@
+mod check {
+   #[cfg_attr(not(feature = "expansion-tests"), ignore)]
+   #[test]
+   pub fn pass() {
+      tryexpand::expand(["tests/macros/check/pass/*.rs"]).and_check().expect_pass();
+   }
+
+   #[cfg_attr(not(feature = "expansion-tests"), ignore)]
+   #[test]
+   fn generic_tc() {
+      tryexpand::expand(["tests/macros/check/pass/generic_tc/*.rs"]).and_check().expect_pass();
+   }
+
+   #[cfg_attr(not(feature = "expansion-tests"), ignore)]
+   #[test]
+   fn lattices() {
+      tryexpand::expand(["tests/macros/check/pass/lattices/*.rs"]).and_check().expect_pass();
+   }
+}
+
+mod run {
+   #[cfg_attr(not(feature = "expansion-tests"), ignore)]
+   #[test]
+   pub fn pass() {
+      tryexpand::expand(["tests/macros/run/pass/*.rs"]).and_run().expect_pass();
+   }
+
+   #[cfg_attr(not(feature = "expansion-tests"), ignore)]
+   #[test]
+   pub fn fail() {
+      // tryexpand::expand(["tests/macros/run/fail/*.rs"]).and_run().expect_fail();
+   }
+}
+
+mod run_tests {
+   #[cfg_attr(not(feature = "expansion-tests"), ignore)]
+   #[test]
+   pub fn pass() {
+      tryexpand::expand(["tests/macros/run_tests/pass/*.rs"]).and_run_tests().expect_pass();
+   }
+
+   #[cfg_attr(not(feature = "expansion-tests"), ignore)]
+   #[test]
+   pub fn fail() {
+      // tryexpand::expand(["tests/macros/run_tests/fail/*.rs"]).and_run_tests().expect_fail();
+   }
+}
