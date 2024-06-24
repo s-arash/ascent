@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 
-ascent = {path = "../ascent"}
+ascent = { path = "../ascent", default-features = false }
 stopwatch = "0.0.7"
 bencher = "0.1.5"
 derive_more = "0.99.16"
@@ -24,4 +24,4 @@ name = "benches"
 harness = false
 
 [features]
-par = []
+par = ["ascent/par"]

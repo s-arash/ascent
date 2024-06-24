@@ -7,7 +7,7 @@ use std::hash::{Hash, BuildHasherDefault};
 
 use crate::c_rel_index::{shards_count, DashMapViewParIter};
 use crate::internal::{RelIndexWrite, CRelIndexWrite, RelIndexMerge, Freezable};
-use crate::rel_index_read::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
+use crate::internal::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
 
 type SetType<T> = HashSet<T>;
 pub enum CLatIndex<K, V> {

@@ -1,5 +1,4 @@
 
-use rayon::prelude::*;
 use rustc_hash::FxHasher;
 
 use crate::internal::*;
@@ -18,27 +17,12 @@ pub trait RelIndexRead<'a>{
    fn len(&'a self) -> usize;
 }
 
-pub trait CRelIndexRead<'a>{
-   type Key;
-   type Value;
-   type IteratorType: ParallelIterator<Item = Self::Value> + Clone + 'a;
-   fn c_index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType>;
-}
-
 pub trait RelIndexReadAll<'a>{
    type Key: 'a;
    type Value;
    type ValueIteratorType: Iterator<Item = Self::Value> + 'a;
    type AllIteratorType: Iterator<Item = (Self::Key, Self::ValueIteratorType)> + 'a;
    fn iter_all(&'a self) -> Self::AllIteratorType;
-}
-
-pub trait CRelIndexReadAll<'a>{
-   type Key: 'a;
-   type Value;
-   type ValueIteratorType: ParallelIterator<Item = Self::Value> + 'a;
-   type AllIteratorType: ParallelIterator<Item = (Self::Key, Self::ValueIteratorType)> + 'a;
-   fn c_iter_all(&'a self) -> Self::AllIteratorType;
 }
 
 impl<'a, K: Eq + std::hash::Hash + 'a, V: Clone + 'a> RelIndexRead<'a> for RelIndexType1<K, V> {

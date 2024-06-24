@@ -4,6 +4,7 @@ use std::iter::{FlatMap, Repeat, Zip};
 
 use hashbrown::hash_set::Iter as HashSetIter;
 
+#[cfg(feature = "par")]
 use ascent::rayon::prelude::{ParallelIterator, IntoParallelRefIterator};
 use rustc_hash::FxHasher;
 
@@ -31,7 +32,10 @@ pub type IterAllIterator<'a, T> = FlatMap<
    >,
    fn(&HashSet<T, BuildHasherDefault<FxHasher>>,) -> FlatMap<Zip<HashSetIter<T>, Repeat<HashSetIter<T>>>,Zip<HashSetIter<T>, Repeat<&T>>,for<'aa> fn((&'aa T, HashSetIter<'aa, T>)) -> Zip<HashSetIter<'aa, T>, Repeat<&'aa T>>,>,>;
 
+
+#[cfg(feature = "par")]
 pub struct IterAllParIterator<'a, T: Clone + Hash + Eq>(&'a EqRel<T>);
+#[cfg(feature = "par")]
 impl<'a, T: Clone + Hash + Eq + Sync> ParallelIterator for IterAllParIterator<'a, T> {
    type Item = (&'a T, &'a T);
 
@@ -111,6 +115,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
       res
    }
 
+   #[cfg(feature = "par")]
    pub fn c_set_of(&self, x: &T) -> Option<&'_ hashbrown::hash_set::HashSet<T, BuildHasherDefault<FxHasher>>> where T: Sync{
       let set = self.elem_set(x)?;
       let res = Some(&self.sets[set]);
@@ -133,6 +138,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
       res
    }
 
+   #[cfg(feature = "par")]
    pub fn c_iter_all<'a>(&'a self) -> IterAllParIterator<'a, T> where T: Sync 
    {
       IterAllParIterator(self)
