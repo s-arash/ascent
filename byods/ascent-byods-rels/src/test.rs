@@ -1,7 +1,6 @@
 #![cfg(test)]
 
-#[allow(unused_imports)]
-use ascent::{ascent, ascent_run, ascent_par};
+use ascent::{ascent, ascent_run};
 use itertools::Itertools;
 
 #[test]

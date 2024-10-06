@@ -6,6 +6,7 @@ use std::time::Duration;
 use std::hash::{BuildHasherDefault, Hash};
 use std::collections::{HashMap, HashSet};
 
+use cfg_if::cfg_if;
 pub use instant::Instant;
 
 use ascent_base::Lattice;
@@ -14,9 +15,6 @@ use rustc_hash::FxHasher;
 pub use crate::rel_index_read::RelIndexCombined;
 pub use crate::rel_index_read::RelIndexRead;
 pub use crate::rel_index_read::RelIndexReadAll;
-
-pub use crate::rel_index_read::CRelIndexRead;
-pub use crate::rel_index_read::CRelIndexReadAll;
 
 pub type RelIndexType<K> = RelIndexType1<K, usize>;
 
@@ -27,16 +25,24 @@ pub type RelFullIndexType<K, V> = HashBrownRelFullIndexType<K, V>;
 
 pub type RelNoIndexType = Vec<usize>;
 
-pub use crate::c_rel_index::CRelIndex;
-pub use crate::c_rel_full_index::CRelFullIndex;
-pub use crate::c_lat_index::CLatIndex;
-pub use crate::c_rel_no_index::CRelNoIndex;
-pub use crate::c_rel_index::DashMapViewParIter;
+cfg_if! {
+   if #[cfg(feature = "par")] {
+      pub use crate::c_rel_index_read::CRelIndexRead;
+      pub use crate::c_rel_index_read::CRelIndexReadAll;
+
+      pub use crate::c_rel_index::shards_count;
+
+      pub use crate::c_rel_index::CRelIndex;
+      pub use crate::c_rel_full_index::CRelFullIndex;
+      pub use crate::c_lat_index::CLatIndex;
+      pub use crate::c_rel_no_index::CRelNoIndex;
+      pub use crate::c_rel_index::DashMapViewParIter;
+   }
+}
 
 pub use crate::to_rel_index::{ToRelIndex0, ToRelIndex};
 pub use crate::tuple_of_borrowed::TupleOfBorrowed;
 
-pub use crate::c_rel_index::shards_count;
 
 pub trait Freezable {
    fn freeze(&mut self) { }

@@ -6,7 +6,7 @@ use std::hash::{Hash, BuildHasherDefault};
 
 use crate::c_rel_index::{DashMapViewParIter, shards_count};
 use crate::internal::{RelIndexWrite, CRelIndexWrite, RelFullIndexRead, RelFullIndexWrite, CRelFullIndexWrite, RelIndexMerge, Freezable};
-use crate::rel_index_read::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
+use crate::internal::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
 
 
 pub enum CRelFullIndex<K, V> {

@@ -1,4 +1,6 @@
-use crate::rel_index_read::{CRelIndexRead, RelIndexCombined, CRelIndexReadAll};
+use crate::rel_index_read::RelIndexCombined;
+use crate::internal::{CRelIndexRead, CRelIndexReadAll};
+
 use rayon::prelude::*;
 
 impl <'a, Ind1, Ind2, K, V> CRelIndexRead<'a> for RelIndexCombined<'a, Ind1, Ind2> 
