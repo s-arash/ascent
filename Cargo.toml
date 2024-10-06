@@ -4,9 +4,9 @@ exclude = ["ascent_tests", "wasm-tests"]
 resolver = "2"
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0-alpha"
 
 [workspace.dependencies]
-ascent = { path = "./ascent", default-features = false, version = "0.6.0" }
-ascent_macro = { path = "./ascent_macro", version = "0.6.0" }
-ascent_base = { path = "./ascent_base", version = "0.6.0" }
+ascent = { path = "./ascent", default-features = false, version = "0.7.0-alpha" }
+ascent_macro = { path = "./ascent_macro", version = "0.7.0-alpha" }
+ascent_base = { path = "./ascent_base", version = "0.7.0-alpha" }

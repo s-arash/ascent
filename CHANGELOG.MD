@@ -1,3 +1,8 @@
+## 0.7.0
+
+- Fixed unsoundness in `util::update` (#41)
+- Moved `ascent_par!` and required dependencies behind Cargo feature `par` (enabled by default)
+
 ## 0.6.0
 
 - BYODS (Bring Your Own Data Structures to Datalog): this version allows relations in Ascent programs to
