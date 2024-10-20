@@ -7,7 +7,7 @@ pub mod ord_lattice;
 pub mod bounded_set;
 pub use product::Product;
 pub mod tuple;
-use std::cmp::Ordering;
+use std::cmp::{Ordering, Reverse};
 use std::sync::Arc;
 use std::rc::Rc;
 mod dual;
@@ -130,7 +130,7 @@ impl<T: Lattice> Lattice for Option<T> {
    }
 }
 
-impl<T: BoundedLattice + Eq> BoundedLattice for Option<T> where Option<T> : Lattice {
+impl<T: BoundedLattice> BoundedLattice for Option<T> {
    #[inline]
    fn bottom() -> Self { None }
    #[inline]
@@ -202,6 +202,28 @@ impl<T: Lattice + Sized> Lattice for Box<T> {
    fn join_mut(&mut self, other: Self) -> bool {
       self.as_mut().join_mut(*other)
    }
+}
+
+impl<T: Lattice> Lattice for Reverse<T> {
+   #[inline]
+   fn meet(self, other: Self) -> Self { Reverse(self.0.join(other.0)) }
+
+   #[inline]
+   fn join(self, other: Self) -> Self { Reverse(self.0.meet(other.0)) }
+
+   #[inline]
+   fn meet_mut(&mut self, other: Self) -> bool { self.0.join_mut(other.0) }
+
+   #[inline]
+   fn join_mut(&mut self, other: Self) -> bool { self.0.meet_mut(other.0) }
+}
+
+impl<T: BoundedLattice> BoundedLattice for Reverse<T> {
+   #[inline]
+   fn bottom() -> Self { Reverse(T::top()) }
+
+   #[inline]
+   fn top() -> Self { Reverse(T::bottom()) }
 }
 
 #[cfg(test)]

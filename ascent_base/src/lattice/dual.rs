@@ -5,6 +5,8 @@ use crate::Lattice;
 use super::BoundedLattice;
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
+// TODO uncomment for a major release
+// #[repr(transparent)]
 /// A wrapper type that swaps (`<=` and `>=`) for `PartialOrd`s, (`meet` and `join`) for `Lattice`s, 
 /// and (`top` and `bottom`) for `BoundedLattice`s.
 /// 
@@ -41,21 +43,24 @@ impl<T> Ord for Dual<T> where T: Ord {
    fn cmp(&self, other: &Self) -> Ordering { other.0.cmp(&self.0) }
 }
 
-impl<T> Lattice for Dual<T> where T: Lattice{
+impl<T: Lattice> Lattice for Dual<T> {
+   #[inline]
    fn meet(self, other: Self) -> Self { Dual(self.0.join(other.0)) }
+
+   #[inline]
    fn join(self, other: Self) -> Self { Dual(self.0.meet(other.0)) }
+   
+   #[inline]
+   fn meet_mut(&mut self, other: Self) -> bool { self.0.join_mut(other.0) }
 
-   fn meet_mut(&mut self, other: Self) -> bool {
-      self.0.join_mut(other.0)
-   }
-
-   fn join_mut(&mut self, other: Self) -> bool {
-      self.0.meet_mut(other.0)
-   }
+   #[inline]
+   fn join_mut(&mut self, other: Self) -> bool { self.0.meet_mut(other.0) }
 }
 
-
-impl<T> BoundedLattice for Dual<T> where T: BoundedLattice, Dual<T>: Lattice{
+impl<T: BoundedLattice> BoundedLattice for Dual<T> {
+   #[inline]
    fn top() -> Self { Dual(T::bottom()) }
+
+   #[inline]
    fn bottom() -> Self { Dual(T::top()) }
 }
