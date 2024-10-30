@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use super::{BoundedLattice, Lattice};
 
 /// A flat `Lattice`: `Bottom` <= everything <= `Top`, and `Constant(x) == Constant(y)` iff `x == y`
-#[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
 #[allow(dead_code)]
 pub enum ConstPropagation<T> {
    Bottom,
