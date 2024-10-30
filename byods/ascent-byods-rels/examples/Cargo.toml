@@ -12,7 +12,7 @@ autobins = false
 [dependencies]
 ascent = { path = "../../../ascent" }
 ascent-byods-rels = { path = ".." }
-itertools = "0.12"
+itertools = "0.13"
 serde = "1.0"
 csv = "1.0"
 separator = "0.4.1"
