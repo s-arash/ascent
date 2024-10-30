@@ -7,7 +7,7 @@ use crate::Lattice;
 /// `BoundedSet` is a generalization of the flat lattice.
 ///
 /// A `BoundedSet` stores at most `BOUND` items, and if asked to store more, will go to `TOP`.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct BoundedSet<const BOUND: usize, T: PartialEq + Eq + Hash + Ord>(Option<Set<T>>);
 
 impl<const BOUND: usize, T: PartialEq + Eq + Hash + Ord> Default for BoundedSet<BOUND, T> {
