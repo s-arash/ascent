@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
+use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 use std::ops::Deref;
 
@@ -20,6 +21,10 @@ impl<T: PartialEq + Eq + Hash + Ord> Set<T> {
 
 impl<T: PartialEq + Eq + Hash + Ord> Default for Set<T> {
    fn default() -> Self { Self(Default::default()) }
+}
+
+impl<T: PartialEq + Eq + Hash + Ord + Debug> Debug for Set<T> {
+   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.0.fmt(f) }
 }
 
 impl<T: PartialEq + Eq + Hash + Ord> Deref for Set<T> {
