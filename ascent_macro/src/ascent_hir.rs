@@ -57,6 +57,7 @@ impl AscentConfig {
       ];
       for attr in attrs.iter() {
          if !recognized_attrs.iter().any(|recognized_attr| attr.meta.path().is_ident(recognized_attr)) {
+            let recognized_attrs: Vec<_> = recognized_attrs.iter().map(|attr| format!("`{attr}`")).collect();
             return Err(Error::new_spanned(
                attr,
                format!("unrecognized attribute. recognized attributes are: {}", recognized_attrs.join(", ")),
@@ -325,7 +326,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             // TODO may someday this will work
             let other_var = grounded_vars.iter().find(|&x| x == &v).unwrap();
             let other_err = Error::new(other_var.span(), "variable being shadowed");
-            let mut err = Error::new(v.span(), format!("'{}' shadows another variable with the same name", v));
+            let mut err = Error::new(v.span(), format!("`{}` shadows another variable with the same name", v));
             err.combine(other_err);
             return Err(err);
          }
@@ -446,7 +447,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
       let rel = prog.relations.iter().find(|r| hcl_node.rel == r.name);
       let rel = match rel {
          Some(rel) => rel,
-         None => return Err(Error::new(hcl_node.rel.span(), format!("relation {} not defined", hcl_node.rel))),
+         None => return Err(Error::new(hcl_node.rel.span(), format!("relation `{}` is not defined", hcl_node.rel))),
       };
 
       let rel = RelationIdentity::from(rel);
@@ -514,11 +515,15 @@ pub(crate) fn prog_get_relation<'a>(
          if rel.field_types.len() != arity {
             Err(Error::new(
                name.span(),
-               format!("Wrong arity for relation {}. Actual arity: {}", name, rel.field_types.len()),
+               format!(
+                  "wrong arity for relation `{name}` (expected {expected}, found {actual})",
+                  expected = arity,
+                  actual = rel.field_types.len()
+               ),
             ))
          } else {
             Ok(rel)
          },
-      None => Err(Error::new(name.span(), format!("Relation {} not defined", name))),
+      None => Err(Error::new(name.span(), format!("relation `{}` is not defined", name))),
    }
 }
