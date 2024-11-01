@@ -278,7 +278,7 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir> {
                if dynamic_relations.contains_key(&agg.rel.relation) {
                   return Err(syn::Error::new(
                      agg.span,
-                     format!("use of aggregated relation {} cannot be stratified", &agg.rel.relation.name),
+                     format!("use of aggregated relation `{}` cannot be stratified", &agg.rel.relation.name),
                   ));
                }
             }
