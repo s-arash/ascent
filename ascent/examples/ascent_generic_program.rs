@@ -10,7 +10,27 @@ use ascent::ascent;
 pub struct Node(&'static str);
 
 ascent! {
-    struct AscentProgram<N> where N: Clone + Eq + Hash;
+    struct AscentProgram<N: Clone + Eq + Hash>;
+
+    // Or alternatively (and with the same semantics!):
+    // struct AscentProgram<N> where N: Clone + Eq + Hash;
+
+    // If you want to keep the trait bounds out of the program's
+    // type signature and limit them to its `impl` blocks,
+    // you could alternatively specify the program's type like this:
+    //
+    // struct AscentProgram<N>;
+    // impl<N> AscentProgram<N: Clone + Eq + Hash>;
+    //
+    // Or alternatively (and with the same semantics!):
+    //
+    // struct AscentProgram<N>;
+    // impl<N> AscentProgram<N> where N: Clone + Eq + Hash;
+
+    // Where desirable you could even do a mix of both:
+    //
+    // struct AscentProgram<N: Eq + Hash>;
+    // impl<N> AscentProgram<N: Clone + Eq + Hash>;
 
     // Facts:
 
