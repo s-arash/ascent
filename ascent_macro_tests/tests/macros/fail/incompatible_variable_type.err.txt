@@ -1,0 +1,9 @@
+error[E0277]: the trait bound `String: Convert<&usize>` is not satisfied
+  --> /tests/macros/fail/incompatible_variable_type.rs:11:10
+   |
+11 |     rule(x) <-- fact(x);
+   |          ^ the trait `Convert<&usize>` is not implemented for `String`
+   |
+   = help: the trait `Convert<&str>` is implemented for `String`
+
+For more information about this error, try `rustc --explain E0277`.

@@ -1,0 +1,17 @@
+error[E0308]: mismatched types
+  --> /tests/macros/fail/invalid_rule_head_arity_too_many.rs:11:10
+   |
+5  | / ascent! {
+6  | |     relation fact(usize);
+7  | |
+8  | |     relation rule(usize, usize);
+...  |
+11 | |     rule(x, x, x) <-- fact(x);
+   | |          ^ expected a tuple with 2 elements, found one with 3 elements
+12 | | }
+   | |_- expected due to this
+   |
+   = note: expected tuple `(usize, usize)`
+              found tuple `(usize, usize, _)`
+
+For more information about this error, try `rustc --explain E0308`.
