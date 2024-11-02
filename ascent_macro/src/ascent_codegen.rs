@@ -326,7 +326,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       res
    } else {
       quote! {
-         {
+         {{
             #![allow(clippy::all)]
             #res
             let mut __run_res: #struct_name #ty_ty_generics = #struct_name::default();
@@ -336,7 +336,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
                #run_code
             }
             __run_res
-         }
+         }}
       }
    }
 }
