@@ -1,8 +1,8 @@
-use std::hash::{Hash, BuildHasherDefault};
+use std::hash::{BuildHasherDefault, Hash};
 
 use ascent::internal::{RelIndexRead, RelIndexReadAll};
-use hashbrown::hash_map::Iter;
 use hashbrown::HashMap;
+use hashbrown::hash_map::Iter;
 use rustc_hash::FxHasher;
 
 pub type MyHashSetIter<'a, T> = hashbrown::hash_set::Iter<'a, T>;
@@ -17,17 +17,11 @@ pub struct BinaryRel<T: Clone + Hash + Eq> {
    pub(crate) reverse_map: RevMap<T>,
 }
 
-impl<T: Clone + Hash + Eq > Default for BinaryRel<T> {
-   fn default() -> Self {
-      Self { 
-         map: Default::default(), 
-         reverse_map: Default::default(), 
-      }
-   }
+impl<T: Clone + Hash + Eq> Default for BinaryRel<T> {
+   fn default() -> Self { Self { map: Default::default(), reverse_map: Default::default() } }
 }
 
 impl<T: Clone + Hash + Eq> BinaryRel<T> {
-
    /// returns true if this tuple did not exist in the binary relation
    pub fn insert(&mut self, x: T, y: T) -> bool {
       if self.map.entry(x.clone()).or_default().insert(y.clone()) {
@@ -41,9 +35,7 @@ impl<T: Clone + Hash + Eq> BinaryRel<T> {
    /// returns true if this tuple did not exist in the binary relation
    pub fn insert_by_ref(&mut self, x: &T, y: &T) -> bool {
       let added = match self.map.raw_entry_mut().from_key(x) {
-         hashbrown::hash_map::RawEntryMut::Occupied(mut occ) => {
-            occ.get_mut().insert(y.clone())
-         },
+         hashbrown::hash_map::RawEntryMut::Occupied(mut occ) => occ.get_mut().insert(y.clone()),
          hashbrown::hash_map::RawEntryMut::Vacant(vac) => {
             vac.insert(x.clone(), MyHashSet::from_iter([y.clone()]));
             true
@@ -51,8 +43,12 @@ impl<T: Clone + Hash + Eq> BinaryRel<T> {
       };
       if added {
          match self.reverse_map.raw_entry_mut().from_key(y) {
-            hashbrown::hash_map::RawEntryMut::Occupied(mut occ) => {occ.get_mut().push(x.clone());},
-            hashbrown::hash_map::RawEntryMut::Vacant(vac) => {vac.insert(y.clone(), vec![x.clone()]);},
+            hashbrown::hash_map::RawEntryMut::Occupied(mut occ) => {
+               occ.get_mut().push(x.clone());
+            },
+            hashbrown::hash_map::RawEntryMut::Vacant(vac) => {
+               vac.insert(y.clone(), vec![x.clone()]);
+            },
          };
          true
       } else {
@@ -71,9 +67,7 @@ impl<T: Clone + Hash + Eq> BinaryRel<T> {
    }
 
    #[inline]
-   pub fn contains(&self, x: &T, y: &T) -> bool {
-      self.map.get(x).map_or(false, |s| s.contains(y))
-   }
+   pub fn contains(&self, x: &T, y: &T) -> bool { self.map.get(x).map_or(false, |s| s.contains(y)) }
 
    pub fn count_estimate(&self) -> usize {
       let sample_size = 3;
@@ -81,12 +75,12 @@ impl<T: Clone + Hash + Eq> BinaryRel<T> {
       sum * self.map.len() / sample_size.min(self.map.len()).max(1)
    }
 
-   pub fn count_exact(&self) -> usize {
-      self.map.values().map(|x| x.len()).sum()
-   }
+   pub fn count_exact(&self) -> usize { self.map.values().map(|x| x.len()).sum() }
 }
 
-pub struct MapRelIndexAdaptor<'a, T: Clone + Hash + Eq>(pub &'a HashMap<T, MyHashSet<T, BuildHasherDefault<FxHasher>>, BuildHasherDefault<FxHasher>>);
+pub struct MapRelIndexAdaptor<'a, T: Clone + Hash + Eq>(
+   pub &'a HashMap<T, MyHashSet<T, BuildHasherDefault<FxHasher>>, BuildHasherDefault<FxHasher>>,
+);
 
 impl<'a, T: Clone + Hash + Eq + 'a> RelIndexReadAll<'a> for MapRelIndexAdaptor<'a, T> {
    type Key = &'a T;
@@ -95,7 +89,10 @@ impl<'a, T: Clone + Hash + Eq + 'a> RelIndexReadAll<'a> for MapRelIndexAdaptor<'
 
    type ValueIteratorType = MyHashSetIter<'a, T>;
 
-   type AllIteratorType = std::iter::Map<Iter<'a, T, MyHashSet<T, BuildHasherDefault<FxHasher>>>, for<'aa> fn((&'aa T, &'a MyHashSet<T, BuildHasherDefault<FxHasher>>)) -> (&'aa T, Self::ValueIteratorType)>;
+   type AllIteratorType = std::iter::Map<
+      Iter<'a, T, MyHashSet<T, BuildHasherDefault<FxHasher>>>,
+      for<'aa> fn((&'aa T, &'a MyHashSet<T, BuildHasherDefault<FxHasher>>)) -> (&'aa T, Self::ValueIteratorType),
+   >;
 
    fn iter_all(&'a self) -> Self::AllIteratorType {
       let res: Self::AllIteratorType = self.0.iter().map(|(k, v)| {
@@ -119,47 +116,55 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for MapRelIndexAdaptor<'a, T> {
       Some(res)
    }
 
-   fn len(&'a self) -> usize {
-      self.0.len()
-   }
+   fn len(&'a self) -> usize { self.0.len() }
 }
 
-pub struct RelIndexValTransformer<T, F>{
+pub struct RelIndexValTransformer<T, F> {
    rel: T,
-   f: F
+   f: F,
 }
 
 impl<'a, T: 'a, F: 'a, V: 'a, U: 'a> RelIndexRead<'a> for RelIndexValTransformer<T, F>
-where T: RelIndexRead<'a, Value = V>, F: Fn(V) -> U
+where
+   T: RelIndexRead<'a, Value = V>,
+   F: Fn(V) -> U,
 {
    type Key = T::Key;
    type Value = U;
 
-   type IteratorType = std::iter::Map<std::iter::Zip<T::IteratorType, std::iter::Repeat<&'a RelIndexValTransformer<T, F>>>, for <'aa> fn((V, &'aa RelIndexValTransformer<T, F>)) -> U>;
+   type IteratorType = std::iter::Map<
+      std::iter::Zip<T::IteratorType, std::iter::Repeat<&'a RelIndexValTransformer<T, F>>>,
+      for<'aa> fn((V, &'aa RelIndexValTransformer<T, F>)) -> U,
+   >;
 
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType> {
-      let res: Self::IteratorType = self.rel.index_get(key)?.zip(std::iter::repeat(self)).map(|(x, _self)| (_self.f)(x));
+      let res: Self::IteratorType =
+         self.rel.index_get(key)?.zip(std::iter::repeat(self)).map(|(x, _self)| (_self.f)(x));
       Some(res)
    }
 
-   fn len(&'a self) -> usize {
-      self.rel.len()
-   }
+   fn len(&'a self) -> usize { self.rel.len() }
 }
 
 impl<'a, T: 'a, F: 'a, V: 'a, U: 'a> RelIndexReadAll<'a> for RelIndexValTransformer<T, F>
-where T: RelIndexReadAll<'a, Value = V>, F: Fn(V) -> U
+where
+   T: RelIndexReadAll<'a, Value = V>,
+   F: Fn(V) -> U,
 {
    type Key = T::Key;
    type Value = U;
 
-   type ValueIteratorType = std::iter::Map<std::iter::Zip<T::ValueIteratorType, std::iter::Repeat<&'a RelIndexValTransformer<T, F>>>, for <'aa> fn((V, &'aa RelIndexValTransformer<T, F>)) -> U>;
+   type ValueIteratorType = std::iter::Map<
+      std::iter::Zip<T::ValueIteratorType, std::iter::Repeat<&'a RelIndexValTransformer<T, F>>>,
+      for<'aa> fn((V, &'aa RelIndexValTransformer<T, F>)) -> U,
+   >;
 
    type AllIteratorType = Box<dyn Iterator<Item = (Self::Key, Self::ValueIteratorType)> + 'a>;
 
    fn iter_all(&'a self) -> Self::AllIteratorType {
       let res = self.rel.iter_all().map(move |(k, vals_iter)| {
-         let new_vals_iter: Self::ValueIteratorType = vals_iter.zip(std::iter::repeat(self)).map(|(x, _self)| (_self.f)(x));
+         let new_vals_iter: Self::ValueIteratorType =
+            vals_iter.zip(std::iter::repeat(self)).map(|(x, _self)| (_self.f)(x));
          (k, new_vals_iter)
       });
 

@@ -8,8 +8,8 @@ pub mod bounded_set;
 pub use product::Product;
 pub mod tuple;
 use std::cmp::{Ordering, Reverse};
-use std::sync::Arc;
 use std::rc::Rc;
+use std::sync::Arc;
 mod dual;
 pub use dual::Dual;
 
@@ -20,7 +20,7 @@ pub trait Lattice: PartialOrd + Sized {
    /// Returns true if `self` was changed.
    fn meet_mut(&mut self, other: Self) -> bool;
 
-   /// ensures `self` is the meet of `self` and `other`. 
+   /// ensures `self` is the meet of `self` and `other`.
    ///
    /// Returns true if `self` was changed.
    fn join_mut(&mut self, other: Self) -> bool;
@@ -31,7 +31,7 @@ pub trait Lattice: PartialOrd + Sized {
       self.meet_mut(other);
       self
    }
-   
+
    /// The least upper bound of two elements. `join(x, y)` is the smallest value `z`
    /// s.t. `z >= x` and `z >= y`.
    fn join(mut self, other: Self) -> Self {
@@ -41,7 +41,7 @@ pub trait Lattice: PartialOrd + Sized {
 }
 
 pub trait BoundedLattice: Lattice {
-   fn bottom() -> Self;   
+   fn bottom() -> Self;
    fn top() -> Self;
 }
 
@@ -56,7 +56,7 @@ macro_rules! ord_lattice_impl {
             }
             changed
          }
-         
+
          fn join_mut(&mut self, other: Self) -> bool {
             #[allow(clippy::neg_cmp_op_on_partial_ord)]
             let changed = !(*self >= other);
@@ -65,7 +65,7 @@ macro_rules! ord_lattice_impl {
             }
             changed
          }
-      }     
+      }
    };
 }
 
@@ -105,27 +105,23 @@ num_lattice_impl!(usize);
 impl<T: Lattice> Lattice for Option<T> {
    fn meet_mut(&mut self, other: Self) -> bool {
       match (self, other) {
-         (Some(x), Some(y)) => {
-            x.meet_mut(y)
-         },
+         (Some(x), Some(y)) => x.meet_mut(y),
          (this @ Some(_), None) => {
             *this = None;
             true
          },
-         (None, _) => false
+         (None, _) => false,
       }
    }
 
    fn join_mut(&mut self, other: Self) -> bool {
       match (self, other) {
-         (Some(x), Some(y)) => {
-            x.join_mut(y)
-         },
+         (Some(x), Some(y)) => x.join_mut(y),
          (this @ None, Some(y)) => {
             *this = Some(y);
             true
-         }
-         (_, None) => false
+         },
+         (_, None) => false,
       }
    }
 }
@@ -137,7 +133,6 @@ impl<T: BoundedLattice> BoundedLattice for Option<T> {
    fn top() -> Self { Some(T::top()) }
 }
 
-
 impl<T: Lattice + Clone> Lattice for Rc<T> {
    fn meet_mut(&mut self, other: Self) -> bool {
       match self.as_ref().partial_cmp(&other) {
@@ -145,10 +140,10 @@ impl<T: Lattice + Clone> Lattice for Rc<T> {
          Some(Ordering::Greater) => {
             *self = other;
             true
-         }
+         },
          // Stable in 1.76:
          // None => Rc::make_mut(self).meet_mut(Rc::unwrap_or_clone(other))
-         None => Rc::make_mut(self).meet_mut(Rc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone()))
+         None => Rc::make_mut(self).meet_mut(Rc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
       }
    }
 
@@ -161,7 +156,7 @@ impl<T: Lattice + Clone> Lattice for Rc<T> {
          },
          // Stable in 1.76:
          // None => Rc::make_mut(self).join_mut(Rc::unwrap_or_clone(other))
-         None => Rc::make_mut(self).join_mut(Rc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone()))
+         None => Rc::make_mut(self).join_mut(Rc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
       }
    }
 }
@@ -173,10 +168,10 @@ impl<T: Lattice + Clone> Lattice for Arc<T> {
          Some(Ordering::Greater) => {
             *self = other;
             true
-         }
+         },
          // Stable in 1.76:
          // None => Arc::make_mut(self).meet_mut(Arc::unwrap_or_clone(other))
-         None => Arc::make_mut(self).meet_mut(Arc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone()))
+         None => Arc::make_mut(self).meet_mut(Arc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
       }
    }
 
@@ -189,19 +184,15 @@ impl<T: Lattice + Clone> Lattice for Arc<T> {
          },
          // Stable in 1.76:
          // None => Arc::make_mut(self).join_mut(Arc::unwrap_or_clone(other))
-         None => Arc::make_mut(self).join_mut(Arc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone()))
+         None => Arc::make_mut(self).join_mut(Arc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
       }
    }
 }
 
 impl<T: Lattice + Sized> Lattice for Box<T> {
-   fn meet_mut(&mut self, other: Self) -> bool {
-      self.as_mut().meet_mut(*other)
-   }
-   
-   fn join_mut(&mut self, other: Self) -> bool {
-      self.as_mut().join_mut(*other)
-   }
+   fn meet_mut(&mut self, other: Self) -> bool { self.as_mut().meet_mut(*other) }
+
+   fn join_mut(&mut self, other: Self) -> bool { self.as_mut().join_mut(*other) }
 }
 
 impl<T: Lattice> Lattice for Reverse<T> {

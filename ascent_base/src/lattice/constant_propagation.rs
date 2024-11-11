@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
-use super::{BoundedLattice, Lattice};
 
+use super::{BoundedLattice, Lattice};
 
 /// A flat `Lattice`: `Bottom` <= everything <= `Top`, and `Constant(x) == Constant(y)` iff `x == y`
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
@@ -18,7 +18,12 @@ impl<T: PartialEq> PartialOrd for ConstPropagation<T> {
          (Bottom, Bottom) => Some(Ordering::Equal),
          (Bottom, _) => Some(Ordering::Less),
          (Constant(_x), Bottom) => Some(Ordering::Greater),
-         (Constant(x), Constant(y)) => if x == y {Some(Ordering::Equal)} else {None},
+         (Constant(x), Constant(y)) =>
+            if x == y {
+               Some(Ordering::Equal)
+            } else {
+               None
+            },
          (Constant(_), Top) => Some(Ordering::Less),
          (Top, Top) => Some(Ordering::Equal),
          (Top, _) => Some(Ordering::Greater),
@@ -32,7 +37,12 @@ impl<T: PartialEq> Lattice for ConstPropagation<T> {
       match (self, other) {
          (Bottom, _) => Self::Bottom,
          (Constant(_x), Bottom) => Self::Bottom,
-         (Constant(x), Constant(y)) => if x == y {Constant(x)} else {Self::Bottom},
+         (Constant(x), Constant(y)) =>
+            if x == y {
+               Constant(x)
+            } else {
+               Self::Bottom
+            },
          (Constant(x), Top) => Constant(x),
          (Top, other) => other,
       }
@@ -43,12 +53,17 @@ impl<T: PartialEq> Lattice for ConstPropagation<T> {
       match (self, other) {
          (Bottom, other) => other,
          (Constant(x), Bottom) => Constant(x),
-         (Constant(x), Constant(y)) => if x == y {Constant(x)} else {Self::Top},
+         (Constant(x), Constant(y)) =>
+            if x == y {
+               Constant(x)
+            } else {
+               Self::Top
+            },
          (Constant(_x), Top) => Top,
          (Top, _) => Top,
       }
    }
-   
+
    fn meet_mut(&mut self, other: Self) -> bool {
       use ConstPropagation::*;
       match (self, other) {
@@ -61,11 +76,11 @@ impl<T: PartialEq> Lattice for ConstPropagation<T> {
          (_, Top) => false,
          (this @ Top, other) => {
             *this = other;
-            true 
+            true
          },
       }
    }
-   
+
    fn join_mut(&mut self, other: Self) -> bool {
       use ConstPropagation::*;
       match (self, other) {
@@ -84,13 +99,15 @@ impl<T: PartialEq> Lattice for ConstPropagation<T> {
    }
 }
 
-impl<T: Lattice> BoundedLattice for ConstPropagation<T> where ConstPropagation<T>: Lattice {
+impl<T: Lattice> BoundedLattice for ConstPropagation<T>
+where ConstPropagation<T>: Lattice
+{
    fn top() -> Self { Self::Top }
    fn bottom() -> Self { Self::Bottom }
 }
 
 #[test]
-fn test_constant_propagation(){
+fn test_constant_propagation() {
    let const_1 = ConstPropagation::Constant(1);
    assert!(const_1 > ConstPropagation::Bottom);
    assert!(const_1 < ConstPropagation::Top);
@@ -98,7 +115,7 @@ fn test_constant_propagation(){
 }
 
 #[test]
-fn test_constant_propagation_lattice(){
+fn test_constant_propagation_lattice() {
    let const_1 = ConstPropagation::Constant(1);
 
    let mut x = const_1.clone();

@@ -1,18 +1,21 @@
+use std::collections::HashSet;
+use std::hash::{BuildHasherDefault, Hash};
+
 use ascent_base::util::update;
 use dashmap::{DashMap, SharedValue};
 use instant::Instant;
 use rustc_hash::FxHasher;
-use std::collections::HashSet;
-use std::hash::{Hash, BuildHasherDefault};
 
-use crate::c_rel_index::{shards_count, DashMapViewParIter};
-use crate::internal::{RelIndexWrite, CRelIndexWrite, RelIndexMerge, Freezable};
-use crate::internal::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
+use crate::c_rel_index::{DashMapViewParIter, shards_count};
+use crate::internal::{
+   CRelIndexRead, CRelIndexReadAll, CRelIndexWrite, Freezable, RelIndexMerge, RelIndexRead, RelIndexReadAll,
+   RelIndexWrite,
+};
 
 type SetType<T> = HashSet<T>;
 pub enum CLatIndex<K, V> {
    Unfrozen(DashMap<K, SetType<V>, BuildHasherDefault<FxHasher>>),
-   Frozen(dashmap::ReadOnlyView<K, SetType<V>, BuildHasherDefault<FxHasher>>)
+   Frozen(dashmap::ReadOnlyView<K, SetType<V>, BuildHasherDefault<FxHasher>>),
 }
 
 impl<K: Clone + Hash + Eq, V: Clone + Hash + Eq> Freezable for CLatIndex<K, V> {
@@ -32,7 +35,6 @@ impl<K: Clone + Hash + Eq, V: Clone + Hash + Eq> Freezable for CLatIndex<K, V> {
 }
 
 impl<K: Clone + Hash + Eq, V: Clone + Hash + Eq> CLatIndex<K, V> {
-
    #[inline]
    pub fn unwrap_frozen(&self) -> &dashmap::ReadOnlyView<K, SetType<V>, BuildHasherDefault<FxHasher>> {
       match self {
@@ -67,7 +69,9 @@ impl<K: Clone + Hash + Eq, V: Clone + Hash + Eq> CLatIndex<K, V> {
    #[inline]
    fn insert(&self, key: K, value: V) {
       match self.unwrap_unfrozen().entry(key) {
-         dashmap::mapref::entry::Entry::Occupied(mut occ) => {occ.get_mut().insert(value);},
+         dashmap::mapref::entry::Entry::Occupied(mut occ) => {
+            occ.get_mut().insert(value);
+         },
          dashmap::mapref::entry::Entry::Vacant(vac) => {
             let mut set = SetType::default();
             set.insert(value);
@@ -77,9 +81,7 @@ impl<K: Clone + Hash + Eq, V: Clone + Hash + Eq> CLatIndex<K, V> {
    }
 
    #[inline]
-   pub fn hash_usize(&self, k: &K) -> usize {
-      self.unwrap_unfrozen().hash_usize(k)
-   }
+   pub fn hash_usize(&self, k: &K) -> usize { self.unwrap_unfrozen().hash_usize(k) }
 }
 
 impl<K: Clone + Hash + Eq, V> Default for CLatIndex<K, V> {
@@ -101,9 +103,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone + Hash + Eq> RelIndexRead<'a> 
       Some(res)
    }
 
-   fn len(&self) -> usize {
-      self.unwrap_frozen().len()
-   }
+   fn len(&self) -> usize { self.unwrap_frozen().len() }
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone + Hash + Eq + Sync> CRelIndexRead<'a> for CLatIndex<K, V> {
@@ -118,10 +118,11 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone + Hash + Eq + Sync> CRelIndexR
       let res = vals.par_iter();
       Some(res)
    }
-
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Hash + Eq + Send + Sync> RelIndexWrite for CLatIndex<K, V> {
+impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Hash + Eq + Send + Sync> RelIndexWrite
+   for CLatIndex<K, V>
+{
    type Key = K;
    type Value = V;
 
@@ -133,14 +134,18 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Hash + Eq + Se
 
       let hash = dm.hash_usize(&key);
       let shard = dm.determine_shard(hash);
-      let entry = dm.shards_mut()[shard].get_mut().raw_entry_mut()
+      let entry = dm.shards_mut()[shard]
+         .get_mut()
+         .raw_entry_mut()
          .from_key_hashed_nocheck(hash as u64, &key)
          .or_insert(key, SharedValue::new(Default::default()));
       entry.1.get_mut().insert(value);
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Hash + Eq + Send + Sync> RelIndexMerge for CLatIndex<K, V> {
+impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Hash + Eq + Send + Sync> RelIndexMerge
+   for CLatIndex<K, V>
+{
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
       let from = from.unwrap_mut_unfrozen();
@@ -168,15 +173,15 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Hash + Eq + Se
                   occ.reserve(v.len());
                   occ.extend(&mut v.into_iter());
                },
-               hashbrown::hash_map::Entry::Vacant(vac) => {vac.insert(v);},
+               hashbrown::hash_map::Entry::Vacant(vac) => {
+                  vac.insert(v);
+               },
             }
          }
-      
       });
       unsafe {
          crate::internal::MOVE_REL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
       }
-
    }
 }
 
@@ -194,14 +199,18 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone + Hash + Eq> RelIndexReadAll<'
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: 'a + Clone + Hash + Eq + Sync + Send> CRelIndexReadAll<'a> for CLatIndex<K, V> {
+impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: 'a + Clone + Hash + Eq + Sync + Send> CRelIndexReadAll<'a>
+   for CLatIndex<K, V>
+{
    type Key = &'a K;
    type Value = &'a V;
 
    type ValueIteratorType = rayon::collections::hash_set::Iter<'a, V>;
 
-   type AllIteratorType = 
-      rayon::iter::Map<DashMapViewParIter<'a, K, SetType<V>, BuildHasherDefault<FxHasher>>, for<'aa, 'bb> fn((&'aa K, &'bb SetType<V>)) -> (&'aa K, rayon::collections::hash_set::Iter<'bb, V>)>;
+   type AllIteratorType = rayon::iter::Map<
+      DashMapViewParIter<'a, K, SetType<V>, BuildHasherDefault<FxHasher>>,
+      for<'aa, 'bb> fn((&'aa K, &'bb SetType<V>)) -> (&'aa K, rayon::collections::hash_set::Iter<'bb, V>),
+   >;
 
    fn c_iter_all(&'a self) -> Self::AllIteratorType {
       use rayon::prelude::*;
@@ -209,7 +218,6 @@ impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: 'a + Clone + Hash + Eq + Sy
       res
    }
 }
-
 
 impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone + Hash + Eq> CRelIndexWrite for CLatIndex<K, V> {
    type Key = K;

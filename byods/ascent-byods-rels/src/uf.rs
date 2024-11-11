@@ -13,12 +13,10 @@ use self::elems::{Elems, FindResult, Id};
 /// - `Elem` IDs are determined by their index in the `Vec`
 /// - [`Id`] and `Rank` happen to be integers
 pub mod elems {
-   use std::{
-      cell::Cell,
-      collections::HashSet,
-      fmt::Debug,
-      ops::{Add, Index},
-   };
+   use std::cell::Cell;
+   use std::collections::HashSet;
+   use std::fmt::Debug;
+   use std::ops::{Add, Index};
 
    #[cfg(not(feature = "compact"))]
    type UfPtrType = usize;
@@ -48,9 +46,7 @@ pub mod elems {
    impl Add<UfPtrType> for UfPtr {
       type Output = UfPtr;
 
-      fn add(self, rhs: UfPtrType) -> Self::Output {
-         UfPtr(self.0 + rhs)
-      }
+      fn add(self, rhs: UfPtrType) -> Self::Output { UfPtr(self.0 + rhs) }
    }
 
    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -62,9 +58,7 @@ pub mod elems {
    impl Add<UfPtrType> for Rank {
       type Output = Rank;
 
-      fn add(self, rhs: UfPtrType) -> Self::Output {
-         Rank(self.0 + rhs)
-      }
+      fn add(self, rhs: UfPtrType) -> Self::Output { Rank(self.0 + rhs) }
    }
 
    /// Each field is wrapped in a [`Cell`] so that the union-find can expose
@@ -145,24 +139,17 @@ pub mod elems {
          let parent = unsafe { self.get_unchecked(parent_id) };
          let grandparent_id = parent.parent.get();
          if grandparent_id == parent_id {
-            return FindResult {
-               id: parent_id,
-               elem: parent,
-            };
+            return FindResult { id: parent_id, elem: parent };
          }
          // Path halving
          elem.parent.set(grandparent_id);
          self.find(grandparent_id)
       }
 
-      pub(super) fn get(&self, id: Id) -> Option<&Elem<T>> {
-         self.0.get(id.0.to_usize())
-      }
+      pub(super) fn get(&self, id: Id) -> Option<&Elem<T>> { self.0.get(id.0.to_usize()) }
 
       #[inline]
-      pub(super) fn has(&self, id: Id) -> bool {
-         id.0.to_usize() < self.0.len()
-      }
+      pub(super) fn has(&self, id: Id) -> bool { id.0.to_usize() < self.0.len() }
 
       #[inline]
       pub(super) unsafe fn get_unchecked(&self, id: Id) -> &Elem<T> {
@@ -210,20 +197,14 @@ pub mod elems {
       }
 
       #[inline]
-      pub(super) fn len(&self) -> usize {
-         self.0.len()
-      }
+      pub(super) fn len(&self) -> usize { self.0.len() }
 
       #[inline]
-      fn next(&self) -> Id {
-         Id(UfPtr::from_usize(self.len()))
-      }
+      fn next(&self) -> Id { Id(UfPtr::from_usize(self.len())) }
 
       /// O(1)
       #[allow(dead_code)]
-      pub(super) fn ok_cheap(&self) -> bool {
-         self.len() < UfPtr::MAX.to_usize()
-      }
+      pub(super) fn ok_cheap(&self) -> bool { self.len() < UfPtr::MAX.to_usize() }
 
       /// O(n^2)
       #[allow(dead_code)]
@@ -290,36 +271,25 @@ pub mod elems {
       }
 
       #[inline]
-      pub(super) fn _is_empty(&self) -> bool {
-         self.0.is_empty()
-      }
+      pub(super) fn _is_empty(&self) -> bool { self.0.is_empty() }
 
       pub(super) fn push(&mut self, value: T) -> Id {
          debug_assert!(self.ok_cheap());
          let id = self.next();
-         self.0.push(Elem {
-            next: Cell::new(id),
-            parent: Cell::new(id),
-            rank: Cell::new(Rank(UfPtr(0))),
-            value,
-         });
+         self.0.push(Elem { next: Cell::new(id), parent: Cell::new(id), rank: Cell::new(Rank(UfPtr(0))), value });
          assert!(self.len() < UfPtr::MAX.to_usize());
          id
       }
 
       #[inline]
-      pub(super) fn _with_capacity(cap: usize) -> Self {
-         Self(Vec::with_capacity(cap))
-      }
+      pub(super) fn _with_capacity(cap: usize) -> Self { Self(Vec::with_capacity(cap)) }
    }
 
    impl<T: PartialEq> Index<Id> for Elems<T> {
       type Output = Elem<T>;
 
       #[inline]
-      fn index(&self, index: Id) -> &Self::Output {
-         &self.get(index).unwrap()
-      }
+      fn index(&self, index: Id) -> &Self::Output { &self.get(index).unwrap() }
    }
 
    /// Iterator over a single equivalence class
@@ -336,11 +306,7 @@ pub mod elems {
       }
 
       unsafe fn new_unchecked(elems: &'a Elems<T>, start: Id) -> Self {
-         Class {
-            elems,
-            start,
-            current: elems.get_unchecked(start),
-         }
+         Class { elems, start, current: elems.get_unchecked(start) }
       }
    }
 
@@ -370,13 +336,7 @@ pub mod elems {
    }
 
    impl<'a, T: PartialEq> Classes<'a, T> {
-      fn new(elems: &'a Elems<T>) -> Self {
-         Self {
-            elems,
-            seen: HashSet::new(),
-            iter: elems.0.iter(),
-         }
-      }
+      fn new(elems: &'a Elems<T>) -> Self { Self { elems, seen: HashSet::new(), iter: elems.0.iter() } }
    }
 
    /// Guaranteed to yield the root of each class first in each iterator.
@@ -437,9 +397,7 @@ impl<T: Clone + Hash + Eq> UnionFind<T> {
       self.elems.find(id).id
    }
 
-   pub fn find_item(&self, item: &T) -> Option<Id> {
-      self.find_item_internal(item).map(|r| r.id)
-   }
+   pub fn find_item(&self, item: &T) -> Option<Id> { self.find_item_internal(item).map(|r| r.id) }
 
    fn find_item_internal(&self, item: &T) -> Option<FindResult<T>> {
       match self.items.get(item) {
@@ -450,7 +408,7 @@ impl<T: Clone + Hash + Eq> UnionFind<T> {
             let fr @ FindResult { id: root_id, .. } = unsafe { self.elems.find(id) };
             id_cell.set(root_id);
             Some(fr)
-         }
+         },
       }
    }
 
@@ -467,15 +425,11 @@ impl<T: Clone + Hash + Eq> UnionFind<T> {
    }
 
    /// O(1)
-   fn ok_cheap(&self) -> bool {
-      self.elems.len() == self.items.len()
-   }
+   fn ok_cheap(&self) -> bool { self.elems.len() == self.items.len() }
 
    /// O(n^2)
    #[allow(dead_code)]
-   fn ok(&self) -> bool {
-      self.ok_cheap() && self.elems.ok()
-   }
+   fn ok(&self) -> bool { self.ok_cheap() && self.elems.ok() }
 
    fn push(&mut self, item: T) -> Id {
       debug_assert!(self.ok_cheap()); // invariant
@@ -532,10 +486,8 @@ impl<T: Clone + Hash + Eq> UnionFind<T> {
 
 #[cfg(test)]
 mod tests {
-   use proptest::{
-      prelude::{any, Strategy},
-      proptest,
-   };
+   use proptest::prelude::{Strategy, any};
+   use proptest::proptest;
 
    use super::UnionFind;
 

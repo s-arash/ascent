@@ -6,7 +6,7 @@ macro_rules! eqrel_binary_rel {
       $crate::fake_vec::FakeVec<($col1, $col2)>
    };
 
-   // par: 
+   // par:
    (($col1: ty, $col2: ty), $indices: expr, par, ()) => {
       // ::std::vec::Vec<($col1, $col2)>
       $crate::fake_vec::FakeVec<($col1, $col2)>
@@ -20,7 +20,7 @@ macro_rules! eqrel_binary_rel_full_ind {
    (($col1: ty, $col2: ty), $indices: expr, ser, (), $key: ty, $val: ty) => {
       $crate::eqrel_ind::ToEqRelInd0_1<$col1>
    };
-   
+
    // par:
    (($col1: ty, $col2: ty), $indices: expr, par, (), $key: ty, $val: ty) => {
       $crate::ceqrel_ind::ToEqRelInd0_1<$col1>
@@ -68,9 +68,8 @@ macro_rules! eqrel_binary_rel_ind_common {
 }
 pub use eqrel_binary_rel_ind_common as rel_ind_common;
 
-
 fn _test_macros() {
-   let _x: rel!((u32, u32), [[0,1], [0]], ser, ());
+   let _x: rel!((u32, u32), [[0, 1], [0]], ser, ());
    let _full_ind: rel_full_ind!((u32, u32), [[0, 1], [0]], ser, (), (u32, u32), ());
-   let _ind_0: rel_ind!((u32, u32), [[0, 1], [0]], ser, (), [0], (u32,) , (u32,));
+   let _ind_0: rel_ind!((u32, u32), [[0, 1], [0]], ser, (), [0], (u32,), (u32,));
 }

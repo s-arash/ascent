@@ -2,7 +2,7 @@ use paste::paste;
 
 use super::{BoundedLattice, Lattice};
 
-macro_rules! tuple_lattice_impl{
+macro_rules! tuple_lattice_impl {
    ($($i:tt),*) => {
       paste!(
       impl< $([<T $i>]),* > Lattice for ($([<T $i>]),*,) where ($([<T $i>]),*,): Ord {

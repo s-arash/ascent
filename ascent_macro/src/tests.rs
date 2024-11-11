@@ -4,10 +4,9 @@ use proc_macro2::TokenStream;
 
 use crate::ascent_impl;
 
-
 #[test]
 fn test_macro0() {
-   let inp = quote!{
+   let inp = quote! {
       struct Polonius<T: FactTypes>;
       relation subset(T::Origin, T::Origin, T::Point);// = ctx.subset_base.clone();
       relation cfg_edge(T::Point, T::Point);
@@ -62,7 +61,7 @@ fn test_macro0() {
 }
 #[test]
 fn test_macro_generic_tc() {
-   let inp = quote!{
+   let inp = quote! {
       #![ds(custom_ds)]
       struct TC<TNode> where TNode: Clone + std::cmp::Eq + std::hash::Hash + Sync + Send;
       #[ds(ascent::rel)]
@@ -96,7 +95,7 @@ fn test_macro_multiple_dynamic_clauses() {
 
 #[test]
 fn test_macro_tc() {
-   let inp = quote!{
+   let inp = quote! {
       // #![measure_rule_times]
       struct TC;
       relation edge(i32, i32);
@@ -228,11 +227,11 @@ fn test_macro_patterns() {
 }
 
 #[test]
-fn test_macro_sp(){
-   let input = quote!{
+fn test_macro_sp() {
+   let input = quote! {
       relation edge(i32, i32, u32);
       lattice shortest_path(i32, i32, Dual<u32>);
-      
+
       edge(1, 2, 30);
 
       shortest_path(x, y, Dual(*len)) <-- edge(x, y, len);
@@ -243,7 +242,7 @@ fn test_macro_sp(){
 }
 
 #[test]
-fn test_lattice(){
+fn test_lattice() {
    let input = quote! {
       relation foo(i32, i32);
       relation bar(i32, i32);
@@ -265,8 +264,8 @@ fn test_lattice(){
 }
 
 #[test]
-fn test_macro_lattices(){
-   let input = quote!{
+fn test_macro_lattices() {
+   let input = quote! {
       lattice longest_path(i32, i32, u32);
       relation edge(i32, i32, u32);
 
@@ -286,8 +285,8 @@ fn test_macro_lattices(){
 }
 
 #[test]
-fn test_no_generic(){
-   let input = quote!{
+fn test_no_generic() {
+   let input = quote! {
       struct AscentProgram;
       relation dummy(usize);
    };
@@ -296,8 +295,8 @@ fn test_no_generic(){
 }
 
 #[test]
-fn test_generic_ty(){
-   let input = quote!{
+fn test_generic_ty() {
+   let input = quote! {
       struct AscentProgram<T: Clone + Hash + Eq>;
       relation dummy(T);
    };
@@ -306,8 +305,8 @@ fn test_generic_ty(){
 }
 
 #[test]
-fn test_generic_ty_where_clause(){
-   let input = quote!{
+fn test_generic_ty_where_clause() {
+   let input = quote! {
       struct AscentProgram<T> where T: Clone + Hash + Eq;
       relation dummy(T);
    };
@@ -315,8 +314,8 @@ fn test_generic_ty_where_clause(){
 }
 
 #[test]
-fn test_generic_ty_with_divergent_impl_generics(){
-   let input = quote!{
+fn test_generic_ty_with_divergent_impl_generics() {
+   let input = quote! {
       struct AscentProgram<T>;
       impl<T: Clone + Hash + Eq> AscentProgram<T>;
       relation dummy(T);
@@ -325,8 +324,8 @@ fn test_generic_ty_with_divergent_impl_generics(){
 }
 
 #[test]
-fn test_generic_ty_with_divergent_impl_generics_where_clause(){
-   let input = quote!{
+fn test_generic_ty_with_divergent_impl_generics_where_clause() {
+   let input = quote! {
       /// Type DOC COMMENT
       struct AscentProgram<T>;
       impl<T> AscentProgram<T> where T: Clone + Hash + Eq;
@@ -337,7 +336,7 @@ fn test_generic_ty_with_divergent_impl_generics_where_clause(){
 }
 
 #[test]
-fn exp_borrowing(){
+fn exp_borrowing() {
    // let mut v: Vec<i32> = vec![];
    // let mut u: Vec<i32> = vec![];
    // for i in 0..v.len(){
@@ -357,9 +356,9 @@ fn exp_borrowing(){
 
 #[test]
 fn exp_condensation() {
+   use petgraph::Graph;
    use petgraph::algo::condensation;
    use petgraph::prelude::*;
-   use petgraph::Graph;
 
    let mut graph: Graph<&'static str, (), Directed> = Graph::new();
    let a = graph.add_node("a"); // node with no weight
@@ -387,28 +386,33 @@ fn exp_condensation() {
 
    let sccs = petgraph::algo::tarjan_scc(&graph);
    println!("sccs ordered:");
-   for scc in sccs.iter(){
+   for scc in sccs.iter() {
       println!("{:?}", scc);
    }
 }
 
 #[test]
-fn exp_items_in_fn(){
+fn exp_items_in_fn() {
    let mut p = Default::default();
    for i in 0..10 {
       p = {
          #[derive(Debug, Default)]
-         struct Point{x: i32, y: i32}
-         impl Point {
-            pub fn size(&self) -> i32 {self.x * self.x + self.y * self.y}
+         struct Point {
+            x: i32,
+            y: i32,
          }
-         Point{x:i, y: i+1}
+         impl Point {
+            pub fn size(&self) -> i32 { self.x * self.x + self.y * self.y }
+         }
+         Point { x: i, y: i + 1 }
       };
    }
    println!("point is {:?}, with size {}", p, p.size());
 }
 
-fn write_to_scratchpad_base(tokens: TokenStream, prefix: TokenStream, is_ascent_run: bool, is_parallel: bool) -> TokenStream {
+fn write_to_scratchpad_base(
+   tokens: TokenStream, prefix: TokenStream, is_ascent_run: bool, is_parallel: bool,
+) -> TokenStream {
    let code = ascent_impl(tokens, is_ascent_run, is_parallel);
    let code = code.unwrap();
    let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
@@ -419,30 +423,27 @@ fn write_to_scratchpad_base(tokens: TokenStream, prefix: TokenStream, is_ascent_
    code
 }
 
-fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, quote!{}, false, false)
-}
+fn write_to_scratchpad(tokens: TokenStream) -> TokenStream { write_to_scratchpad_base(tokens, quote! {}, false, false) }
 
 fn write_with_prefix_to_scratchpad(tokens: TokenStream, prefix: TokenStream) -> TokenStream {
    write_to_scratchpad_base(tokens, prefix, false, false)
 }
 
 fn write_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, quote!{}, false, true)
+   write_to_scratchpad_base(tokens, quote! {}, false, true)
 }
 
 #[allow(unused)]
 fn write_ascent_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, quote!{}, true, false)
+   write_to_scratchpad_base(tokens, quote! {}, true, false)
 }
 
 fn write_ascent_run_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, quote!{}, true, true)
+   write_to_scratchpad_base(tokens, quote! {}, true, true)
 }
 
-
 #[test]
-fn test_macro_lambda_calc(){
+fn test_macro_lambda_calc() {
    let prefix = quote! {
       #[derive(Clone, PartialEq, Eq, Debug, Hash)]
       pub enum LambdaCalcExpr{
@@ -489,7 +490,7 @@ fn test_macro_lambda_calc(){
          inp.map(|tuple| tuple.0).min().cloned().into_iter()
       }
    };
-   let inp = quote!{
+   let inp = quote! {
       relation output(LambdaCalcExpr);
       relation input(LambdaCalcExpr);
       relation do_eval(LambdaCalcExpr);
@@ -505,11 +506,11 @@ fn test_macro_lambda_calc(){
 
       do_eval(ef.as_ref().clone()) <-- do_eval(?App(ef,_ea));
 
-      do_eval(sub(fb, fx, ea)) <-- 
-         do_eval(?App(ef, ea)), 
+      do_eval(sub(fb, fx, ea)) <--
+         do_eval(?App(ef, ea)),
          eval(ef.deref(), ?Lam(fx, fb));
-      
-      eval(exp.clone(), final_res.clone()) <-- 
+
+      eval(exp.clone(), final_res.clone()) <--
          do_eval(?exp @ App(ef, ea)), // this requires nightly
          eval(ef.deref(), ?Lam(fx, fb)),
          eval(sub(fb, fx, ea), final_res);
@@ -519,7 +520,7 @@ fn test_macro_lambda_calc(){
 
 #[test]
 fn test_macro_in_macro() {
-   let inp = quote!{
+   let inp = quote! {
       relation foo(i32, i32);
       relation bar(i32, i32);
 
@@ -537,7 +538,7 @@ fn test_macro_in_macro() {
       foo(3, 4);
 
       bar(x, y) <-- foo(x, y), foo!(x + 1, y + 1), foo!(x + 2, y + 2), foo!(x + 3, y + 3);
-      
+
    };
 
    write_to_scratchpad(inp);

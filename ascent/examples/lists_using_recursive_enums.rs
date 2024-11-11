@@ -20,20 +20,20 @@ use ascent::ascent;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum List<T> {
-  Cons(T, Rc<List<T>>),
-  Nil
+   Cons(T, Rc<List<T>>),
+   Nil,
 }
 
 macro_rules! cons {
-    ($h: expr, $t: expr) => {
+   ($h: expr, $t: expr) => {
         Rc::new(List::Cons($h, $t))
-    }
+    };
 }
 
 macro_rules! nil {
-    () => {
+   () => {
         Rc::new(List::Nil)
-    }
+    };
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
@@ -43,19 +43,19 @@ ascent! {
     // Facts:
 
     relation char(char);
-    
+
     // Rules:
-    
+
     relation list(Rc<List<char>>);
-    
+
     list(nil!());
     list(cons!(c.clone(), l.clone())) <-- char(c), list(l), len(l, n), if *n < 5;
 
     relation len(Rc<List<char>>, usize);
-    
+
     len(nil!(), 0);
     len(l.clone(), n + 1) <-- char(c), len(r, n), let l = cons!(c.clone(), r.clone()), list(&l);
-    
+
     relation res(Res);
 
     res(Res("-")) <-- list(nil!());
@@ -68,24 +68,15 @@ ascent! {
 }
 
 fn main() {
-    let mut prog = AscentProgram::default();
-    
-    prog.char = vec![
-        ('a',),
-        ('b',),
-    ];
+   let mut prog = AscentProgram::default();
 
-    prog.run();
+   prog.char = vec![('a',), ('b',)];
 
-    let AscentProgram { mut res, ..} = prog;
+   prog.run();
 
-    res.sort_by_key(|(key,)| key.0);
+   let AscentProgram { mut res, .. } = prog;
 
-    assert_eq!(res, vec![
-        (Res("-"),),
-        (Res("a"),),
-        (Res("ab"),),
-        (Res("aba"),),
-        (Res("b"),),
-    ]);
+   res.sort_by_key(|(key,)| key.0);
+
+   assert_eq!(res, vec![(Res("-"),), (Res("a"),), (Res("ab"),), (Res("aba"),), (Res("b"),),]);
 }

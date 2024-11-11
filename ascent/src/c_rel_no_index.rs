@@ -1,9 +1,11 @@
+use dashmap::RwLock;
 use instant::Instant;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::internal::{RelIndexWrite, CRelIndexWrite, RelIndexMerge, Freezable};
-use crate::internal::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
-use dashmap::RwLock;
+use crate::internal::{
+   CRelIndexRead, CRelIndexReadAll, CRelIndexWrite, Freezable, RelIndexMerge, RelIndexRead, RelIndexReadAll,
+   RelIndexWrite,
+};
 
 pub struct CRelNoIndex<V> {
    // TODO remove pub
@@ -27,7 +29,6 @@ impl<V> Default for CRelNoIndex<V> {
 }
 
 impl<V> CRelNoIndex<V> {
-   
    pub fn hash_usize(&self, _key: &()) -> usize { 0 }
 }
 
@@ -40,12 +41,16 @@ impl<'a, V: 'a> RelIndexRead<'a> for CRelNoIndex<V> {
    type Key = ();
    type Value = &'a V;
 
-   type IteratorType = std::iter::FlatMap<std::slice::Iter<'a, RwLock<Vec<V>>>, std::slice::Iter<'a, V>, fn(&RwLock<Vec<V>>) -> std::slice::Iter<V>>;
+   type IteratorType = std::iter::FlatMap<
+      std::slice::Iter<'a, RwLock<Vec<V>>>,
+      std::slice::Iter<'a, V>,
+      fn(&RwLock<Vec<V>>) -> std::slice::Iter<V>,
+   >;
 
    fn index_get(&'a self, _key: &Self::Key) -> Option<Self::IteratorType> {
       assert!(self.frozen);
       let res: Self::IteratorType = self.vec.iter().flat_map(|v| {
-         let data = unsafe { &*v.data_ptr()};
+         let data = unsafe { &*v.data_ptr() };
          data.iter()
       });
       Some(res)
@@ -59,12 +64,13 @@ impl<'a, V: 'a + Sync + Send> CRelIndexRead<'a> for CRelNoIndex<V> {
    type Key = ();
    type Value = &'a V;
 
-   type IteratorType = rayon::iter::FlatMap<rayon::slice::Iter<'a, RwLock<Vec<V>>>, fn(&RwLock<Vec<V>>) -> rayon::slice::Iter<V>>;
+   type IteratorType =
+      rayon::iter::FlatMap<rayon::slice::Iter<'a, RwLock<Vec<V>>>, fn(&RwLock<Vec<V>>) -> rayon::slice::Iter<V>>;
 
    fn c_index_get(&'a self, _key: &Self::Key) -> Option<Self::IteratorType> {
       assert!(self.frozen);
       let res: Self::IteratorType = self.vec.par_iter().flat_map(|v| {
-         let data = unsafe {&* v.data_ptr()};
+         let data = unsafe { &*v.data_ptr() };
          data.par_iter()
       });
       Some(res)
@@ -125,9 +131,7 @@ impl<'a, V: 'a> RelIndexReadAll<'a> for CRelNoIndex<V> {
 
    type AllIteratorType = std::iter::Once<(&'a (), Self::ValueIteratorType)>;
 
-   fn iter_all(&'a self) -> Self::AllIteratorType {
-      std::iter::once((&(), self.index_get(&()).unwrap()))
-   }
+   fn iter_all(&'a self) -> Self::AllIteratorType { std::iter::once((&(), self.index_get(&()).unwrap())) }
 }
 
 impl<'a, V: 'a + Sync + Send> CRelIndexReadAll<'a> for CRelNoIndex<V> {
@@ -138,7 +142,5 @@ impl<'a, V: 'a + Sync + Send> CRelIndexReadAll<'a> for CRelNoIndex<V> {
 
    type AllIteratorType = rayon::iter::Once<(&'a (), Self::ValueIteratorType)>;
 
-   fn c_iter_all(&'a self) -> Self::AllIteratorType {
-      rayon::iter::once((&(), self.c_index_get(&()).unwrap()))
-   }
+   fn c_iter_all(&'a self) -> Self::AllIteratorType { rayon::iter::once((&(), self.c_index_get(&()).unwrap())) }
 }

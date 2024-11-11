@@ -1,45 +1,45 @@
-use std::{cmp::Ordering, fmt::Debug, fmt::Display, fmt::Formatter, ops::Deref};
-
-use crate::Lattice;
+use std::cmp::Ordering;
+use std::fmt::{Debug, Display, Formatter};
+use std::ops::Deref;
 
 use super::BoundedLattice;
+use crate::Lattice;
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
 // TODO uncomment for a major release
 // #[repr(transparent)]
-/// A wrapper type that swaps (`<=` and `>=`) for `PartialOrd`s, (`meet` and `join`) for `Lattice`s, 
+/// A wrapper type that swaps (`<=` and `>=`) for `PartialOrd`s, (`meet` and `join`) for `Lattice`s,
 /// and (`top` and `bottom`) for `BoundedLattice`s.
-/// 
-/// # Example 
+///
+/// # Example
 /// ```
 /// # use ascent_base::lattice::Dual;
 /// assert!(Dual(2) < Dual(1));
 /// ```
 pub struct Dual<T>(pub T);
 
-impl<T> Deref for Dual<T>{
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+impl<T> Deref for Dual<T> {
+   type Target = T;
+   fn deref(&self) -> &Self::Target { &self.0 }
 }
 
 impl<T: Debug> Debug for Dual<T> {
    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.0.fmt(f) }
 }
- 
+
 impl<T: Display> Display for Dual<T> {
    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.0.fmt(f) }
 }
 
-
-impl<T> PartialOrd for Dual<T> where T: PartialOrd {
-   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-      other.0.partial_cmp(&self.0)
-   }
+impl<T> PartialOrd for Dual<T>
+where T: PartialOrd
+{
+   fn partial_cmp(&self, other: &Self) -> Option<Ordering> { other.0.partial_cmp(&self.0) }
 }
 
-impl<T> Ord for Dual<T> where T: Ord {
+impl<T> Ord for Dual<T>
+where T: Ord
+{
    fn cmp(&self, other: &Self) -> Ordering { other.0.cmp(&self.0) }
 }
 
@@ -49,7 +49,7 @@ impl<T: Lattice> Lattice for Dual<T> {
 
    #[inline]
    fn join(self, other: Self) -> Self { Dual(self.0.meet(other.0)) }
-   
+
    #[inline]
    fn meet_mut(&mut self, other: Self) -> bool { self.0.join_mut(other.0) }
 

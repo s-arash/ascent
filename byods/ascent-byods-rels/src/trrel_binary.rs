@@ -1,6 +1,6 @@
-use std::hash::{Hash, BuildHasherDefault};
+use std::hash::{BuildHasherDefault, Hash};
 
-use hashbrown::{HashMap};
+use hashbrown::HashMap;
 use rustc_hash::FxHasher;
 
 pub type MyHashSetIter<'a, T> = hashbrown::hash_set::Iter<'a, T>;
@@ -15,30 +15,27 @@ pub struct TrRel<T: Clone + Hash + Eq> {
    pub anti_reflexive: bool,
 }
 
-impl<T: Clone + Hash + Eq > Default for TrRel<T> {
+impl<T: Clone + Hash + Eq> Default for TrRel<T> {
    fn default() -> Self {
-      Self { 
-         map: Default::default(), 
-         reverse_map: Default::default(), 
+      Self {
+         map: Default::default(),
+         reverse_map: Default::default(),
          // precursor_map: Default::default(),
          precursor_set: Default::default(),
-         anti_reflexive: true
+         anti_reflexive: true,
       }
    }
 }
 
-
 impl<T: Clone + Hash + Eq> TrRel<T> {
-
    /// returns true if this tuple did not exist in the transitive relation
    pub fn insert(&mut self, x: T, y: T) -> bool {
-
       // TODO is this correct?
 
       if x == y {
          return false;
       }
-      
+
       if self.map.get(&x).map_or(false, |s| s.contains(&y)) {
          return false;
       }
@@ -53,7 +50,7 @@ impl<T: Clone + Hash + Eq> TrRel<T> {
 
       let mut x_reverse_map = std::mem::take(self.reverse_map.entry(x.clone()).or_default());
       let mut y_map = std::mem::take(self.map.entry(y.clone()).or_default());
-      // let y_map2 = y_map.iter().chain([&x]).map(|elem| (hash_one(self.map.hasher(), elem), elem.clone())).collect_vec(); 
+      // let y_map2 = y_map.iter().chain([&x]).map(|elem| (hash_one(self.map.hasher(), elem), elem.clone())).collect_vec();
       for x_prime in x_reverse_map.iter().chain([&x]) {
          if x_prime != &y {
             let x_prime_map = self.map.entry(x_prime.clone()).or_default();
@@ -87,9 +84,7 @@ impl<T: Clone + Hash + Eq> TrRel<T> {
    }
 
    #[inline]
-   pub fn contains(&self, x: &T, y: &T) -> bool {
-      self.map.get(x).map_or(false, |s| s.contains(y))
-   }
+   pub fn contains(&self, x: &T, y: &T) -> bool { self.map.get(x).map_or(false, |s| s.contains(y)) }
 
    pub fn count_estimate(&self) -> usize {
       let sample_size = 3;
@@ -97,7 +92,5 @@ impl<T: Clone + Hash + Eq> TrRel<T> {
       sum * self.map.len() / sample_size.min(self.map.len()).max(1)
    }
 
-   pub fn count_exact(&self) -> usize {
-      self.map.values().map(|x| x.len()).sum()
-   }
+   pub fn count_exact(&self) -> usize { self.map.values().map(|x| x.len()).sum() }
 }

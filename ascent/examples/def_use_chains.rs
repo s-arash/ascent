@@ -27,9 +27,9 @@ pub struct Jump(&'static str);
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Instr {
-    Read(Read),
-    Write(Write),
-    Jump(Jump),
+   Read(Read),
+   Write(Write),
+   Jump(Jump),
 }
 
 ascent! {
@@ -52,37 +52,26 @@ ascent! {
 }
 
 fn main() {
-    let mut prog = AscentProgram::default();
+   let mut prog = AscentProgram::default();
 
-    prog.read = vec![
-        (Read("r1"), Var("v1")),
-        (Read("r2"), Var("v1")),
-        (Read("r3"), Var("v2")),
-    ];
+   prog.read = vec![(Read("r1"), Var("v1")), (Read("r2"), Var("v1")), (Read("r3"), Var("v2"))];
 
-    prog.write = vec![
-        (Write("w1"), Var("v1")),
-        (Write("w2"), Var("v2")),
-        (Write("w3"), Var("v2")),
-    ];
+   prog.write = vec![(Write("w1"), Var("v1")), (Write("w2"), Var("v2")), (Write("w3"), Var("v2"))];
 
-    prog.succ = vec![
-        (Instr::Write(Write("w1")), Instr::Jump(Jump("o1"))),
-        (Instr::Jump(Jump("o1")), Instr::Read(Read("r1"))),
-        (Instr::Jump(Jump("o1")), Instr::Read(Read("r2"))),
-        (Instr::Read(Read("r2")), Instr::Read(Read("r3"))),
-        (Instr::Read(Read("r3")), Instr::Write(Write("w2"))),
-    ];
+   prog.succ = vec![
+      (Instr::Write(Write("w1")), Instr::Jump(Jump("o1"))),
+      (Instr::Jump(Jump("o1")), Instr::Read(Read("r1"))),
+      (Instr::Jump(Jump("o1")), Instr::Read(Read("r2"))),
+      (Instr::Read(Read("r2")), Instr::Read(Read("r3"))),
+      (Instr::Read(Read("r3")), Instr::Write(Write("w2"))),
+   ];
 
-    prog.run();
+   prog.run();
 
-    let AscentProgram { mut def_use, ..} = prog;
+   let AscentProgram { mut def_use, .. } = prog;
 
-    def_use.sort_by_key(|(key, _)| key.0);
-    def_use.sort_by_key(|(_, key)| key.0);
-    
-    assert_eq!(def_use, vec![
-        (Write("w1"), Read("r1")),
-        (Write("w1"), Read("r2")),
-    ]);
+   def_use.sort_by_key(|(key, _)| key.0);
+   def_use.sort_by_key(|(_, key)| key.0);
+
+   assert_eq!(def_use, vec![(Write("w1"), Read("r1")), (Write("w1"), Read("r2")),]);
 }

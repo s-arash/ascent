@@ -1,19 +1,18 @@
-use ascent::ascent_run;
-use ascent::ascent;
-use std::rc::Rc;
-use ascent::aggregators::mean;
-use crate::ascent_m_par;
-use crate::ascent_run_m_par;
-use crate::assert_rels_eq;
-use crate::utils::rels_equal;
 use std::hash::Hash;
+use std::rc::Rc;
+
+use ascent::aggregators::mean;
+use ascent::{ascent, ascent_run};
+
+use crate::utils::rels_equal;
+use crate::{ascent_m_par, ascent_run_m_par, assert_rels_eq};
 
 #[test]
 fn test_generators_conditions_example() {
    let res = ascent_run! {
       relation node(i32, Rc<Vec<i32>>);
       relation edge(i32, i32);
-      
+
       node(1, Rc::new(vec![2, 3]));
       node(2, Rc::new(vec![3, 4]));
 
@@ -40,7 +39,7 @@ fn test_agg_example() {
          agg avg = mean(g) in course_grade(s, _, g);
    }
    let mut prog = AscentProgram::default();
-   prog.student = FromIterator::from_iter([(1, ), (2, )]);
+   prog.student = FromIterator::from_iter([(1,), (2,)]);
    prog.course_grade = FromIterator::from_iter([(1, 600, 60), (1, 602, 80), (2, 602, 70), (2, 605, 90)]);
    prog.run();
    println!("avg grade: {:?}", prog.avg_grade);
@@ -50,39 +49,61 @@ fn test_agg_example() {
 #[test]
 fn test_tc_example() {
    fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
-      ascent_run!{
+      ascent_run! {
          relation r(i32, i32) = r;
          relation tc(i32, i32);
          tc(x, y) <-- r(x, y);
          tc(x, z) <-- r(x, y), tc(y, z);
          tc(x, x), tc(y, y) <-- if reflexive, r(x, y);
-      }.tc
+      }
+      .tc
    }
    let r = vec![(1, 2), (2, 4), (3, 1)];
    println!("tc: {:?}", tc(r.clone(), true));
    println!("reflexive tc: {:?}", tc(r.clone(), true));
-   assert_rels_eq!(tc(r.clone(), true), 
-                   vec![(1,1), (2,2), (3,3), (4,4), (1, 2), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4)]);
+   assert_rels_eq!(tc(r.clone(), true), vec![
+      (1, 1),
+      (2, 2),
+      (3, 3),
+      (4, 4),
+      (1, 2),
+      (1, 4),
+      (2, 4),
+      (3, 1),
+      (3, 2),
+      (3, 4)
+   ]);
 }
-
 
 #[test]
 fn test_generic_tc_example() {
-   fn tc<N>(r: Vec<(N, N)>, reflexive: bool) -> Vec<(N, N)> where N: Clone + Hash + Eq{
-      ascent_run!{
+   fn tc<N>(r: Vec<(N, N)>, reflexive: bool) -> Vec<(N, N)>
+   where N: Clone + Hash + Eq {
+      ascent_run! {
          struct TC<N: Clone + Hash + Eq>;
          relation r(N, N) = r;
          relation tc(N, N);
          tc(x, y) <-- r(x, y);
          tc(x, z) <-- r(x, y), tc(y, z);
          tc(x, x), tc(y, y) <-- if reflexive, r(x, y);
-      }.tc
+      }
+      .tc
    }
    let r = vec![(1, 2), (2, 4), (3, 1)];
    println!("tc: {:?}", tc(r.clone(), true));
    println!("reflexive tc: {:?}", tc(r.clone(), true));
-   assert_rels_eq!(tc(r.clone(), true), 
-                   vec![(1,1), (2,2), (3,3), (4,4), (1, 2), (1, 4), (2, 4), (3, 1), (3, 2), (3, 4)]);
+   assert_rels_eq!(tc(r.clone(), true), vec![
+      (1, 1),
+      (2, 2),
+      (3, 3),
+      (4, 4),
+      (1, 2),
+      (1, 4),
+      (2, 4),
+      (3, 1),
+      (3, 2),
+      (3, 4)
+   ]);
 }
 
 #[test]
@@ -92,15 +113,13 @@ fn test_generic_ty() {
       relation dummy(T);
    }
 
-   struct Container<T>(AscentProgram<T>) where T: Clone + Hash + Eq;
+   struct Container<T>(AscentProgram<T>)
+   where T: Clone + Hash + Eq;
 
    impl<T> Container<T>
-   where
-      T: Clone + Hash + Eq
+   where T: Clone + Hash + Eq
    {
-      fn run(&mut self) {
-         self.0.run();
-      }
+      fn run(&mut self) { self.0.run(); }
    }
 
    let mut container: Container<bool> = Container(AscentProgram::default());
@@ -118,12 +137,9 @@ fn test_generic_ty_with_divergent_impl_generics() {
    struct Container<T>(AscentProgram<T>);
 
    impl<T> Container<T>
-   where
-      T: Clone + Hash + Eq
+   where T: Clone + Hash + Eq
    {
-      fn run(&mut self) {
-         self.0.run();
-      }
+      fn run(&mut self) { self.0.run(); }
    }
 
    let mut container: Container<bool> = Container(AscentProgram::default());
@@ -159,7 +175,6 @@ fn test_borrowed_strings() {
 
 #[test]
 fn test_borrowed_strings_2() {
-
    fn ancestry_fn<'a>(parent_rel: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<(&'a str, &'a str)> {
       ascent_run_m_par! {
          struct Ancestry<'a>;
@@ -170,7 +185,10 @@ fn test_borrowed_strings_2() {
 
          ancestor(p, gc) <--
             parent(p, c), ancestor(c, gc);
-      }.ancestor.into_iter().collect()
+      }
+      .ancestor
+      .into_iter()
+      .collect()
    }
 
    let james = "James".to_string();

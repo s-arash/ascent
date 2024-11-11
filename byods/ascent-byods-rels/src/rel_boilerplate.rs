@@ -10,12 +10,12 @@ impl<K, V> Default for NoopRelIndexWrite<K, V> {
 }
 
 impl<K, V> RelIndexMerge for NoopRelIndexWrite<K, V> {
-   fn move_index_contents(_from: &mut Self, _to: &mut Self) { }
+   fn move_index_contents(_from: &mut Self, _to: &mut Self) {}
 }
 
-impl <K, V> RelIndexWrite for NoopRelIndexWrite<K, V> {
+impl<K, V> RelIndexWrite for NoopRelIndexWrite<K, V> {
    type Key = K;
    type Value = V;
    #[inline(always)]
-   fn index_insert(&mut self, _key: Self::Key, _value: Self::Value) { }
+   fn index_insert(&mut self, _key: Self::Key, _value: Self::Value) {}
 }

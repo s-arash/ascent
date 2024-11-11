@@ -3,14 +3,14 @@
 
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::Relaxed;
 use std::time::Instant;
 
 use rayon::prelude::*;
 
 use crate::c_rel_index::CRelIndex;
-use crate::internal::{RelIndexWrite, Freezable};
+use crate::internal::{Freezable, RelIndexWrite};
 use crate::rel_index_read::RelIndexRead;
-use std::sync::atomic::Ordering::Relaxed;
 
 // #[test]
 fn bench_aovec() {
@@ -35,7 +35,7 @@ fn bench_aovec() {
    println!("ao vec time: {:?}", elapsed);
 
    /////////////////////////////////
-   
+
    println!("\nparallel pushing ...");
 
    let before = Instant::now();
@@ -46,7 +46,6 @@ fn bench_aovec() {
    let elapsed = before.elapsed();
    assert_eq!(vec.lock().unwrap().len(), size);
    println!("parallel Mutex<Vec> time: {:?}", elapsed);
-
 
    let before = Instant::now();
    let vec = AOVec::new();
@@ -64,7 +63,6 @@ fn bench_atomic_changed() {
    let size = 125_000_000;
 
    {
-
       let before = Instant::now();
       let vec = AOVec::new();
       let changed = AtomicBool::new(false);
@@ -94,7 +92,6 @@ fn bench_atomic_changed() {
    }
 }
 
-
 // #[test]
 fn bench_crel_index() {
    let mut rel_index = CRelIndex::default();
@@ -115,7 +112,7 @@ fn bench_crel_index() {
       _sum += rel_index.index_get(&42).unwrap().next().unwrap();
       rel_index.unfreeze();
    }
-   
+
    let elapsed = before.elapsed();
 
    println!("freeze_unfreeze for {} iterations time: {:?}", iters, elapsed);
@@ -123,7 +120,6 @@ fn bench_crel_index() {
 
 // #[test]
 fn bench_par_iter() {
-
    let arr = (1..1_000_000).collect::<Vec<_>>();
 
    let before = Instant::now();
@@ -145,7 +141,6 @@ fn bench_par_iter() {
 
 #[test]
 fn bench_par_flat_map() {
-
    fn calc_sum(x: usize) -> usize {
       let mut res = 0;
       for i in 0..=(x >> 5) {
@@ -163,7 +158,6 @@ fn bench_par_flat_map() {
       arr.push(vec);
    }
 
-   
    let before = Instant::now();
    arr.iter().flat_map(|v| v.iter()).for_each(|x| {
       calc_sum(*x);
@@ -181,17 +175,12 @@ fn bench_par_flat_map() {
       calc_sum(*x);
    });
    println!("par flat_map_iter took {:?}", before.elapsed());
-
 }
 
 #[test]
 fn exp_rayon_scope() {
    rayon::scope(|__scope| {
-      __scope.spawn(|_| {
-
-      });
-      __scope.spawn(|_| {
-
-      });
+      __scope.spawn(|_| {});
+      __scope.spawn(|_| {});
    });
 }

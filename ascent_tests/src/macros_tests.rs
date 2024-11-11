@@ -6,7 +6,7 @@ use crate::assert_rels_eq;
 
 #[test]
 fn test_macro_in_macro() {
-   ascent!{
+   ascent! {
       relation foo1(i32, i32);
       relation foo2(i32, i32);
       relation bar(i32 , i32);
@@ -38,7 +38,6 @@ fn test_macro_in_macro() {
 
 #[test]
 fn test_macro_in_macro2() {
-
    type Var = String;
    type Val = isize;
    #[derive(Clone, Eq, PartialEq, Hash)]
@@ -70,16 +69,15 @@ fn test_macro_in_macro2() {
    prog.res = vec![(Atomic::Val(1000),), (Atomic::Var("x1".into()),)];
    prog.run();
 
-   println!("res_val: {}\n{:?}" , prog.res_val.len(), prog.res_val);
+   println!("res_val: {}\n{:?}", prog.res_val.len(), prog.res_val);
    println!("res_val2: {}\n{:?}", prog.res_val2.len(), prog.res_val2);
 
    assert_eq!(prog.res_val2.len(), prog.res_val.len().pow(2));
-   assert_rels_eq!(prog.res_val, [(100, ), (1000, )]);
+   assert_rels_eq!(prog.res_val, [(100,), (1000,)]);
 }
 
 #[test]
 fn test_macro_in_macro3() {
-
    ascent! {
       relation edge(i32, i32);
       relation edge_rev(i32, i32);
@@ -101,7 +99,6 @@ fn test_macro_in_macro3() {
 
 #[test]
 fn test_macro_in_macro4() {
-
    ascent! {
       relation foo(i32, i32);
       relation bar(i32, i32);
@@ -124,7 +121,6 @@ fn test_macro_in_macro4() {
 
 #[test]
 fn test_macro_in_macro5() {
-
    type Lang = &'static str;
    type CompilerName = &'static str;
    ascent! {
@@ -145,9 +141,13 @@ fn test_macro_in_macro5() {
    }
 
    let mut prog = AscentProgram::default();
-   prog.compiler = vec![("Rustc", "Rust", "X86"), ("Rustc", "Rust", "WASM"), 
-                        ("MyRandomCompiler", "Python", "Rust"),
-                        ("Cython", "Python", "C"), ("Clang", "C", "X86")];
+   prog.compiler = vec![
+      ("Rustc", "Rust", "X86"),
+      ("Rustc", "Rust", "WASM"),
+      ("MyRandomCompiler", "Python", "Rust"),
+      ("Cython", "Python", "C"),
+      ("Clang", "C", "X86"),
+   ];
    prog.bad_compiler = vec![("MyRandomCompiler",)];
    prog.run();
 
@@ -160,7 +160,6 @@ fn test_macro_in_macro5() {
 
 #[test]
 fn test_macro_in_macro6() {
-
    ascent! {
       relation foo(i32, i32) = vec![(0, 1), (1, 2), (2, 3), (3, 4)];
 
@@ -194,7 +193,6 @@ fn test_macro_in_macro6() {
 
 #[test]
 fn test_macro_in_macro7() {
-
    ascent! {
       relation foo(i32, i32) = vec![(0, 1), (1, 2), (2, 3), (3, 4), (4, 6), (3, 7)];
       relation bar(Option<i32>, i32) = vec![(Some(1), 2), (Some(2), 3), (None, 4)];
@@ -202,8 +200,8 @@ fn test_macro_in_macro7() {
       macro foo($x: expr, $y: expr) { foo($x, $y), }
       macro bar($x: ident, $y: expr) { bar(?Some($x), $y) }
 
-      macro foo2($x: expr, $y: expr) { 
-         foo!($x, $y), let x = $x, for x2 in [1, 2], ((foo(x, x2), let y = $y, let _ = println!("{}", y)) || if true, for y in [$y, $y]), 
+      macro foo2($x: expr, $y: expr) {
+         foo!($x, $y), let x = $x, for x2 in [1, 2], ((foo(x, x2), let y = $y, let _ = println!("{}", y)) || if true, for y in [$y, $y]),
          foo!(x + 0, y - 0), foo(x, y), foo!(x, y),
          let z = |x: i32| {x}, foo(z(*x), z(*y))
       }
@@ -215,7 +213,7 @@ fn test_macro_in_macro7() {
       baz!(x, z) <-- bar!(x, y), foo!(y, z);
       baz!(a, c) <-- bar!(a, b), foo!(b, c);
       baz_e(x, z) <-- bar(?Some(x), y), foo(y, z);
-      
+
       relation quax(i32, i32);
       relation quax_e(i32, i32);
 
@@ -228,15 +226,13 @@ fn test_macro_in_macro7() {
 
    println!("baz  : {:?}", prog.baz);
    assert_rels_eq!(prog.baz, prog.baz_e);
-   
+
    println!("quax: {:?}", prog.quax);
    assert_rels_eq!(prog.quax, prog.quax_e);
-
 }
 
 #[test]
 fn test_macro_in_macro8() {
-
    macro_rules! id {
       ($($inp: tt)*) => { $($inp)* };
    }
@@ -248,7 +244,7 @@ fn test_macro_in_macro8() {
       macro foo2($x: expr, $y: expr) { foo($x, $y), }
       macro bar($x: ident, $y: expr) { bar(?Some($x), $y) }
 
-      macro foo($xx: expr, $yy: expr) { 
+      macro foo($xx: expr, $yy: expr) {
          foo2!($xx, $yy), let x = id!($xx), let y = id!($yy), for x2 in [1, 2],
          let _ = assert!(x == $xx && y == $yy),
          foo2!(id!(id!(x) + 0), id!(y - 0)), foo(x, y), foo2!(x, y),
@@ -258,7 +254,7 @@ fn test_macro_in_macro8() {
       relation baz(i32, i32);
       relation baz_e(i32, i32);
       baz(x, z) <-- bar!(x, y), foo!(y, z);
-      
+
       relation baz2(i32, i32);
       baz2(a, c) <-- bar!(a, b), foo!(b, c);
 

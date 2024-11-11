@@ -1,50 +1,45 @@
 #![allow(dead_code)]
 ///! k-cfa on lambda calculus + numbers
-
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use arrayvec::ArrayVec;
-use ascent::ascent;
-use ascent::ascent_run;
-
 use Expr::*;
+use arrayvec::ArrayVec;
 use ascent::lattice::constant_propagation::ConstPropagation;
-use crate::utils::*;
+use ascent::{ascent, ascent_run};
 use itertools::Itertools;
+
+use crate::utils::*;
 type Var = &'static str;
 type NumConcrete = isize;
 type Num = ConstPropagation<NumConcrete>;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Op {
-   Add, Mul, Sub, Div
+   Add,
+   Mul,
+   Sub,
+   Div,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
-pub enum Expr{
+pub enum Expr {
    Ref(Var),
    Lam(Var, Rc<Expr>),
    App(Rc<Expr>, Rc<Expr>),
    Lit(Num),
-   Binop(Op, Rc<Expr>, Rc<Expr>)
+   Binop(Op, Rc<Expr>, Rc<Expr>),
 }
-fn app(f: Expr, a: Expr) -> Expr {
-   App(Rc::new(f), Rc::new(a))
-}
-fn lam(x: Var, e: Expr) -> Expr {
-   Lam(x, Rc::new(e))
-}
-fn binop(op: Op, e1: Expr, e2: Expr) -> Expr {
-   Binop(op, Rc::new(e1), Rc::new(e2))
-}
+fn app(f: Expr, a: Expr) -> Expr { App(Rc::new(f), Rc::new(a)) }
+fn lam(x: Var, e: Expr) -> Expr { Lam(x, Rc::new(e)) }
+fn binop(op: Op, e1: Expr, e2: Expr) -> Expr { Binop(op, Rc::new(e1), Rc::new(e2)) }
 
 fn sub(exp: &Expr, var: &str, e: &Expr) -> Expr {
    match exp {
       Ref(x) if *x == var => e.clone(),
       Ref(_x) => exp.clone(),
-      App(ef,ea) => app(sub(ef, var, e), sub(ea, var, e)),
+      App(ef, ea) => app(sub(ef, var, e), sub(ea, var, e)),
       Lam(x, _eb) if *x == var => exp.clone(),
       Lam(x, eb) => lam(x, sub(eb, var, e)),
       Lit(_) => exp.clone(),
@@ -53,9 +48,9 @@ fn sub(exp: &Expr, var: &str, e: &Expr) -> Expr {
 }
 
 #[allow(non_snake_case)]
-fn U() -> Expr {lam("ux", app(Ref("ux"), Ref("ux")))}
+fn U() -> Expr { lam("ux", app(Ref("ux"), Ref("ux"))) }
 #[allow(non_snake_case)]
-fn I() -> Expr {lam("ix", Ref("ix"))}
+fn I() -> Expr { lam("ix", Ref("ix")) }
 
 const K: usize = 1;
 type Contour = ArrayVec<Expr, K>;
@@ -63,12 +58,15 @@ type Lab = Expr;
 type Time = (Option<Lab>, Contour);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-enum Either<L,R> {Left(L), Right(R)}
+enum Either<L, R> {
+   Left(L),
+   Right(R),
+}
 type Addr = (Either<Lab, Var>, Contour);
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 enum Storable {
    Value(Expr, Env),
-   Kont(Continuation)
+   Kont(Continuation),
 }
 use Storable::*;
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
@@ -77,17 +75,19 @@ enum Continuation {
    Ar(Expr, Env, Addr),
    BinopAr2(Op, Expr, Env, Addr),
    BinopAr1(Op, Num, Addr),
-   Mt
+   Mt,
 }
 use Continuation::*;
 type Env = Rc<BTreeMap<Var, Addr>>;
 
 fn array_vec_cons<T: Clone, const N: usize>(x: T, array_vec: &ArrayVec<T, N>) -> ArrayVec<T, N> {
-   if N == 0 {return ArrayVec::new()}
+   if N == 0 {
+      return ArrayVec::new()
+   }
    let mut res = ArrayVec::new();
    res.insert(0, x);
    let to_take = array_vec.len();
-   let to_take = if to_take == N {N - 1} else {to_take};
+   let to_take = if to_take == N { N - 1 } else { to_take };
    res.extend(array_vec[0..to_take].iter().cloned());
    res
 }
@@ -107,13 +107,11 @@ fn tick(e: &Expr, _ρ: &Env, _a: &Addr, t: &Time, k: &Continuation) -> Time {
       Binop(_, _, _) => t.clone(), // TODO this line is a judgment call
    }
 }
-fn alloc(e: &Expr, _ρ: &Env, _a: &Addr, t: &Time, k: &Continuation) -> Addr { 
+fn alloc(e: &Expr, _ρ: &Env, _a: &Addr, t: &Time, k: &Continuation) -> Addr {
    let (_lt, δ) = t;
    match e {
-      Binop(..) |
-      App(..) => (Either::Left(e.clone()), δ.clone()),
-      Lit(_) |
-      Lam(_, _) => match k {
+      Binop(..) | App(..) => (Either::Left(e.clone()), δ.clone()),
+      Lit(_) | Lam(_, _) => match k {
          BinopAr2(_, ek, _, _) | // TODO judgment call
          Ar(ek, _, _) => (Either::Left(ek.clone()), δ.clone()),
          Fn(Lam(x, _e), _, _) => (Either::Right(x), δ.clone()),
@@ -124,7 +122,7 @@ fn alloc(e: &Expr, _ρ: &Env, _a: &Addr, t: &Time, k: &Continuation) -> Addr {
       Ref(_) => panic!("alloc with Ref(_) as expression"),
    }
 }
-fn upd(ρ: &Env, var: Var, addr: Addr) -> Env{
+fn upd(ρ: &Env, var: Var, addr: Addr) -> Env {
    let mut ρ = ρ.deref().clone();
    ρ.insert(var, addr);
    Rc::new(ρ)
@@ -134,8 +132,8 @@ fn atom(e: &Expr) -> bool {
    match e {
       Lit(_) => true,
       Lam(_, _) => true,
-      _ => false
-   }  
+      _ => false,
+   }
 }
 
 fn apply_op_concrete(op: Op, x: NumConcrete, y: NumConcrete) -> NumConcrete {
@@ -160,7 +158,7 @@ fn apply_op(op: Op, x: &Num, y: &Num) -> Num {
    }
 }
 
-ascent!{
+ascent! {
    struct CESK;
    relation σ(Addr, Storable);
    lattice σnum(Addr, Num);
@@ -168,7 +166,7 @@ ascent!{
 
    ς(v.clone(), ρ2, a, tick(e, ρ, a, t, k)) <--
       ς(?e@Ref(x), ρ, a, t),
-      (σ(ρ[x], ?Value(v, ρ2)) || 
+      (σ(ρ[x], ?Value(v, ρ2)) ||
       σnum(ρ[x], lit), let v = Lit(*lit), let ρ2 = ρ),
       σ(a, ?Kont(k));
 
@@ -177,7 +175,7 @@ ascent!{
       ς(?e@App(e0, e1), ρ, a, t),
       σ(a, ?Kont(k)),
       let b = alloc(e, ρ, a, t, k);
-   
+
    σ(b.clone(), Kont(BinopAr2(*op, e2.deref().clone(), ρ.clone(), a.clone()))),
    ς(e1, ρ, b, tick(e, ρ, a, t, k)) <--
       ς(?e@Binop(op, e1, e2), ρ, a, t),
@@ -190,17 +188,17 @@ ascent!{
       σ(a, ?Kont(k)),
       if let Ar(e, ρ2, c) = k,
       let b = alloc(v, ρ, a, t, k);
-   
+
    σ(b.clone(), Kont(BinopAr1(*op, *l, c.clone()))),
    ς(e, ρ2, b, tick(v, ρ, a, t, k)) <--
-      ς(?v@Lit(l), ρ, a, t), 
+      ς(?v@Lit(l), ρ, a, t),
       σ(a, ?Kont(k)),
       if let BinopAr2(op, e, ρ2, c) = k,
       let b = alloc(v, ρ, a, t, k);
 
    σnum(op_addr.clone(), apply_op(*op, l1, l2)),
    ς(Ref("IT"), upd(ρ, "IT", op_addr), c, tick(v2, ρ, a, t, k)) <--
-      ς(?v2@Lit(l2), ρ, a, t), 
+      ς(?v2@Lit(l2), ρ, a, t),
       σ(a, ?Kont(k)),
       if let BinopAr1(op, l1, c) = k,
       let op_addr = alloc(v2, ρ, a, t, k);
@@ -211,7 +209,7 @@ ascent!{
       σ(a, ?Kont(k)),
       if let Fn(Lam(x, e), ρ2, c) = k,
       let b = alloc(v, ρ, a, t, k);
-   
+
    σnum(b.clone(), lit),
    ς(e, upd(ρ2, x, b), c, tick(v, ρ, a, t, k)) <--
       ς(?v@Lit(lit), ρ, a, t),
@@ -230,11 +228,9 @@ ascent!{
       σ(a, Kont(Continuation::Mt));
 }
 
-fn let_(x: &'static str, e0: Expr, e1: Expr) -> Expr {
-   app(lam(x, e1), e0)
-}
+fn let_(x: &'static str, e0: Expr, e1: Expr) -> Expr { app(lam(x, e1), e0) }
 #[allow(non_snake_case)]
-fn Y() -> Expr{
+fn Y() -> Expr {
    // (λ (f) (let ([u′ (λ (x) (f (λ (v) (let ([xx (x x)]) (xx v)))))])
    //          (u′ u′)))
 
@@ -244,10 +240,10 @@ fn Y() -> Expr{
 }
 
 // #[test]
-pub fn analysis_exp(){
+pub fn analysis_exp() {
    use ascent::lattice::constant_propagation::ConstPropagation::*;
    // println!("CESK summary:\n{}", CESK::summary());
-   
+
    // term = (λx. 42 + x) 58
    // let term = app(lam("x", binop(Op::Add, Lit(Constant(42)), Ref("x"))),
    //                Lit(Constant(58)));
@@ -261,7 +257,7 @@ pub fn analysis_exp(){
    // println!("ς: \n{}", cesk.ς.iter().map(|x| format!("{:?}", x)).join("\n"));
    // println!("σ: \n{}", cesk.σ.iter().map(|x| format!("{:?}", x)).join("\n"));
    println!("σnum: \n{}", cesk.σnum.iter().map(|x| format!("{:?}", x)).join("\n"));
-   
+
    println!("summary: \n{}", cesk.relation_sizes_summary());
    println!("output: \n{}", cesk.output.iter().map(|x| format!("{:?}", x.0)).join("\n\n"));
 }

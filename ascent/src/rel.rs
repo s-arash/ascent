@@ -75,41 +75,60 @@ impl<K, V> Default for ToRelIndexType<K, V> {
 }
 
 impl<K, V, R> ToRelIndex<R> for ToRelIndexType<K, V> {
-   type RelIndex<'a> = &'a RelIndexType1<K, V> where Self: 'a, R: 'a;
+   type RelIndex<'a>
+      = &'a RelIndexType1<K, V>
+   where
+      Self: 'a,
+      R: 'a;
 
    #[inline(always)]
-   fn to_rel_index<'a>(&'a self, _rel: &'a R) -> Self::RelIndex<'a> {
-      &self.0
-   }
+   fn to_rel_index<'a>(&'a self, _rel: &'a R) -> Self::RelIndex<'a> { &self.0 }
 
-   type RelIndexWrite<'a> = &'a mut RelIndexType1<K, V> where Self: 'a, R: 'a;
+   type RelIndexWrite<'a>
+      = &'a mut RelIndexType1<K, V>
+   where
+      Self: 'a,
+      R: 'a;
 
    #[inline(always)]
-   fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut R) -> Self::RelIndexWrite<'a> {
-      &mut self.0
-   }
+   fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut R) -> Self::RelIndexWrite<'a> { &mut self.0 }
 }
 
 use crate::internal::{Freezable, RelFullIndexType, RelIndexMerge, RelIndexType1};
 use crate::to_rel_index::ToRelIndex;
 
 impl<K, V, Rel> ToRelIndex<Rel> for RelIndexType1<K, V> {
-   type RelIndex<'a> = &'a Self where Self: 'a, Rel: 'a;
+   type RelIndex<'a>
+      = &'a Self
+   where
+      Self: 'a,
+      Rel: 'a;
    #[inline(always)]
    fn to_rel_index<'a>(&'a self, _rel: &'a Rel) -> Self::RelIndex<'a> { self }
 
-   type RelIndexWrite<'a> = &'a mut Self where Self: 'a, Rel: 'a;
+   type RelIndexWrite<'a>
+      = &'a mut Self
+   where
+      Self: 'a,
+      Rel: 'a;
    #[inline(always)]
    fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> { self }
 }
 
 impl<K, V, Rel> ToRelIndex<Rel> for RelFullIndexType<K, V> {
-   
-   type RelIndex<'a> = &'a Self where Self: 'a, Rel: 'a;
+   type RelIndex<'a>
+      = &'a Self
+   where
+      Self: 'a,
+      Rel: 'a;
    #[inline(always)]
    fn to_rel_index<'a>(&'a self, _rel: &'a Rel) -> Self::RelIndex<'a> { self }
 
-   type RelIndexWrite<'a> = &'a mut Self where Self: 'a, Rel: 'a;
+   type RelIndexWrite<'a>
+      = &'a mut Self
+   where
+      Self: 'a,
+      Rel: 'a;
    #[inline(always)]
    fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> { self }
 }
@@ -120,50 +139,71 @@ mod par {
    use crate::c_rel_index::CRelIndex;
    use crate::c_rel_no_index::CRelNoIndex;
    use crate::to_rel_index::ToRelIndex;
-   
-   impl<K, V, Rel> ToRelIndex<Rel> for CRelIndex<K, V> {
 
-      type RelIndex<'a> = &'a Self where Self: 'a, Rel: 'a;
+   impl<K, V, Rel> ToRelIndex<Rel> for CRelIndex<K, V> {
+      type RelIndex<'a>
+         = &'a Self
+      where
+         Self: 'a,
+         Rel: 'a;
       #[inline(always)]
       fn to_rel_index<'a>(&'a self, _rel: &'a Rel) -> Self::RelIndex<'a> { self }
 
-      type RelIndexWrite<'a> = &'a mut Self where Self: 'a, Rel: 'a;
+      type RelIndexWrite<'a>
+         = &'a mut Self
+      where
+         Self: 'a,
+         Rel: 'a;
       #[inline(always)]
       fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> { self }
    }
 
    impl<V, Rel> ToRelIndex<Rel> for CRelNoIndex<V> {
-      type RelIndex<'a> = &'a Self where Self: 'a, Rel: 'a;
+      type RelIndex<'a>
+         = &'a Self
+      where
+         Self: 'a,
+         Rel: 'a;
       #[inline(always)]
       fn to_rel_index<'a>(&'a self, _rel: &'a Rel) -> Self::RelIndex<'a> { self }
 
-      type RelIndexWrite<'a> = &'a mut Self where Self: 'a, Rel: 'a;
+      type RelIndexWrite<'a>
+         = &'a mut Self
+      where
+         Self: 'a,
+         Rel: 'a;
       #[inline(always)]
       fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> { self }
    }
 
    impl<K, V, Rel> ToRelIndex<Rel> for CRelFullIndex<K, V> {
-      
-      type RelIndex<'a> = &'a Self where Self: 'a, Rel: 'a;
+      type RelIndex<'a>
+         = &'a Self
+      where
+         Self: 'a,
+         Rel: 'a;
       #[inline(always)]
       fn to_rel_index<'a>(&'a self, _rel: &'a Rel) -> Self::RelIndex<'a> { self }
 
-      type RelIndexWrite<'a> = &'a mut Self where Self: 'a, Rel: 'a;
+      type RelIndexWrite<'a>
+         = &'a mut Self
+      where
+         Self: 'a,
+         Rel: 'a;
       #[inline(always)]
       fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> { self }
    }
 }
 
-
 impl RelIndexMerge for () {
    #[inline(always)]
-   fn move_index_contents(_from: &mut Self, _to: &mut Self) { }
+   fn move_index_contents(_from: &mut Self, _to: &mut Self) {}
 
    #[inline(always)]
-   fn merge_delta_to_total_new_to_delta(_new: &mut Self, _delta: &mut Self, _total: &mut Self) { }
+   fn merge_delta_to_total_new_to_delta(_new: &mut Self, _delta: &mut Self, _total: &mut Self) {}
 }
 
 impl Freezable for () {
-   fn freeze(&mut self) { }
-   fn unfreeze(&mut self) { }
+   fn freeze(&mut self) {}
+   fn unfreeze(&mut self) {}
 }

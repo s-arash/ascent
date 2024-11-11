@@ -1,9 +1,9 @@
-//! data structures for [`ascent`](https://github.com/s-arash/ascent) relations, 
+//! data structures for [`ascent`](https://github.com/s-arash/ascent) relations,
 //! made possible by Ascent's [BYODS](https://dl.acm.org/doi/pdf/10.1145/3622840) feature
 
 #![cfg_attr(not(test), deny(unused_crate_dependencies))]
 
-// See Cargo.toml for why this is needed. 
+// See Cargo.toml for why this is needed.
 use syn as _;
 
 mod union_find;

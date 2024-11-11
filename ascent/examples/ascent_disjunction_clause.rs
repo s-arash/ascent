@@ -6,9 +6,9 @@ ascent! {
     // Facts:
 
     relation number(i32);
-    
+
     // Rules:
-    
+
     relation square(i32);
 
     square(y * y) <-- number(y), number(y * y);
@@ -23,23 +23,15 @@ ascent! {
 }
 
 fn main() {
-    let mut prog = AscentProgram::default();
-    
-    prog.number = (1..=10).map(|n| (n,)).collect();
+   let mut prog = AscentProgram::default();
 
-    prog.run();
+   prog.number = (1..=10).map(|n| (n,)).collect();
 
-    let AscentProgram { mut even_or_square, ..} = prog;
+   prog.run();
 
-    even_or_square.sort_by_key(|(key,)| *key);
+   let AscentProgram { mut even_or_square, .. } = prog;
 
-    assert_eq!(even_or_square, vec![
-        (1,),
-        (2,),
-        (4,),
-        (6,),
-        (8,),
-        (9,),
-        (10,),
-    ]);
+   even_or_square.sort_by_key(|(key,)| *key);
+
+   assert_eq!(even_or_square, vec![(1,), (2,), (4,), (6,), (8,), (9,), (10,),]);
 }

@@ -1,18 +1,17 @@
 #![deny(warnings)]
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
-use proc_macro2::{Ident, TokenStream, TokenTree, Group};
 
-use quote::ToTokens;
-use syn::visit_mut::VisitMut;
-use syn::{Block, Stmt, ExprMacro};
-use syn::{Expr, Pat, Path};
-use crate::utils::{collect_set, into_set};
-use duplicate::duplicate_item;
 use ascent_base::util::update;
-
+use duplicate::duplicate_item;
+use proc_macro2::{Group, Ident, TokenStream, TokenTree};
+use quote::ToTokens;
 #[cfg(test)]
 use syn::parse2;
+use syn::visit_mut::VisitMut;
+use syn::{Block, Expr, ExprMacro, Pat, Path, Stmt};
+
+use crate::utils::{collect_set, into_set};
 
 // TODO maybe remove?
 #[allow(unused)]
@@ -35,7 +34,7 @@ pub fn pattern_get_vars(pat: &Pat) -> Vec<Ident> {
    let mut res = vec![];
    match pat {
       Pat::Ident(pat_ident) => {
-         res.push(pat_ident.ident.clone()); 
+         res.push(pat_ident.ident.clone());
          if let Some(subpat) = &pat_ident.subpat {
             res.extend(pattern_get_vars(&subpat.1))
          }
@@ -53,37 +52,32 @@ pub fn pattern_get_vars(pat: &Pat) -> Vec<Ident> {
       Pat::Range(_) => {},
       Pat::Reference(ref_pat) => res.extend(pattern_get_vars(&ref_pat.pat)),
       Pat::Rest(_) => {},
-      Pat::Slice(slice_pat) => {
-         for sub_pat in slice_pat.elems.iter(){
+      Pat::Slice(slice_pat) =>
+         for sub_pat in slice_pat.elems.iter() {
             res.extend(pattern_get_vars(sub_pat));
-         }
-      },
-      Pat::Struct(struct_pat) => {
+         },
+      Pat::Struct(struct_pat) =>
          for field_pat in struct_pat.fields.iter() {
             res.extend(pattern_get_vars(&field_pat.pat));
-         }
-      },
-      Pat::Tuple(tuple_pat) => {
+         },
+      Pat::Tuple(tuple_pat) =>
          for elem_pat in tuple_pat.elems.iter() {
             res.extend(pattern_get_vars(elem_pat));
-         }
-      }
-      Pat::TupleStruct(tuple_strcut_pat) => {
-         for elem_pat in tuple_strcut_pat.elems.iter(){
+         },
+      Pat::TupleStruct(tuple_strcut_pat) =>
+         for elem_pat in tuple_strcut_pat.elems.iter() {
             res.extend(pattern_get_vars(elem_pat));
-         }
-      },
+         },
       Pat::Type(type_pat) => {
          res.extend(pattern_get_vars(&type_pat.pat));
       },
       Pat::Verbatim(_) => {},
       Pat::Wild(_) => {},
-      _ => {}
+      _ => {},
    }
    // println!("pattern vars {} : {}", pat.to_token_stream(), res.iter().map(|ident| ident.to_string()).join(", "));
    res
 }
-
 
 pub fn pattern_visit_vars_mut(pat: &mut Pat, visitor: &mut dyn FnMut(&mut Ident)) {
    macro_rules! visit {
@@ -93,62 +87,58 @@ pub fn pattern_visit_vars_mut(pat: &mut Pat, visitor: &mut dyn FnMut(&mut Ident)
    }
    match pat {
       Pat::Ident(pat_ident) => {
-         visitor(&mut pat_ident.ident); 
+         visitor(&mut pat_ident.ident);
          if let Some(subpat) = &mut pat_ident.subpat {
             visit!(&mut subpat.1);
          }
       },
       Pat::Lit(_) => {},
       Pat::Macro(_) => {},
-      Pat::Or(or_pat) => {
+      Pat::Or(or_pat) =>
          for case in or_pat.cases.iter_mut() {
             visit!(case)
-         }
-      },
+         },
       Pat::Path(_) => {},
       Pat::Range(_) => {},
       Pat::Reference(ref_pat) => visit!(&mut ref_pat.pat),
       Pat::Rest(_) => {},
-      Pat::Slice(slice_pat) => {
-         for sub_pat in slice_pat.elems.iter_mut(){
+      Pat::Slice(slice_pat) =>
+         for sub_pat in slice_pat.elems.iter_mut() {
             visit!(sub_pat);
-         }
-      },
-      Pat::Struct(struct_pat) => {
+         },
+      Pat::Struct(struct_pat) =>
          for field_pat in struct_pat.fields.iter_mut() {
             visit!(&mut field_pat.pat);
-         }
-      },
-      Pat::Tuple(tuple_pat) => {
+         },
+      Pat::Tuple(tuple_pat) =>
          for elem_pat in tuple_pat.elems.iter_mut() {
             visit!(elem_pat);
-         }
-      }
-      Pat::TupleStruct(tuple_strcut_pat) => {
-         for elem_pat in tuple_strcut_pat.elems.iter_mut(){
+         },
+      Pat::TupleStruct(tuple_strcut_pat) =>
+         for elem_pat in tuple_strcut_pat.elems.iter_mut() {
             visit!(elem_pat);
-         }
-      },
+         },
       Pat::Type(type_pat) => {
          visit!(&mut type_pat.pat);
       },
       Pat::Verbatim(_) => {},
       Pat::Wild(_) => {},
-      _ => {}
+      _ => {},
    }
 }
 
 #[test]
-fn test_pattern_get_vars(){
+fn test_pattern_get_vars() {
    use syn::parse::Parser;
 
    let pattern = quote! {
       SomePair(x, (y, z))
    };
    let pat = Pat::parse_single.parse2(pattern).unwrap();
-   assert_eq!(collect_set(["x", "y", "z"].iter().map(ToString::to_string)), 
-              pattern_get_vars(&pat).into_iter().map(|id| id.to_string()).collect());
-
+   assert_eq!(
+      collect_set(["x", "y", "z"].iter().map(ToString::to_string)),
+      pattern_get_vars(&pat).into_iter().map(|id| id.to_string()).collect()
+   );
 }
 
 /// if the expression is a let expression (for example in `if let Some(foo) = bar {..}`),
@@ -156,7 +146,7 @@ fn test_pattern_get_vars(){
 pub fn expr_get_let_bound_vars(expr: &Expr) -> Vec<Ident> {
    match expr {
       Expr::Let(l) => pattern_get_vars(&l.pat),
-      _ => vec![]
+      _ => vec![],
    }
 }
 
@@ -176,48 +166,52 @@ pub fn stmt_get_vars(stmt: &Stmt) -> (Vec<Ident>, Vec<Ident>) {
       Stmt::Item(_) => {},
       Stmt::Expr(e, _) => used_vars.extend(expr_get_vars(e)),
       Stmt::Macro(m) => {
-         eprintln!("WARNING: cannot determine variables of macro invocations. macro invocation:\n{}", 
-            m.to_token_stream());
-      }
+         eprintln!(
+            "WARNING: cannot determine variables of macro invocations. macro invocation:\n{}",
+            m.to_token_stream()
+         );
+      },
    }
    (bound_vars, used_vars)
 }
 
 pub fn stmt_visit_free_vars_mut(stmt: &mut Stmt, visitor: &mut dyn FnMut(&mut Ident)) {
    match stmt {
-      Stmt::Local(l) => {
+      Stmt::Local(l) =>
          if let Some(init) = &mut l.init {
             expr_visit_free_vars_mut(&mut init.expr, visitor);
             if let Some(diverge) = &mut init.diverge {
                expr_visit_free_vars_mut(&mut diverge.1, visitor);
             }
-         }
-      },
+         },
       Stmt::Item(_) => {},
       Stmt::Expr(e, _) => expr_visit_free_vars_mut(e, visitor),
       Stmt::Macro(m) => {
-         eprintln!("WARNING: cannot determine free variables of macro invocations. macro invocation:\n{}", 
-            m.to_token_stream());
-      }
+         eprintln!(
+            "WARNING: cannot determine free variables of macro invocations. macro invocation:\n{}",
+            m.to_token_stream()
+         );
+      },
    }
 }
 
-pub fn stmt_visit_free_vars(stmt: &Stmt, visitor: &mut dyn FnMut(& Ident)) {
+pub fn stmt_visit_free_vars(stmt: &Stmt, visitor: &mut dyn FnMut(&Ident)) {
    match stmt {
-      Stmt::Local(l) => {
+      Stmt::Local(l) =>
          if let Some(init) = &l.init {
             expr_visit_free_vars(&init.expr, visitor);
             if let Some(diverge) = &init.diverge {
                expr_visit_free_vars(&diverge.1, visitor);
             }
-         }
-      },
+         },
       Stmt::Item(_) => {},
       Stmt::Expr(e, _) => expr_visit_free_vars(e, visitor),
       Stmt::Macro(m) => {
-         eprintln!("WARNING: cannot determine free variables of macro invocations. macro invocation:\n{}", 
-            m.to_token_stream());
-      }
+         eprintln!(
+            "WARNING: cannot determine free variables of macro invocations. macro invocation:\n{}",
+            m.to_token_stream()
+         );
+      },
    }
 }
 
@@ -225,7 +219,11 @@ pub fn block_visit_free_vars_mut(block: &mut Block, visitor: &mut dyn FnMut(&mut
    let mut bound_vars = HashSet::new();
    for stmt in block.stmts.iter_mut() {
       let (stmt_bound_vars, _) = stmt_get_vars(stmt);
-      stmt_visit_free_vars_mut(stmt, &mut |ident| if !bound_vars.contains(ident) {visitor(ident)});
+      stmt_visit_free_vars_mut(stmt, &mut |ident| {
+         if !bound_vars.contains(ident) {
+            visitor(ident)
+         }
+      });
       bound_vars.extend(stmt_bound_vars);
    }
 }
@@ -234,11 +232,14 @@ pub fn block_visit_free_vars(block: &Block, visitor: &mut dyn FnMut(&Ident)) {
    let mut bound_vars = HashSet::new();
    for stmt in block.stmts.iter() {
       let (stmt_bound_vars, _) = stmt_get_vars(stmt);
-      stmt_visit_free_vars(stmt, &mut |ident| if !bound_vars.contains(ident) {visitor(ident)});
+      stmt_visit_free_vars(stmt, &mut |ident| {
+         if !bound_vars.contains(ident) {
+            visitor(ident)
+         }
+      });
       bound_vars.extend(stmt_bound_vars);
    }
 }
-
 
 // all this nonsense to have two versions of this function:
 //expr_visit_free_vars and expr_visit_free_vars_mut
@@ -261,11 +262,10 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
       ($e: expr, $excluded: expr) => { expr_visit_free_vars_mbm($e, visitor_except!($excluded))};
    }
    match expr {
-      Expr::Array(arr) => {
+      Expr::Array(arr) =>
          for elem in arr.elems.iter_mbm() {
             expr_visit_free_vars_mbm(elem, visitor);
-         }
-      }
+         },
       Expr::Assign(assign) => {
          visit!(assign.left);
          visit!(assign.right)
@@ -275,21 +275,24 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
       Expr::Binary(b) => {
          visit!(b.left);
          visit!(b.right)
-      }
+      },
       Expr::Block(b) => block_visit_free_vars_mbm(reft([b.block]), visitor),
-      Expr::Break(b) => if let Some(b_e) = reft([b.expr]) {expr_visit_free_vars_mbm(b_e, visitor)},
+      Expr::Break(b) =>
+         if let Some(b_e) = reft([b.expr]) {
+            expr_visit_free_vars_mbm(b_e, visitor)
+         },
       Expr::Call(c) => {
          visit!(c.func);
          for arg in c.args.iter_mbm() {
             expr_visit_free_vars_mbm(arg, visitor)
          }
-      }
+      },
       Expr::Cast(c) => visit!(c.expr),
       Expr::Closure(c) => {
-         let input_vars : HashSet<_> = c.inputs.iter().flat_map(pattern_get_vars).collect();
+         let input_vars: HashSet<_> = c.inputs.iter().flat_map(pattern_get_vars).collect();
          visit_except!(reft([c.body]), input_vars);
       },
-      Expr::Continue(_c) => {}
+      Expr::Continue(_c) => {},
       Expr::Field(f) => visit!(f.base),
       Expr::ForLoop(f) => {
          let pat_vars: HashSet<_> = pattern_get_vars(&f.pat).into_iter().collect();
@@ -304,17 +307,19 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
          if let Some(eb) = reft([e.else_branch]) {
             visit!(eb.1)
          }
-      }
+      },
       Expr::Index(i) => {
          visit!(i.expr);
          visit!(i.index)
-      }
+      },
       Expr::Let(l) => visit!(l.expr),
-      Expr::Lit(_) => {}
+      Expr::Lit(_) => {},
       Expr::Loop(l) => block_visit_free_vars_mbm(reft([l.body]), visitor),
       Expr::Macro(_m) => {
-         eprintln!("WARNING: cannot determine free variables of macro invocations. macro invocation:\n{}", 
-                   expr.to_token_stream())
+         eprintln!(
+            "WARNING: cannot determine free variables of macro invocations. macro invocation:\n{}",
+            expr.to_token_stream()
+         )
       },
       Expr::Match(m) => {
          visit!(m.expr);
@@ -325,19 +330,18 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
             let arm_vars = pattern_get_vars(&arm.pat).into_iter().collect::<HashSet<_>>();
             visit_except!(reft([arm.body]), arm_vars);
          }
-      }
+      },
       Expr::MethodCall(c) => {
          visit!(c.receiver);
          for arg in c.args.iter_mbm() {
             expr_visit_free_vars_mbm(arg, visitor)
          }
-      }
+      },
       Expr::Paren(p) => visit!(p.expr),
-      Expr::Path(p) => {
+      Expr::Path(p) =>
          if let Some(ident) = path_get_ident_mbm(reft([p.path])) {
             visitor(ident)
-         }
-      }
+         },
       Expr::Range(r) => {
          if let Some(start) = reft([r.start]) {
             expr_visit_free_vars_mbm(start, visitor)
@@ -345,15 +349,16 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
          if let Some(end) = reft([r.end]) {
             expr_visit_free_vars_mbm(end, visitor)
          };
-      }
+      },
       Expr::Reference(r) => visit!(r.expr),
       Expr::Repeat(r) => {
          visit!(r.expr);
          visit!(r.len)
-      }
-      Expr::Return(r) => {
-         if let Some(e) = reft([r.expr]) { expr_visit_free_vars_mbm(e, visitor) }
-      }
+      },
+      Expr::Return(r) =>
+         if let Some(e) = reft([r.expr]) {
+            expr_visit_free_vars_mbm(e, visitor)
+         },
       Expr::Struct(s) => {
          for f in s.fields.iter_mbm() {
             visit!(f.expr)
@@ -361,40 +366,36 @@ pub fn expr_visit_free_vars_mbm(expr: reft([Expr]), visitor: &mut dyn FnMut(reft
          if let Some(rest) = reft([s.rest]) {
             expr_visit_free_vars_mbm(rest.deref_mbm(), visitor)
          }
-      }
+      },
       Expr::Try(t) => visit!(t.expr),
       Expr::TryBlock(t) => block_visit_free_vars_mbm(reft([t.block]), visitor),
-      Expr::Tuple(t) => {
+      Expr::Tuple(t) =>
          for e in t.elems.iter_mbm() {
             expr_visit_free_vars_mbm(e, visitor)
-         }
-      }
+         },
       Expr::Unary(u) => visit!(u.expr),
       Expr::Unsafe(u) => block_visit_free_vars_mbm(reft([u.block]), visitor),
-      Expr::Verbatim(_) => {}
+      Expr::Verbatim(_) => {},
       Expr::While(w) => {
          let bound_vars = expr_get_let_bound_vars(&w.cond).into_iter().collect::<HashSet<_>>();
          visit!(w.cond);
          block_visit_free_vars_mbm(reft([w.body]), visitor_except!(bound_vars))
-      }
-      Expr::Yield(y) => {
+      },
+      Expr::Yield(y) =>
          if let Some(e) = reft([y.expr]) {
             expr_visit_free_vars_mbm(e.deref_mbm(), visitor)
-         }
-      }
-      _ => {}
+         },
+      _ => {},
    }
 }
 
 /// like `Path::get_ident(&self)`, but `mut`
 pub fn path_get_ident_mut(path: &mut Path) -> Option<&mut Ident> {
-   if path.segments.len() != 1 || path.leading_colon.is_some() {return None}
-   let res = path.segments.first_mut()?;
-   if res.arguments.is_empty() {
-      Some(&mut res.ident)
-   } else {
-      None
+   if path.segments.len() != 1 || path.leading_colon.is_some() {
+      return None
    }
+   let res = path.segments.first_mut()?;
+   if res.arguments.is_empty() { Some(&mut res.ident) } else { None }
 }
 
 pub fn expr_get_vars(expr: &Expr) -> Vec<Ident> {
@@ -404,36 +405,42 @@ pub fn expr_get_vars(expr: &Expr) -> Vec<Ident> {
 }
 
 #[test]
-fn test_expr_get_vars(){
+fn test_expr_get_vars() {
    let test_cases = [
-      (quote! {
-         {
-            let res = 0;
-            for i in [0..10] {
-               let x = i + a;
-               res += x / {|m, (n, o)| m + n - o}(2, (b, 42))
+      (
+         quote! {
+            {
+               let res = 0;
+               for i in [0..10] {
+                  let x = i + a;
+                  res += x / {|m, (n, o)| m + n - o}(2, (b, 42))
+               }
+               res
             }
-            res
-         } 
-      }, vec!["a", "b"]),
-      (quote! {
-         |x1: u32, x2: u32| {
-            if y > x1 {
-               if let Some(z) = foo(x1)  {
-                  z + w
-               } else {
-                  t = 42;
-                  x2 
+         },
+         vec!["a", "b"],
+      ),
+      (
+         quote! {
+            |x1: u32, x2: u32| {
+               if y > x1 {
+                  if let Some(z) = foo(x1)  {
+                     z + w
+                  } else {
+                     t = 42;
+                     x2
+                  }
                }
             }
-         }
-      }, vec!["y", "foo", "w", "t"])
+         },
+         vec!["y", "foo", "w", "t"],
+      ),
    ];
 
    for (expr, expected) in test_cases {
       let mut expr = parse2(expr).unwrap();
       let result = expr_get_vars(&mut expr);
-      let result   =   result.into_iter().map(|v| v.to_string()).collect::<HashSet<_>>();
+      let result = result.into_iter().map(|v| v.to_string()).collect::<HashSet<_>>();
       let expected = expected.into_iter().map(|v| v.to_string()).collect::<HashSet<_>>();
       println!("result: {:?}", result);
       println!("expected: {:?}\n", expected);
@@ -441,9 +448,7 @@ fn test_expr_get_vars(){
    }
 }
 
-
 pub fn token_stream_replace_ident(ts: TokenStream, visitor: &mut dyn FnMut(&mut Ident)) -> TokenStream {
-
    fn token_tree_replace_ident(mut tt: TokenTree, visitor: &mut dyn FnMut(&mut Ident)) -> TokenTree {
       match tt {
          TokenTree::Group(grp) => {
@@ -451,7 +456,10 @@ pub fn token_stream_replace_ident(ts: TokenStream, visitor: &mut dyn FnMut(&mut 
             let new_grp = Group::new(grp.delimiter(), updated_ts);
             TokenTree::Group(new_grp)
          },
-         TokenTree::Ident(ref mut ident) =>{visitor(ident); tt},
+         TokenTree::Ident(ref mut ident) => {
+            visitor(ident);
+            tt
+         },
          TokenTree::Punct(_) => tt,
          TokenTree::Literal(_) => tt,
       }
@@ -465,13 +473,12 @@ pub fn token_stream_replace_ident(ts: TokenStream, visitor: &mut dyn FnMut(&mut 
 }
 
 pub fn token_stream_visit_idents(ts: TokenStream, visitor: &mut impl FnMut(&Ident)) {
-
    fn token_tree_visit_idents(mut tt: TokenTree, visitor: &mut impl FnMut(&Ident)) {
       match tt {
          TokenTree::Group(grp) => {
             token_stream_visit_idents(grp.stream(), visitor);
          },
-         TokenTree::Ident(ref mut ident) =>visitor(ident),
+         TokenTree::Ident(ref mut ident) => visitor(ident),
          TokenTree::Punct(_) => (),
          TokenTree::Literal(_) => (),
       }
@@ -491,9 +498,7 @@ pub fn token_stream_idents(ts: TokenStream) -> Vec<Ident> {
 pub fn expr_visit_macros_mut(expr: &mut Expr, visitor: &mut dyn FnMut(&mut ExprMacro)) {
    struct Visitor<'a>(&'a mut dyn FnMut(&mut ExprMacro));
    impl<'a> syn::visit_mut::VisitMut for Visitor<'a> {
-      fn visit_expr_macro_mut(&mut self, node: &mut ExprMacro) {
-         (self.0)(node)
-      }
+      fn visit_expr_macro_mut(&mut self, node: &mut ExprMacro) { (self.0)(node) }
    }
    Visitor(visitor).visit_expr_mut(expr)
 }
@@ -504,4 +509,3 @@ pub fn expr_visit_idents_in_macros_mut(expr: &mut Expr, visitor: &mut dyn FnMut(
    };
    expr_visit_macros_mut(expr, &mut mac_visitor)
 }
-

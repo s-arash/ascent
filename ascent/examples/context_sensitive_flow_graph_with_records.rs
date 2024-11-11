@@ -24,8 +24,8 @@ pub struct ProgPoint(Instr, Context);
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Res {
-    Ok,
-    Err,
+   Ok,
+   Err,
 }
 
 ascent! {
@@ -34,36 +34,33 @@ ascent! {
     relation succ(ProgPoint, ProgPoint);
 
     // Rules:
-    
+
     relation flow(ProgPoint, ProgPoint);
-    
+
     flow(p1, p2) <-- succ(p1, p2);
     flow(p1, p3) <-- flow(p1, p2), flow(p2, p3);
 
     relation res(Res);
-    
+
     res(Res::Ok) <-- flow(ProgPoint(Instr("w1"), Context("c1")), ProgPoint(Instr("r2"), Context("c1")));
     res(Res::Err) <-- flow(ProgPoint(Instr("w1"), Context("c1")), ProgPoint(Instr("r2"), Context("c2")));
 }
 
 fn main() {
-    let mut prog = AscentProgram::default();
-    
-    prog.succ = vec![
-        (ProgPoint(Instr("w1"), Context("c1")), ProgPoint(Instr("w2"), Context("c1"))),
-        (ProgPoint(Instr("w2"), Context("c1")), ProgPoint(Instr("r1"), Context("c1"))),
-        (ProgPoint(Instr("r1"), Context("c1")), ProgPoint(Instr("r2"), Context("c1"))),
+   let mut prog = AscentProgram::default();
 
-        (ProgPoint(Instr("w1"), Context("c2")), ProgPoint(Instr("w2"), Context("c2"))),
-        (ProgPoint(Instr("w2"), Context("c2")), ProgPoint(Instr("r1"), Context("c2"))),
-        (ProgPoint(Instr("r1"), Context("c2")), ProgPoint(Instr("r2"), Context("c2"))),
-    ];
+   prog.succ = vec![
+      (ProgPoint(Instr("w1"), Context("c1")), ProgPoint(Instr("w2"), Context("c1"))),
+      (ProgPoint(Instr("w2"), Context("c1")), ProgPoint(Instr("r1"), Context("c1"))),
+      (ProgPoint(Instr("r1"), Context("c1")), ProgPoint(Instr("r2"), Context("c1"))),
+      (ProgPoint(Instr("w1"), Context("c2")), ProgPoint(Instr("w2"), Context("c2"))),
+      (ProgPoint(Instr("w2"), Context("c2")), ProgPoint(Instr("r1"), Context("c2"))),
+      (ProgPoint(Instr("r1"), Context("c2")), ProgPoint(Instr("r2"), Context("c2"))),
+   ];
 
-    prog.run();
+   prog.run();
 
-    let AscentProgram { res, ..} = prog;
+   let AscentProgram { res, .. } = prog;
 
-    assert_eq!(res, vec![
-        (Res::Ok,),
-    ]);
+   assert_eq!(res, vec![(Res::Ok,),]);
 }

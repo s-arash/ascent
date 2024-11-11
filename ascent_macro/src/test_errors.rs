@@ -1,10 +1,9 @@
 #![cfg(test)]
 use crate::ascent_impl;
 
-
 #[test]
 fn test_agg_not_stratifiable() {
-   let inp = quote!{
+   let inp = quote! {
       relation foo(i32, i32, i32);
       relation bar(i32, i32);
       relation baz(i32);
@@ -12,8 +11,8 @@ fn test_agg_not_stratifiable() {
       baz(x) <--
          foo(x, _, _),
          !bar(_, x);
-         
-      bar(x, x + 1) <-- baz(x); 
+
+      bar(x, x + 1) <-- baz(x);
    };
    let res = ascent_impl(inp, false, false);
    println!("res: {:?}", res);
