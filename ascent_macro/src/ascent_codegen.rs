@@ -5,7 +5,7 @@ use itertools::{Itertools, Either};
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::{Expr, Type, parse2, spanned::Spanned, parse_quote, parse_quote_spanned};
 
-use crate::{ascent_hir::{IrRelation, IndexValType}, ascent_syntax::{CondClause, RelationIdentity}, utils::TokenStreamExtensions};
+use crate::{ascent_hir::{IndexValType, IrRelation}, ascent_syntax::{CondClause, RelationIdentity}, utils::TokenStreamExtensions};
 use crate::utils::{exp_cloned, expr_to_ident, tuple, tuple_spanned, tuple_type};
 use crate::ascent_mir::{AscentMir, MirBodyItem, MirRelation, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name, mir_rule_summary, mir_summary};
 use crate::ascent_mir::MirRelationVersion::*;
@@ -68,7 +68,6 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       }
    }
 
-   
    let mut sccs_compiled = vec![];
    for (i, _scc) in sccs_ordered.iter().enumerate() {
       let msg = format!("scc {}", i);
@@ -563,7 +562,6 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
    }} else {quote! {
       #[allow(unused_assignments, unused_variables)]
       {
-         // let mut __changed = false;
          #changed_var_def_code
          #(#freeze_code)*
 
@@ -748,8 +746,7 @@ fn compile_cond_clause(cond: &CondClause, body: proc_macro2::TokenStream) -> pro
 }
 
 fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> proc_macro2::TokenStream {
-   let (head_rels_structs_and_vars, head_update_code) = 
-      head_clauses_structs_and_update_code(rule, scc, mir);
+   let head_update_code = head_update_code(rule, scc, mir);
 
    const MAX_PAR_ITERS: usize = 2;
 
@@ -761,11 +758,7 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> proc_macro
          if new_count > MAX_PAR_ITERS { Done((new_count, i)) } else { Continue((new_count, i + 1)) }
       }).into_inner().1
    } else { 0 };
-   let rule_code = compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, 0);
-   quote!{
-      #head_rels_structs_and_vars
-      #rule_code
-   }
+   compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, 0)
 }
 
 fn compile_mir_rule_inner(rule: &MirRule, _scc: &MirScc, mir: &AscentMir, par_iter_to_ind: usize, head_update_code: proc_macro2::TokenStream, clause_ind: usize) 
@@ -972,7 +965,7 @@ fn compile_mir_rule_inner(rule: &MirRule, _scc: &MirScc, mir: &AscentMir, par_it
    }
 }
 
-fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+fn head_update_code(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> proc_macro2::TokenStream {
    let mut add_rows = vec![];
 
    let set_changed_true_code = if !mir.is_parallel {
@@ -1115,7 +1108,7 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
             {
                let __lat_changed = ::ascent::Lattice::join_mut(&mut #_self.#head_rel_name[__existing_ind].write().unwrap().#tuple_lat_index, 
                                                                __new_row.#tuple_lat_index.clone());
-               if __lat_changed && !__new_has_ind{
+               if __lat_changed && !__new_has_ind {
                   let __new_row_ind = __existing_ind;
                   #(#update_indices)*
                   #set_changed_true_code
@@ -1136,10 +1129,7 @@ fn head_clauses_structs_and_update_code(rule: &MirRule, scc: &MirScc, mir: &Asce
          add_rows.push(add_row);
       }
    }
-   (
-      quote!{}, 
-      quote!{#(#add_rows)*}
-   )
+   quote!{#(#add_rows)*}
 }
 
 fn lattice_insertion_mutex_var_name(head_relation: &RelationIdentity) -> Ident {

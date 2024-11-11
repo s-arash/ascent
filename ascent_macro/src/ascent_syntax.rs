@@ -822,10 +822,9 @@ fn rule_desugar_pattern_args(rule: RuleNode) -> RuleNode {
       }
    }
    let mut gensym = GenSym::default();
-   use BodyItemNode::*;
    RuleNode {
       body_items: rule.body_items.into_iter().map(|bi| match bi {
-         Clause(cl) => Clause(clause_desugar_pattern_args(cl, &mut gensym)),
+         BodyItemNode::Clause(cl) => BodyItemNode::Clause(clause_desugar_pattern_args(cl, &mut gensym)),
          _ => bi}).collect(),
       head_clauses: rule.head_clauses
    }
