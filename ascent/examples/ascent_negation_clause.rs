@@ -6,9 +6,9 @@ ascent! {
     // Facts:
 
     relation number(i32);
-    
+
     // Rules:
-    
+
     relation even(i32);
 
     even(x) <-- number(x), if x % 2 == 0;
@@ -19,26 +19,19 @@ ascent! {
 }
 
 fn main() {
-    let mut prog = AscentProgram::default();
-    
-    prog.number = (1..=5).map(|n| (n,)).collect();
+   let mut prog = AscentProgram::default();
 
-    prog.run();
+   prog.number = (1..=5).map(|n| (n,)).collect();
 
-    let AscentProgram { mut even, mut odd, ..} = prog;
+   prog.run();
 
-    even.sort_by_key(|(key,)| *key);
+   let AscentProgram { mut even, mut odd, .. } = prog;
 
-    assert_eq!(even, vec![
-        (2,),
-        (4,),
-    ]);
+   even.sort_by_key(|(key,)| *key);
 
-    odd.sort_by_key(|(key,)| *key);
+   assert_eq!(even, vec![(2,), (4,),]);
 
-    assert_eq!(odd, vec![
-        (1,),
-        (3,),
-        (5,),
-    ]);
+   odd.sort_by_key(|(key,)| *key);
+
+   assert_eq!(odd, vec![(1,), (3,), (5,),]);
 }

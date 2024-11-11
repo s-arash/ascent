@@ -10,13 +10,13 @@ type Register = &'static str;
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Val {
    Ref(Register),
-   Lit(i32)
+   Lit(i32),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Trace {
    Null,
-   Cons(SrcLine, Rc<Trace>)
+   Cons(SrcLine, Rc<Trace>),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -27,9 +27,7 @@ pub enum Instr {
    Add(Register, Val, Val),
    Br(SrcLine),
 }
-fn instr_vals(instr: &Instr) -> Vec<&Val>{
-   todo!()
-}
+fn instr_vals(instr: &Instr) -> Vec<&Val> { todo!() }
 
 use Instr::*;
 ascent! {
@@ -37,12 +35,12 @@ ascent! {
    relation source(SrcLine, Instr);
    relation store(Trace, Register, i32);
    relation aeval(Trace, Val, i32);
-   
+
    aeval(time.clone(), val, eval) <--
       source(pc, instr),
       trace(pc, time),
       for (&val, &eval) in instr_vals(instr).into_iter().filter_map(|v| match v {Val::Lit(l) => Some((v,l)), Val::Ref(r) => None});
-   
+
    aeval(time.clone(), val, eval) <--
       source(pc, instr),
       trace(pc, time),

@@ -17,10 +17,13 @@ extern crate proc_macro;
 use ascent_syntax::{AscentProgram, desugar_ascent_program};
 use proc_macro::TokenStream;
 use syn::Result;
-use crate::{ascent_codegen::compile_mir, ascent_hir::compile_ascent_program_to_hir, ascent_mir::compile_hir_to_mir};
+
+use crate::ascent_codegen::compile_mir;
+use crate::ascent_hir::compile_ascent_program_to_hir;
+use crate::ascent_mir::compile_hir_to_mir;
 
 /// The main macro of the ascent library. Allows writing logical inference rules similar to Datalog.
-/// 
+///
 /// Example:
 /// ```
 /// # #[macro_use] extern crate ascent_macro;
@@ -32,7 +35,7 @@ use crate::{ascent_codegen::compile_mir, ascent_hir::compile_ascent_program_to_h
 ///   path(x, y) <-- edge(x,y);
 ///   path(x, z) <-- edge(x,y), path(y, z);
 /// }
-/// 
+///
 /// fn main() {
 ///   let mut tc_comp = AscentProgram::default();
 ///   tc_comp.edge = vec![(1,2), (2,3)];
@@ -45,7 +48,7 @@ use crate::{ascent_codegen::compile_mir, ascent_hir::compile_ascent_program_to_h
 #[proc_macro]
 pub fn ascent(input: TokenStream) -> TokenStream {
    let res = ascent_impl(input.into(), false, false);
-   
+
    match res {
       Ok(res) => res.into(),
       Err(err) => TokenStream::from(err.to_compile_error()),
@@ -53,22 +56,21 @@ pub fn ascent(input: TokenStream) -> TokenStream {
 }
 
 /// Similar to `ascent`, allows writing logic programs in Rust.
-/// 
-/// The difference is that `ascent_par` generates parallelized code. 
+///
+/// The difference is that `ascent_par` generates parallelized code.
 #[proc_macro]
 pub fn ascent_par(input: TokenStream) -> TokenStream {
    let res = ascent_impl(input.into(), false, true);
-   
+
    match res {
       Ok(res) => res.into(),
       Err(err) => TokenStream::from(err.to_compile_error()),
    }
 }
 
-
 /// Like `ascent`, except that the result of an `ascent_run` invocation is a value containing all the relations
 /// defined inside the macro body, and computed to a fixed point.
-/// 
+///
 /// The advantage of `ascent_run` compared to `ascent` is the fact that `ascent_run` has access to local variables
 /// in scope:
 /// ```
@@ -85,7 +87,7 @@ pub fn ascent_par(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn ascent_run(input: TokenStream) -> TokenStream {
    let res = ascent_impl(input.into(), true, false);
-   
+
    match res {
       Ok(res) => res.into(),
       Err(err) => TokenStream::from(err.to_compile_error()),
@@ -96,20 +98,22 @@ pub fn ascent_run(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn ascent_run_par(input: TokenStream) -> TokenStream {
    let res = ascent_impl(input.into(), true, true);
-   
+
    match res {
       Ok(res) => res.into(),
       Err(err) => TokenStream::from(err.to_compile_error()),
    }
 }
 
-pub(crate) fn ascent_impl(input: proc_macro2::TokenStream, is_ascent_run: bool, is_parallel: bool) -> Result<proc_macro2::TokenStream> {
+pub(crate) fn ascent_impl(
+   input: proc_macro2::TokenStream, is_ascent_run: bool, is_parallel: bool,
+) -> Result<proc_macro2::TokenStream> {
    let prog: AscentProgram = syn::parse2(input)?;
    // println!("prog relations: {}", prog.relations.len());
    // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
 
    let prog = desugar_ascent_program(prog)?;
-   
+
    let hir = compile_ascent_program_to_hir(&prog, is_parallel)?;
    // println!("hir relations: {}", hir.relations_ir_relations.keys().map(|r| &r.name).join(", "));
 

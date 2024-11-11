@@ -1,17 +1,19 @@
+use std::hash::{BuildHasherDefault, Hash};
+
 use ascent_base::util::update;
 use dashmap::{DashMap, SharedValue};
 use instant::Instant;
 use rustc_hash::FxHasher;
-use std::hash::{Hash, BuildHasherDefault};
 
 use crate::c_rel_index::{DashMapViewParIter, shards_count};
-use crate::internal::{RelIndexWrite, CRelIndexWrite, RelFullIndexRead, RelFullIndexWrite, CRelFullIndexWrite, RelIndexMerge, Freezable};
-use crate::internal::{RelIndexRead, RelIndexReadAll, CRelIndexRead, CRelIndexReadAll};
-
+use crate::internal::{
+   CRelFullIndexWrite, CRelIndexRead, CRelIndexReadAll, CRelIndexWrite, Freezable, RelFullIndexRead, RelFullIndexWrite,
+   RelIndexMerge, RelIndexRead, RelIndexReadAll, RelIndexWrite,
+};
 
 pub enum CRelFullIndex<K, V> {
    Unfrozen(DashMap<K, V, BuildHasherDefault<FxHasher>>),
-   Frozen(dashmap::ReadOnlyView<K, V, BuildHasherDefault<FxHasher>>)
+   Frozen(dashmap::ReadOnlyView<K, V, BuildHasherDefault<FxHasher>>),
 }
 
 impl<K: Clone + Hash + Eq, V> Freezable for CRelFullIndex<K, V> {
@@ -31,11 +33,9 @@ impl<K: Clone + Hash + Eq, V> Freezable for CRelFullIndex<K, V> {
 }
 
 impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
-
-
    pub fn exact_len(&self) -> usize {
       match self {
-        CRelFullIndex::Unfrozen(uf) => uf.len(),
+         CRelFullIndex::Unfrozen(uf) => uf.len(),
          CRelFullIndex::Frozen(f) => f.len(),
       }
    }
@@ -72,22 +72,18 @@ impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
    }
 
    #[inline]
-   fn insert(&self, key: K, value: V) {
-      self.unwrap_unfrozen().insert(key, value);
-   }
+   fn insert(&self, key: K, value: V) { self.unwrap_unfrozen().insert(key, value); }
 
-   pub fn hash_usize(&self, k: &K) -> usize {
-      self.unwrap_unfrozen().hash_usize(k)
-   }
+   pub fn hash_usize(&self, k: &K) -> usize { self.unwrap_unfrozen().hash_usize(k) }
 
-   pub fn get_cloned(&self, key: &K) -> Option<V> where V: Clone {
+   pub fn get_cloned(&self, key: &K) -> Option<V>
+   where V: Clone {
       match self {
          CRelFullIndex::Unfrozen(uf) => uf.get(key).map(|x| x.value().clone()),
          CRelFullIndex::Frozen(f) => f.get(key).cloned(),
       }
    }
 
-   
    pub fn insert_if_not_present2(&self, key: &K, value: V) -> bool {
       let dm = self.unwrap_unfrozen();
 
@@ -126,9 +122,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelIndexRead<'a> for CRelFullIndex<K,
       Some(res)
    }
 
-   fn len(&self) -> usize {
-      self.unwrap_frozen().len()
-   }
+   fn len(&self) -> usize { self.unwrap_frozen().len() }
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Sync> CRelIndexRead<'a> for CRelFullIndex<K, V> {
@@ -143,16 +137,13 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Sync> CRelIndexRead<'a> for CRelFull
       let res = rayon::iter::once(val);
       Some(res)
    }
-
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelFullIndexRead<'a> for CRelFullIndex<K, V> {
    type Key = K;
 
    #[inline(always)]
-   fn contains_key(&self, key: &Self::Key) -> bool {
-      self.unwrap_frozen().contains_key(key)
-   }
+   fn contains_key(&self, key: &Self::Key) -> bool { self.unwrap_frozen().contains_key(key) }
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelFullIndexWrite for CRelFullIndex<K, V> {
@@ -176,7 +167,6 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelFullIndexWrite for CRelFullIndex<
    type Value = V;
 
    fn insert_if_not_present(&self, key: &Self::Key, v: Self::Value) -> bool {
-
       // TODO decide what to do here
       // let before = Instant::now();
 
@@ -210,20 +200,24 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone> RelIndexReadAll<'a> for CRelF
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Send + Sync> CRelIndexReadAll<'a> for CRelFullIndex<K, V> {
+impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Send + Sync> CRelIndexReadAll<'a>
+   for CRelFullIndex<K, V>
+{
    type Key = &'a K;
    type Value = &'a V;
 
    type ValueIteratorType = rayon::iter::Once<&'a V>;
    // type AllIteratorType = Box<dyn Iterator<Item = (&'a K, Self::ValueIteratorType)> + 'a>;
 
-   type AllIteratorType = 
-      rayon::iter::Map<DashMapViewParIter<'a, K, V, BuildHasherDefault<FxHasher>>, for<'aa, 'bb> fn((&'aa K, &'bb V)) -> (&'aa K, rayon::iter::Once<&'bb V>)>;
-
+   type AllIteratorType = rayon::iter::Map<
+      DashMapViewParIter<'a, K, V, BuildHasherDefault<FxHasher>>,
+      for<'aa, 'bb> fn((&'aa K, &'bb V)) -> (&'aa K, rayon::iter::Once<&'bb V>),
+   >;
 
    fn c_iter_all(&'a self) -> Self::AllIteratorType {
       use rayon::prelude::*;
-      let res: Self::AllIteratorType = DashMapViewParIter::new(self.unwrap_frozen()).map(|(k, v)| (k, rayon::iter::once(v)));
+      let res: Self::AllIteratorType =
+         DashMapViewParIter::new(self.unwrap_frozen()).map(|(k, v)| (k, rayon::iter::once(v)));
       res
    }
 }
@@ -234,13 +228,15 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
 
    fn index_insert(&mut self, key: Self::Key, value: Self::Value) {
       let dm = self.unwrap_mut_unfrozen();
-      
+
       // let shard = dm.determine_map(&key);
       // dm.shards_mut()[shard].get_mut().insert(key, SharedValue::new(value));
-      
+
       let hash = dm.hash_usize(&key);
       let shard = dm.determine_shard(hash);
-      dm.shards_mut()[shard].get_mut().raw_entry_mut()
+      dm.shards_mut()[shard]
+         .get_mut()
+         .raw_entry_mut()
          .from_key_hashed_nocheck(hash as u64, &key)
          .insert(key, SharedValue::new(value));
    }
@@ -249,7 +245,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
 impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexMerge for CRelFullIndex<K, V> {
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
-      
+
       let from = from.unwrap_mut_unfrozen();
       let to = to.unwrap_mut_unfrozen();
 
@@ -271,7 +267,6 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexM
       unsafe {
          crate::internal::MOVE_FULL_INDEX_CONTENTS_TOTAL_TIME += before.elapsed();
       }
-
    }
 }
 

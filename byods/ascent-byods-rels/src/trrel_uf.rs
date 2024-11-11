@@ -20,4 +20,4 @@ macro_rules! trrel_uf_ind_common {
 }
 pub use trrel_uf_ind_common as rel_ind_common;
 
-pub use crate::adaptor::bin_rel_plus_ternary_provider::{rel_codegen, rel_ind, rel_full_ind, rel};
+pub use crate::adaptor::bin_rel_plus_ternary_provider::{rel, rel_codegen, rel_full_ind, rel_ind};

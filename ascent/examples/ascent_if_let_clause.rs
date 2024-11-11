@@ -6,9 +6,9 @@ ascent! {
     // Facts:
 
     relation option(Option<isize>);
-    
+
     // Rules:
-    
+
     relation some(isize);
 
     some(y) <-- option(x), if let Some(y) = x;
@@ -19,24 +19,15 @@ ascent! {
 }
 
 fn main() {
-    let mut prog = AscentProgram::default();
-    
-    prog.option = vec![
-        (None,),
-        (Some(1),),
-        (Some(2),),
-        (Some(3),),
-    ];
+   let mut prog = AscentProgram::default();
 
-    prog.run();
+   prog.option = vec![(None,), (Some(1),), (Some(2),), (Some(3),)];
 
-    let AscentProgram { mut some, ..} = prog;
+   prog.run();
 
-    some.sort_by_key(|(key,)| *key);
+   let AscentProgram { mut some, .. } = prog;
 
-    assert_eq!(some, vec![
-        (1,),
-        (2,),
-        (3,),
-    ]);
+   some.sort_by_key(|(key,)| *key);
+
+   assert_eq!(some, vec![(1,), (2,), (3,),]);
 }

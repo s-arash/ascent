@@ -10,12 +10,12 @@ fn test_eq_rel2_in_ascent() {
 
       #[ds(crate::eqrel)]
       relation indexed_eq_rel(u32, u64, u64);
-      
+
       relation seed(u32);
       seed(x) <-- for x in 0..2;
-      
+
       relation seed2(u32, u64, u64);
-      
+
       seed2(a, 1, 2) <-- seed(a);
       seed2(a, x + 1, y + 1) <-- seed2(a, x, y), if *y < 20;
 
@@ -35,7 +35,6 @@ fn test_eq_rel2_in_ascent() {
 
 #[test]
 fn test_eq_rel2_in_ascent2() {
-
    let test_cases = vec![
       (0..2).flat_map(|a| (3..5).flat_map(move |x| (9..11).map(move |y| (a, x, y)))).collect_vec(),
       vec![(0, 10, 11), (0, 12, 13), (0, 13, 14)],
@@ -45,7 +44,7 @@ fn test_eq_rel2_in_ascent2() {
       println!("test {}", i);
       let res = ascent_run! {
          struct EqRel2TestProg;
-         
+
          #[ds(crate::eqrel)]
          relation indexed_eq_rel(u32, u64, u64);
 
@@ -53,7 +52,7 @@ fn test_eq_rel2_in_ascent2() {
 
          indexed_eq_rel_explicit(a, x, x), indexed_eq_rel_explicit(a, y, x) <-- indexed_eq_rel_explicit(a, x, y);
          indexed_eq_rel_explicit(a, x, z) <-- indexed_eq_rel_explicit(a, x, y), indexed_eq_rel_explicit(a, y, z);
-         
+
          indexed_eq_rel(a, x, y), indexed_eq_rel_explicit(a, x, y) <-- for (a, x, y) in seed_rel;
 
 
@@ -159,28 +158,25 @@ fn test_trrel_uf_ternary_in_ascent() {
    assert_eq!(res.__tr_ind_common.0.map[&1].count_exact() as u32, (ub + 1).pow(2));
 }
 
-
 #[test]
 fn test_trrel1() {
-
    let test_cases = vec![
       vec![(1, 2), (2, 3)],
       vec![(1, 2)],
       (4..6).flat_map(|x| (6..9).map(move |y| (x, y))).collect(),
-      (0..5).map(|x| (x, x + 1)).collect()
+      (0..5).map(|x| (x, x + 1)).collect(),
    ];
 
    for (i, seed_rel) in test_cases.into_iter().enumerate() {
-
       let res = ascent_run! {
          #[ds(crate::trrel)]
          relation tr(u32, u32);
-         
+
          relation tr_explicit(u32, u32);
          tr_explicit(x, z) <-- tr_explicit(x, y), tr_explicit(y, z);
-         
+
          tr(x, y), tr_explicit(x, y) <-- for (x, y) in seed_rel;
-         
+
          tr(x, y) <-- tr(x, y);
          relation tr_materialized(u32, u32);
          tr_materialized(x, y) <-- tr(x, y);
@@ -188,13 +184,13 @@ fn test_trrel1() {
          // testing New, Old variants of `TrRelIndCommon`
          #[ds(crate::trrel)]
          relation dummy1(u32, u32);
-         
+
          #[ds(crate::trrel)]
          relation dummy2(u32, u32);
 
          dummy2(x, y) <-- dummy1(x, y);
       };
-   
+
       println!("TEST {}", i);
       println!("explicit len: {}", res.tr_explicit.len());
       println!("materialized len: {}", res.tr_materialized.len());
@@ -205,29 +201,27 @@ fn test_trrel1() {
 
 #[test]
 fn test_trrel_reflexive_facts() {
-
    let test_cases = vec![
       vec![(1, 1), (1, 2)],
       vec![(1, 1)],
       (4..6).flat_map(|x| (5..7).map(move |y| (x, y))).collect(),
-      (0..5).map(|x| (x, x)).collect()
+      (0..5).map(|x| (x, x)).collect(),
    ];
 
    for (i, seed_rel) in test_cases.into_iter().enumerate() {
-
       let res = ascent_run! {
          #[ds(crate::trrel)]
          relation tr(u32, u32);
-         
+
          relation tr_explicit(u32, u32);
          tr_explicit(x, z) <-- tr_explicit(x, y), tr_explicit(y, z);
-         
+
          tr(x, y), tr_explicit(x, y) <-- for (x, y) in seed_rel;
-         
+
          relation tr_materialized(u32, u32);
          tr_materialized(x, y) <-- tr(x, y);
       };
-   
+
       println!("TEST {}", i);
       println!("explicit len: {}", res.tr_explicit.len());
       assert_eq!(res.tr_explicit.len(), res.tr_materialized.len());
@@ -238,11 +232,19 @@ fn test_trrel_reflexive_facts() {
 fn test_trrel2_in_ascent() {
    let test_cases = vec![
       (1..4).flat_map(|a| (3..7).flat_map(move |x| (11..15).map(move |y| (a, x, y)))).collect_vec(),
-      (0..3).flat_map(|a| (0..15).filter(move |x| x % 3 == a as u64 % 3).flat_map(move |x| (a as u64 + 14..19).map(move |y| (a, x, y)))).collect_vec(),
+      (0..3)
+         .flat_map(|a| {
+            (0..15)
+               .filter(move |x| x % 3 == a as u64 % 3)
+               .flat_map(move |x| (a as u64 + 14..19).map(move |y| (a, x, y)))
+         })
+         .collect_vec(),
       (1..4).flat_map(|a| (5..10).flat_map(move |x| (12..17).map(move |y| (a, x, y)))).collect_vec(),
       vec![(0, 10, 11), (0, 5, 13), (0, 6, 13), (0, 7, 14), (0, 12, 13), (0, 13, 14)],
       vec![(0, 7, 8), (0, 8, 10), (0, 8, 13), (0, 9, 11), (1, 9, 14), (1, 9, 13), (1, 10, 14)]
-         .into_iter().flat_map(|(a, x, y)| (0..3).map(move |o| (a + o, x, y - o as u64))).collect(),
+         .into_iter()
+         .flat_map(|(a, x, y)| (0..3).map(move |o| (a + o, x, y - o as u64)))
+         .collect(),
    ];
 
    for (i, seed_rel) in test_cases.into_iter().enumerate() {
@@ -254,7 +256,7 @@ fn test_trrel2_in_ascent() {
          tr_indexed_explicit(a, x, z) <-- tr_indexed_explicit(a, x, y), tr_indexed_explicit(a, y, z);
 
          relation empty(u32, u64);
-         
+
          relation seed(u32, u64, u64) = seed_rel;
 
          tr_indexed(a, x, y), tr_indexed_explicit(a, x, y) <-- seed(a, x, y);
@@ -279,9 +281,9 @@ fn test_trrel2_in_ascent() {
 
          relation bar(u32, u64, u64);
          bar(a, x, y) <-- for a in 0..1, for x in 5..6, for y in 10..12;
-         bar(a, x, y) <-- 
-            for a in 1..5, 
-            for x in (5..21).filter(|x| x % 3 == a as u64 % 3), 
+         bar(a, x, y) <--
+            for a in 1..5,
+            for x in (5..21).filter(|x| x % 3 == a as u64 % 3),
             for y in (12..18).filter(|y| y % 5 == a as u64 % 5);
 
 
@@ -322,10 +324,9 @@ fn test_trrel2_in_ascent() {
       // println!("test4_expected: {:?}", res.test4_expected);
       // println!("test4_actual: {:?}", res.test4_actual);
       // use hashbrown::HashSet;
-      // println!("test_4 diff: {:?}", 
+      // println!("test_4 diff: {:?}",
       //    res.test4_expected.iter().cloned().collect::<HashSet<_>>()
       //    .symmetric_difference(&res.test4_actual.iter().cloned().collect::<HashSet<_>>()));
-
 
       assert_eq!(res.test1_expected.len(), res.test1_actual.len());
       assert_eq!(res.test2_expected.len(), res.test2_actual.len());
@@ -334,6 +335,5 @@ fn test_trrel2_in_ascent() {
       assert_eq!(res.test5_expected.len(), res.test5_actual.len());
 
       assert_eq!(res.tr_indexed_materialized.len(), res.tr_indexed_explicit.len());
-
    }
 }

@@ -1,65 +1,61 @@
 #![cfg(test)]
 #![allow(irrefutable_let_patterns)]
+use std::cmp::max;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::ops::Deref;
 use std::primitive;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{cmp::max, rc::Rc};
-use ascent::Dual;
-use std::hash::Hash;
-
-use ascent::ascent;
-use ascent::ascent_run;
 
 use LambdaCalcExpr::*;
-use crate::ascent_maybe_par::lat_to_vec;
-use crate::{utils::*, assert_rels_eq, ascent_m_par, ascent_run_m_par};
+use ascent::{Dual, ascent, ascent_run};
 use itertools::Itertools;
 
+use crate::ascent_maybe_par::lat_to_vec;
+use crate::utils::*;
+use crate::{ascent_m_par, ascent_run_m_par, assert_rels_eq};
+
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
-pub enum LambdaCalcExpr{
+pub enum LambdaCalcExpr {
    Ref(&'static str),
    Lam(&'static str, Arc<LambdaCalcExpr>),
-   App(Arc<LambdaCalcExpr>, Arc<LambdaCalcExpr>)
+   App(Arc<LambdaCalcExpr>, Arc<LambdaCalcExpr>),
 }
 
 impl LambdaCalcExpr {
    #[allow(dead_code)]
    fn depth(&self) -> usize {
-      match self{
+      match self {
          LambdaCalcExpr::Ref(_) => 0,
-         LambdaCalcExpr::Lam(_x,b) => 1 + b.depth(),
-         LambdaCalcExpr::App(f,e) => 1 + max(f.depth(), e.depth())
+         LambdaCalcExpr::Lam(_x, b) => 1 + b.depth(),
+         LambdaCalcExpr::App(f, e) => 1 + max(f.depth(), e.depth()),
       }
    }
 }
-fn app(f: LambdaCalcExpr, a: LambdaCalcExpr) -> LambdaCalcExpr {
-   App(Arc::new(f), Arc::new(a))
-}
-fn lam(x: &'static str, e: LambdaCalcExpr) -> LambdaCalcExpr {
-   Lam(x, Arc::new(e))
-}
+fn app(f: LambdaCalcExpr, a: LambdaCalcExpr) -> LambdaCalcExpr { App(Arc::new(f), Arc::new(a)) }
+fn lam(x: &'static str, e: LambdaCalcExpr) -> LambdaCalcExpr { Lam(x, Arc::new(e)) }
 
 fn sub(exp: &LambdaCalcExpr, var: &str, e: &LambdaCalcExpr) -> LambdaCalcExpr {
    match exp {
       Ref(x) if *x == var => e.clone(),
       Ref(_x) => exp.clone(),
-      App(ef,ea) => app(sub(ef, var, e), sub(ea, var, e)),
+      App(ef, ea) => app(sub(ef, var, e), sub(ea, var, e)),
       Lam(x, _eb) if *x == var => exp.clone(),
-      Lam(x, eb) => lam(x, sub(eb, var, e))
+      Lam(x, eb) => lam(x, sub(eb, var, e)),
    }
 }
 
 #[allow(non_snake_case)]
-fn U() -> LambdaCalcExpr {lam("x", app(Ref("x"), Ref("x")))}
+fn U() -> LambdaCalcExpr { lam("x", app(Ref("x"), Ref("x"))) }
 #[allow(non_snake_case)]
-fn I() -> LambdaCalcExpr {lam("x", Ref("x"))}
+fn I() -> LambdaCalcExpr { lam("x", Ref("x")) }
 
 #[test]
-fn test_dl_lambda(){
-   ascent_m_par!{
+fn test_dl_lambda() {
+   ascent_m_par! {
       relation output(LambdaCalcExpr);
       relation input(LambdaCalcExpr);
       relation eval(LambdaCalcExpr, LambdaCalcExpr);
@@ -75,11 +71,11 @@ fn test_dl_lambda(){
 
       do_eval(ef.as_ref().clone()) <-- do_eval(?App(ef,_ea));
 
-      do_eval(sub(fb, fx, ea)) <-- 
-         do_eval(?App(ef, ea)), 
+      do_eval(sub(fb, fx, ea)) <--
+         do_eval(?App(ef, ea)),
          eval(ef.deref(), ?Lam(fx, fb));
-      
-      eval(exp.clone(), final_res.clone()) <-- 
+
+      eval(exp.clone(), final_res.clone()) <--
          do_eval(?exp @ App(ef, ea)), // this requires nightly
          eval(ef.deref(), ?Lam(fx, fb)),
          eval(sub(fb, fx, ea), final_res);
@@ -87,7 +83,7 @@ fn test_dl_lambda(){
 
    let mut prog = AscentProgram::default();
    // println!("{}", AscentProgram::summary());
-   prog.run();   
+   prog.run();
    // println!("input:{:?}\n", prog.input);
    // println!("eval: {}\n", prog.eval.iter().map(|(e,v)| format!("{:?} ===> {:?}", e, v)).join("\n"));
    println!("output: {:?}", prog.output);
@@ -96,34 +92,32 @@ fn test_dl_lambda(){
 }
 
 #[allow(dead_code)]
-fn _test_dl_lambda2(){
+fn _test_dl_lambda2() {
    type Time = u32;
    type Addr = u32;
    #[derive(Clone, Hash, PartialEq, Eq, Debug)]
    enum Storable {
       Value(LambdaCalcExpr, Env),
-      Kont(Continuation)
+      Kont(Continuation),
    }
    use Storable::*;
    #[derive(Clone, Hash, PartialEq, Eq, Debug)]
    enum Continuation {
       Fn(LambdaCalcExpr, Env, Addr),
-      Ar(LambdaCalcExpr, Env, Addr)
+      Ar(LambdaCalcExpr, Env, Addr),
    }
    use Continuation::*;
    type Env = Rc<BTreeMap<&'static str, Addr>>;
-   fn tick(_t: &Time, _k: &Continuation) -> Time {
-      todo!()
-   }
-   fn alloc(_e: &LambdaCalcExpr, _ρ: &Env, _a: &Addr, _t: &Time, _k: &Continuation) -> Addr { todo!()}
-   fn upd(ρ: &Env, var: &'static str, addr: Addr) -> Env{
+   fn tick(_t: &Time, _k: &Continuation) -> Time { todo!() }
+   fn alloc(_e: &LambdaCalcExpr, _ρ: &Env, _a: &Addr, _t: &Time, _k: &Continuation) -> Addr { todo!() }
+   fn upd(ρ: &Env, var: &'static str, addr: Addr) -> Env {
       let mut ρ = ρ.deref().clone();
       ρ.insert(var, addr);
       Rc::new(ρ)
    }
    // #[derive(Clone, Hash, PartialEq, Eq)]
    // struct State(LambdaCalcExpr, Env, Addr, Time);
-   ascent!{
+   ascent! {
       struct CESK;
       relation output(LambdaCalcExpr);
       relation input(LambdaCalcExpr);
@@ -159,7 +153,7 @@ fn _test_dl_lambda2(){
    };
    use std::collections::HashSet;
    type Store = Rc<BTreeMap<Addr, BTreeSet<Storable>>>;
-   ascent!{
+   ascent! {
       struct CeskLocalStore;
       relation output(LambdaCalcExpr);
       relation input(LambdaCalcExpr);
@@ -173,16 +167,15 @@ fn _test_dl_lambda2(){
    }
    let mut prog = CESK::default();
    // println!("{}", AscentProgram::summary());
-   prog.run();   
+   prog.run();
    // println!("input:{:?}\n", prog.input);
    // println!("eval: {}\n", prog.eval.iter().map(|(e,v)| format!("{:?} ===> {:?}", e, v)).join("\n"));
 }
 
-
 #[test]
-fn test_dl_patterns(){
+fn test_dl_patterns() {
    // ascent!{
-   ascent_m_par!{
+   ascent_m_par! {
       #![measure_rule_times]
       relation foo(i32, Option<i32>);
       relation bar(i32, i32);
@@ -194,13 +187,13 @@ fn test_dl_patterns(){
    let mut prog = AscentProgram::default();
    prog.run();
    println!("bar: {:?}", prog.bar);
-   assert!(prog.bar.iter().contains(&(3,30)));
+   assert!(prog.bar.iter().contains(&(3, 30)));
    assert!(prog.bar.len() == 1);
 }
 
 #[test]
-fn test_dl_pattern_args(){
-   ascent_m_par!{
+fn test_dl_pattern_args() {
+   ascent_m_par! {
       relation foo(i32, Option<i32>);
       relation bar(i32, i32);
       foo(1, None);
@@ -212,13 +205,13 @@ fn test_dl_pattern_args(){
    let mut prog = AscentProgram::default();
    prog.run();
    println!("bar: {:?}", prog.bar);
-   assert!(prog.bar.iter().contains(&(3,30)));
+   assert!(prog.bar.iter().contains(&(3, 30)));
    assert!(prog.bar.len() == 1);
 }
 
 #[test]
-fn test_dl2(){
-   ascent_m_par!{
+fn test_dl2() {
+   ascent_m_par! {
       relation bar(i32, i32);
       relation foo1(i32, i32);
       relation foo2(i32, i32);
@@ -231,13 +224,8 @@ fn test_dl2(){
    }
 
    let mut prog = AscentProgram::default();
-   
-   let foo2 = vec![
-      (2, 4),
-      (2, 1),
-      (20, 40),
-      (20, 0),
-   ];
+
+   let foo2 = vec![(2, 4), (2, 1), (20, 40), (20, 0)];
    prog.foo2 = FromIterator::from_iter(foo2);
 
    prog.run();
@@ -247,12 +235,12 @@ fn test_dl2(){
 }
 
 #[test]
-fn test_ascent_expressions_and_inits(){
-   ascent_m_par!{
+fn test_ascent_expressions_and_inits() {
+   ascent_m_par! {
       relation foo(i32, i32) = vec![(1, 2)].into_iter().collect();
       foo(2, 3);
       foo(3, 5);
-      
+
       relation bar(i32, i32);
       relation baz(i32, i32, i32);
 
@@ -264,12 +252,12 @@ fn test_ascent_expressions_and_inits(){
    let mut prog = AscentProgram::default();
    prog.run();
    println!("baz: {:?}", prog.baz);
-   assert!(rels_equal([(1,2,6), (2,3,10)], prog.baz));
+   assert!(rels_equal([(1, 2, 6), (2, 3, 10)], prog.baz));
 }
 
 #[test]
-fn test_dl_cross_join(){
-   ascent_m_par!{
+fn test_dl_cross_join() {
+   ascent_m_par! {
       relation foo(i32, i32);
       relation bar(i32, i32);
       relation baz(i32, i32, i32, i32);
@@ -287,8 +275,8 @@ fn test_dl_cross_join(){
 }
 
 #[test]
-fn test_dl_vars_bound_in_patterns(){
-   ascent_m_par!{
+fn test_dl_vars_bound_in_patterns() {
+   ascent_m_par! {
       relation foo(i32, Option<i32>);
       relation bar(i32, i32);
       relation baz(i32, i32, i32);
@@ -311,8 +299,8 @@ fn test_dl_vars_bound_in_patterns(){
 }
 
 #[test]
-fn test_dl_generators(){
-   ascent!{
+fn test_dl_generators() {
+   ascent! {
       relation foo(i32, i32);
       relation bar(i32);
 
@@ -328,8 +316,8 @@ fn test_dl_generators(){
 }
 
 #[test]
-fn test_dl_generators2(){
-   ascent!{
+fn test_dl_generators2() {
+   ascent! {
       relation foo(i32, i32);
       relation bar(i32);
 
@@ -345,10 +333,9 @@ fn test_dl_generators2(){
    assert!(rels_equal([(3,)], prog.bar));
 }
 
-
 #[test]
-fn test_dl_multiple_head_clauses(){
-   ascent_m_par!{
+fn test_dl_multiple_head_clauses() {
+   ascent_m_par! {
       relation foo(Vec<i32>, Vec<i32>);
       relation foo2(Vec<i32>);
       relation foo1(Vec<i32>);
@@ -366,13 +353,13 @@ fn test_dl_multiple_head_clauses(){
    println!("foo1: {:?}", prog.foo1);
    println!("foo2: {:?}", prog.foo2);
 
-   assert!(rels_equal([(vec![1, 2],), (vec![10,11],)], prog.foo1));
+   assert!(rels_equal([(vec![1, 2],), (vec![10, 11],)], prog.foo1));
    assert!(rels_equal([(vec![4, 5],), (vec![20],)], prog.foo2));
 }
 
 #[test]
-fn test_dl_multiple_head_clauses2(){
-   ascent_m_par!{
+fn test_dl_multiple_head_clauses2() {
+   ascent_m_par! {
       relation foo(Vec<i32>);
       relation foo_left(Vec<i32>);
       relation foo_right(Vec<i32>);
@@ -388,13 +375,27 @@ fn test_dl_multiple_head_clauses2(){
    prog.run();
    println!("foo: {:?}", prog.foo);
 
-   assert!(rels_equal([(vec![],), (vec![1],), (vec![1, 2],), (vec![1, 2, 3],), (vec![1, 2, 3, 4],), (vec![2],), (vec![2, 3],), (vec![2, 3, 4],), (vec![3],), (vec![3, 4],), (vec![4],)], 
-                      prog.foo));
+   assert!(rels_equal(
+      [
+         (vec![],),
+         (vec![1],),
+         (vec![1, 2],),
+         (vec![1, 2, 3],),
+         (vec![1, 2, 3, 4],),
+         (vec![2],),
+         (vec![2, 3],),
+         (vec![2, 3, 4],),
+         (vec![3],),
+         (vec![3, 4],),
+         (vec![4],)
+      ],
+      prog.foo
+   ));
 }
 
 #[test]
-fn test_dl_disjunctions(){
-   ascent!{
+fn test_dl_disjunctions() {
+   ascent! {
       relation foo1(i32, i32);
       relation foo2(i32, i32);
       relation small(i32);
@@ -416,12 +417,12 @@ fn test_dl_disjunctions(){
    let mut prog = AscentProgram::default();
    prog.run();
    println!("bar: {:?}", prog.bar);
-   assert_rels_eq!([(3,30), (2, 20)], prog.bar);
+   assert_rels_eq!([(3, 30), (2, 20)], prog.bar);
 }
 
 #[test]
-fn test_dl_repeated_vars(){
-   ascent_m_par!{
+fn test_dl_repeated_vars() {
+   ascent_m_par! {
       relation foo(i32);
       relation bar(i32, i32);
       relation res(i32);
@@ -453,10 +454,9 @@ fn test_dl_repeated_vars(){
    assert!(rels_equal([(10,)], prog.bar3_res));
 }
 
-
 #[test]
-fn test_dl_lattice1(){
-   ascent_m_par!{
+fn test_dl_lattice1() {
+   ascent_m_par! {
       lattice shortest_path(i32, i32, Dual<u32>);
       relation edge(i32, i32, u32);
 
@@ -474,12 +474,18 @@ fn test_dl_lattice1(){
    println!("shortest_path ({} tuples):", prog.shortest_path.len());
    println!("\n{:?}", prog.shortest_path);
    println!("{}", AscentProgram::summary());
-   assert!(rels_equal(lat_to_vec(prog.shortest_path), [(1,2, Dual(30)), (1, 3, Dual(40)), (1,4, Dual(130)), (2,3, Dual(50)), (2, 4, Dual(100))]))
+   assert!(rels_equal(lat_to_vec(prog.shortest_path), [
+      (1, 2, Dual(30)),
+      (1, 3, Dual(40)),
+      (1, 4, Dual(130)),
+      (2, 3, Dual(50)),
+      (2, 4, Dual(100))
+   ]))
 }
 
 #[test]
-fn test_dl_lattice2(){
-   ascent!{
+fn test_dl_lattice2() {
+   ascent! {
       lattice shortest_path(i32, i32, Dual<u32>);
       relation edge(i32, i32, u32);
 
@@ -499,9 +505,9 @@ fn test_dl_lattice2(){
 }
 
 #[test]
-fn test_ascent_run(){
-   let foo_contents = (0..10).flat_map(|x| (x+1..10).map(move |y| (x,y))).collect_vec();
-   let res = ascent_run!{
+fn test_ascent_run() {
+   let foo_contents = (0..10).flat_map(|x| (x + 1..10).map(move |y| (x, y))).collect_vec();
+   let res = ascent_run! {
       relation foo(i32, i32);
       relation bar(i32);
 
@@ -511,7 +517,7 @@ fn test_ascent_run(){
       bar(*y) <-- foo(x, y);
    };
 
-   let _res2 = ascent_run!{
+   let _res2 = ascent_run! {
       relation foo(i32);
       foo(42);
    };
@@ -520,9 +526,9 @@ fn test_ascent_run(){
 }
 
 #[test]
-fn test_ascent_run_rel_init(){
-   let foo_contents = (0..10).flat_map(|x| (x+1..10).map(move |y| (x,y))).collect_vec();
-   let res = ascent_run!{
+fn test_ascent_run_rel_init() {
+   let foo_contents = (0..10).flat_map(|x| (x + 1..10).map(move |y| (x, y))).collect_vec();
+   let res = ascent_run! {
       relation foo(i32, i32) = foo_contents;
       relation bar(i32);
 
@@ -534,8 +540,8 @@ fn test_ascent_run_rel_init(){
 }
 
 #[test]
-fn test_ascentception(){
-   let res = ascent_run!{
+fn test_ascentception() {
+   let res = ascent_run! {
       relation ascentception_input(i32);
       ascentception_input(0);
       ascentception_input(100);
@@ -544,7 +550,7 @@ fn test_ascentception(){
       funny(x, y) <-- ascentception_input(inp), for (x, y) in {
          ascent_run! {
             relation ascentception(i32, i32);
-            ascentception(x, x + 1) <-- for x in *inp..(inp + 10); 
+            ascentception(x, x + 1) <-- for x in *inp..(inp + 10);
          }.ascentception
       };
    };
@@ -553,34 +559,40 @@ fn test_ascentception(){
 }
 
 #[test]
-fn test_ascent_run_tc(){
-   fn compute_tc(inp: Vec<(i32, i32)>) -> Vec<(i32,i32)> {
-      ascent_run_m_par!{
+fn test_ascent_run_tc() {
+   fn compute_tc(inp: Vec<(i32, i32)>) -> Vec<(i32, i32)> {
+      ascent_run_m_par! {
          relation r(i32, i32) = FromIterator::from_iter(inp);
          relation tc(i32, i32);
          tc(x, y) <-- r(x, y);
          tc(x, z) <-- r(x, y), tc(y, z);
-      }.tc.into_iter().collect()
+      }
+      .tc
+      .into_iter()
+      .collect()
    }
-   assert!(rels_equal([(1,2), (2, 3), (1, 3)], compute_tc(vec![(1,2), (2,3)])));
+   assert!(rels_equal([(1, 2), (2, 3), (1, 3)], compute_tc(vec![(1, 2), (2, 3)])));
 }
 
 #[test]
-fn test_ascent_run_tc_generic(){
-   fn compute_tc<TNode: Clone + Hash + Eq + Sync + Send>(r: &[(TNode, TNode)]) -> Vec<(TNode,TNode)> {
-      ascent_run_m_par!{
+fn test_ascent_run_tc_generic() {
+   fn compute_tc<TNode: Clone + Hash + Eq + Sync + Send>(r: &[(TNode, TNode)]) -> Vec<(TNode, TNode)> {
+      ascent_run_m_par! {
          struct TC<TNode: Clone + Hash + Eq + Sync + Send>;
          relation tc(TNode, TNode);
          tc(x.clone(), y.clone()) <-- for (x, y) in r.iter();
          tc(x.clone(), z.clone()) <-- for (x, y) in r.iter(), tc(y, z);
-      }.tc.into_iter().collect()
+      }
+      .tc
+      .into_iter()
+      .collect()
    }
-   assert!(rels_equal([(1,2), (2, 3), (1, 3)], compute_tc(&[(1,2), (2,3)])));
+   assert!(rels_equal([(1, 2), (2, 3), (1, 3)], compute_tc(&[(1, 2), (2, 3)])));
 }
 
 #[test]
-fn test_ascent_tc_generic(){
-   ascent!{
+fn test_ascent_tc_generic() {
+   ascent! {
       struct TC<TNode: Clone + Hash + Eq>;
       relation tc(TNode, TNode);
       relation r(TNode, TNode);
@@ -588,16 +600,15 @@ fn test_ascent_tc_generic(){
       tc(x.clone(), z.clone()) <-- r(x, y), tc(y, z);
    }
    let mut prog = TC::default();
-   prog.r = vec![(1,2), (2,3)];
+   prog.r = vec![(1, 2), (2, 3)];
    prog.run();
-   assert!(rels_equal([(1,2), (2, 3), (1, 3)], prog.tc));
+   assert!(rels_equal([(1, 2), (2, 3), (1, 3)], prog.tc));
 }
 
-
 #[test]
-fn test_ascent_negation_through_lattices(){
+fn test_ascent_negation_through_lattices() {
    use ascent::lattice::set::Set;
-   let res = ascent_run_m_par!{
+   let res = ascent_run_m_par! {
       relation foo(i32, i32);
       relation bar(i32, i32);
 
@@ -615,13 +626,13 @@ fn test_ascent_negation_through_lattices(){
       res(*x, *y) <-- baz(x, y), foo_as_set(all_foos), if !all_foos.contains(&(*x, *y));
    };
    println!("res: {:?}", res.res);
-   assert!(rels_equal([(1,3)], res.res));
+   assert!(rels_equal([(1, 3)], res.res));
 }
 
 #[test]
-fn test_ascent_run_explicit_decl(){
+fn test_ascent_run_explicit_decl() {
    fn compute_tc<TNode: Clone + Eq + Hash>(edges: &[(TNode, TNode)]) -> Vec<(TNode, TNode)> {
-      ascent_run!{
+      ascent_run! {
          struct TC<TNode> where TNode: Clone + Eq + Hash;
          relation edge(TNode, TNode);
          relation path(TNode, TNode);
@@ -629,18 +640,18 @@ fn test_ascent_run_explicit_decl(){
 
          path(x.clone(), y.clone()) <-- edge(x,y);
          path(x.clone(), z.clone()) <-- edge(x,y), path(y, z);
-      }.path
+      }
+      .path
    }
 
-   let res = compute_tc(&[(1,2), (2, 3)]);
+   let res = compute_tc(&[(1, 2), (2, 3)]);
    println!("res: {:?}", res);
-   assert!(rels_equal([(1,2), (2,3), (1,3)], res));
-
+   assert!(rels_equal([(1, 2), (2, 3), (1, 3)], res));
 }
 
 #[test]
-fn test_ascent_fac(){
-   ascent_m_par!{
+fn test_ascent_fac() {
+   ascent_m_par! {
       struct Fac;
       relation fac(u64, u64);
       relation do_fac(u64);
@@ -662,25 +673,26 @@ fn test_ascent_fac(){
 }
 
 #[test]
-fn test_consuming_ascent_run_tc(){
-   fn compute_tc(inp: impl Iterator<Item = (i32, i32)>) -> Vec<(i32,i32)> {
-      ascent_run!{
+fn test_consuming_ascent_run_tc() {
+   fn compute_tc(inp: impl Iterator<Item = (i32, i32)>) -> Vec<(i32, i32)> {
+      ascent_run! {
          relation tc(i32, i32);
          relation r(i32, i32);
 
          r(x, y) <-- for (x, y) in inp;
          tc(*x, *y) <-- r(x, y);
          tc(*x, *z) <-- r(x, y), tc(y, z);
-      }.tc
+      }
+      .tc
    }
-   let res = compute_tc([(1,2), (2,3)].into_iter());
+   let res = compute_tc([(1, 2), (2, 3)].into_iter());
    println!("res: {:?}", res);
-   assert!(rels_equal([(1,2), (2, 3), (1, 3)], compute_tc([(1,2), (2,3)].into_iter())));
+   assert!(rels_equal([(1, 2), (2, 3), (1, 3)], compute_tc([(1, 2), (2, 3)].into_iter())));
 }
 
 #[test]
-fn test_ascent_simple_join(){
-   let res = ascent_run_m_par!{
+fn test_ascent_simple_join() {
+   let res = ascent_run_m_par! {
       relation bar(i32, i32);
       relation foo(i32, i32);
       relation baz(i32, i32);
@@ -697,8 +709,8 @@ fn test_ascent_simple_join(){
 }
 
 #[test]
-fn test_ascent_simple_join2(){
-   let res = ascent_run_m_par!{
+fn test_ascent_simple_join2() {
+   let res = ascent_run_m_par! {
       relation bar(i32, i32);
       relation foo(i32, i32);
       relation baz(i32, i32);
@@ -716,8 +728,8 @@ fn test_ascent_simple_join2(){
 }
 
 #[test]
-fn test_ascent_simple_join3(){
-   let res = ascent_run_m_par!{
+fn test_ascent_simple_join3() {
+   let res = ascent_run_m_par! {
       relation bar(i32, i32);
       relation foo(i32, i32);
       relation baz(i32, i32);
@@ -728,7 +740,7 @@ fn test_ascent_simple_join3(){
       bar(2, 1);
 
       baz(*x, *z) <-- foo(x, y) if *x != 10, bar(y, ?z) if *z < 4, if x != z;
-      
+
       baz(*x, *z) <-- foo(x, y) if *x != 10, bar(y, z) if *z * x != 444, if x != z;
       foo(*x, *y), bar(*x, *y) <-- baz(x, y);
    };
@@ -738,9 +750,12 @@ fn test_ascent_simple_join3(){
 
 #[test]
 fn test_ascent_simple_join4() {
-   
    #[derive(Default, Clone, Copy)]
-   struct Prop { transitive: bool, reflexive: bool, symmetric: bool }
+   struct Prop {
+      transitive: bool,
+      reflexive: bool,
+      symmetric: bool,
+   }
    let no_prop = Prop::default();
 
    let input_rel = vec![(1, 2), (2, 3)];
@@ -749,7 +764,17 @@ fn test_ascent_simple_join4() {
       (Prop { transitive: true, ..no_prop }, vec![(1, 2), (2, 3), (1, 3)]),
       (Prop { reflexive: true, ..no_prop }, vec![(1, 2), (2, 3), (1, 1), (2, 2), (3, 3)]),
       (Prop { symmetric: true, ..no_prop }, vec![(1, 2), (2, 3), (3, 2), (2, 1)]),
-      (Prop { reflexive: true, transitive: true, symmetric: true }, vec![(1, 2), (2, 3), (1, 3), (1, 1), (2, 2), (3, 3), (2, 1), (3, 2), (3, 1)])
+      (Prop { reflexive: true, transitive: true, symmetric: true }, vec![
+         (1, 2),
+         (2, 3),
+         (1, 3),
+         (1, 1),
+         (2, 2),
+         (3, 3),
+         (2, 1),
+         (3, 2),
+         (3, 1),
+      ]),
    ];
 
    for (prop, expected) in test_cases {
@@ -778,7 +803,7 @@ fn test_ascent_simple_join5() {
       relation baz(i32, i32);
       baz(x, y) <-- foo(x, y), bar(x, y);
       baz(x, z) <-- let _ = 42, if let Some(w) = Some(42), baz(x, y), baz(y, z);
-      
+
    };
 
    assert_rels_eq!(res.foo, [(1, 2), (2, 3)]);
@@ -787,8 +812,8 @@ fn test_ascent_simple_join5() {
 }
 
 #[test]
-fn test_ascent_wildcards(){
-   let res = ascent_run_m_par!{
+fn test_ascent_wildcards() {
+   let res = ascent_run_m_par! {
       relation foo(i32, i32, i32);
       relation bar(i32, i32);
       relation baz(i32);
@@ -812,8 +837,8 @@ fn min<'a>(inp: impl Iterator<Item = (&'a i32,)>) -> impl Iterator<Item = i32> {
 }
 
 #[test]
-fn test_ascent_agg(){
-   let res = ascent_run_m_par!{
+fn test_ascent_agg() {
+   let res = ascent_run_m_par! {
       relation foo(i32, i32);
       relation bar(i32, i32, i32);
       relation baz(i32, i32, i32);
@@ -866,7 +891,7 @@ fn test_ascent_bounded_set() {
    let mut prog = AscentProgram::<10>::default();
    prog.run();
    let store = &lat_to_vec(prog.num_store)[0].0;
-   for (x, ) in prog.init.iter() {
+   for (x,) in prog.init.iter() {
       assert!(store.contains(x));
    }
 }
@@ -875,20 +900,20 @@ fn test_ascent_bounded_set() {
 fn test_issue3() {
    #![allow(non_snake_case)]
 
-   ascent_m_par!{
+   ascent_m_par! {
       relation a__(i32, i32);
       relation c__(i32, i32, i32);
       relation e__(i32);
       relation h__(i32, i32, i32);
-   
+
       e__(a) <-- a__(b, a);
       h__(e, e, e) <-- a__(d, e), c__(e, f, e), e__(e);
    }
    let mut prog = AscentProgram::default();
-   prog.a__ = FromIterator::from_iter(vec![(88,5), (37,24), (11,91)]);
-   prog.c__ = FromIterator::from_iter(vec![(32,83,88), (2,8,5)]);
+   prog.a__ = FromIterator::from_iter(vec![(88, 5), (37, 24), (11, 91)]);
+   prog.c__ = FromIterator::from_iter(vec![(32, 83, 88), (2, 8, 5)]);
    prog.e__ = FromIterator::from_iter(vec![(44,), (83,)]);
-   prog.h__ = FromIterator::from_iter(vec![(38,88,18), (76,18,65), (86,73,91), (98,26,91), (76,10,14)]);
+   prog.h__ = FromIterator::from_iter(vec![(38, 88, 18), (76, 18, 65), (86, 73, 91), (98, 26, 91), (76, 10, 14)]);
 
    prog.run();
    println!("h__: {:?}", prog.h__);
@@ -904,9 +929,9 @@ fn test_repeated_vars_simple_joins() {
 
       // filler:
       foo2(100, 100), foo2(101, 101), foo2(102, 102);
-      
+
       foo1(1, 1), foo2(1, 2), foo1(10, 11), foo2(11, 12);
-      
+
       bar(x, y) <-- foo2(x, y), foo1(x, x);
    }
    let mut prog = AscentProgram::default();

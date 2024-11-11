@@ -1,12 +1,12 @@
-//! A data structure for union-find based reflexive transitive relations. 
-//! 
+//! A data structure for union-find based reflexive transitive relations.
+//!
 //! This is the backing data strcuture for [`trrel_uf`](crate::trrel_uf) in Ascent.
-use ascent::internal::Instant;
-use hashbrown::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::{BuildHasher, BuildHasherDefault, Hash};
 use std::time::Duration;
 
+use ascent::internal::Instant;
+use hashbrown::{HashMap, HashSet};
 use itertools::Itertools;
 use rustc_hash::FxHasher;
 
@@ -61,10 +61,10 @@ impl<T: Clone + Hash + Eq> TrRelUnionFind<T> {
 
                   *self.set_subsumptions.get_mut(&id).unwrap() = grandparent;
                   self.get_dominant_id_mut(grandparent)
-               }
+               },
                None => dom_id,
             }
-         }
+         },
          None => id,
       }
    }
@@ -77,7 +77,7 @@ impl<T: Clone + Hash + Eq> TrRelUnionFind<T> {
                self.set_subsumptions.insert(id, dom_id);
             }
             (dom_id, depth + 1)
-         }
+         },
          None => (id, 0),
       }
    }
@@ -112,7 +112,7 @@ impl<T: Clone + Hash + Eq> TrRelUnionFind<T> {
             self.sets.push(HashSet::from_iter([x.clone()]));
             self.elem_ids.insert(x.clone(), elem_id);
             (elem_id, true)
-         }
+         },
       };
 
       #[cfg(debug_assertions)]
@@ -120,9 +120,7 @@ impl<T: Clone + Hash + Eq> TrRelUnionFind<T> {
       res
    }
 
-   pub(crate) fn add_node(&mut self, x: T) -> usize {
-      self.add_node_new(x).0
-   }
+   pub(crate) fn add_node(&mut self, x: T) -> usize { self.add_node_new(x).0 }
 
    pub fn add(&mut self, x: T, y: T) -> bool {
       let (x_set, x_new) = self.add_node_new(x.clone());
@@ -165,10 +163,7 @@ impl<T: Clone + Hash + Eq> TrRelUnionFind<T> {
    }
 
    fn merge_multiple(
-      &mut self,
-      from: usize,
-      to: usize,
-      in_between: &hashbrown::HashSet<usize, BuildHasherDefault<FxHasher>>,
+      &mut self, from: usize, to: usize, in_between: &hashbrown::HashSet<usize, BuildHasherDefault<FxHasher>>,
    ) -> usize {
       let before = Instant::now();
       // TODO is this right? Aren't we doing too much?
@@ -322,9 +317,7 @@ impl<T: Clone + Hash + Eq> TrRelUnionFind<T> {
    }
 
    #[inline]
-   pub fn is_empty(&self) -> bool {
-      self.sets.is_empty()
-   }
+   pub fn is_empty(&self) -> bool { self.sets.is_empty() }
 
    // TODO `set_connections` and `reverse_set_connections` should be guaranteed to contain only dominant ids
    pub fn get_set_connections(&self, set: usize) -> Option<impl Iterator<Item = usize> + '_> {
@@ -404,17 +397,16 @@ fn extend_set<T: Hash + Eq + Clone, S: BuildHasher + Clone>(set1: &mut HashSet<T
 
 #[cfg(test)]
 mod tests {
-   use ascent::ascent;
-   use rand::{prelude::Distribution, thread_rng};
-   use std::hash::Hash;
    use std::collections::HashSet;
+   use std::hash::Hash;
 
+   use ascent::ascent;
    use itertools::Itertools;
-   use proptest::{
-      prelude::{any, Strategy},
-      proptest,
-      strategy::Just,
-   };
+   use proptest::prelude::{Strategy, any};
+   use proptest::proptest;
+   use proptest::strategy::Just;
+   use rand::prelude::Distribution;
+   use rand::thread_rng;
 
    use super::TrRelUnionFind;
 
@@ -563,7 +555,9 @@ mod tests {
       let tests_count = 15;
       for i in 0..tests_count {
          let tuples_count = Uniform::new(10, 70).sample(&mut thread_rng());
-         let tuples = values_distro.sample_iter(&mut thread_rng()).take(tuples_count)
+         let tuples = values_distro
+            .sample_iter(&mut thread_rng())
+            .take(tuples_count)
             .zip(values_distro.sample_iter(&mut thread_rng()).take(tuples_count))
             .collect_vec();
 
@@ -588,10 +582,15 @@ mod tests {
          let count_exact = trrel_uf.count_exact();
          // println!("count_exact: {count_exact}");
 
-         assert_eq!(trrel_uf_res, ground_truth_res,
+         assert_eq!(
+            trrel_uf_res,
+            ground_truth_res,
             "input tuples: {:?}, ground_truth_res len: {:?}, trrel_uf_res len: {:?}",
-            tuples, ground_truth_res.len(), trrel_uf_res.len());
-         
+            tuples,
+            ground_truth_res.len(),
+            trrel_uf_res.len()
+         );
+
          assert_eq!(count_exact, ground_truth_res.len());
       }
    }

@@ -75,25 +75,39 @@ pub(crate) mod test {
 
       fn contains(&self, _x0: &Self::T0, _x1: &Self::T1) -> bool { todo!() }
 
-      type AllIter<'a> = Once<(&'a T0, &'a T1)> where Self: 'a;
+      type AllIter<'a>
+         = Once<(&'a T0, &'a T1)>
+      where Self: 'a;
       fn iter_all<'a>(&'a self) -> Self::AllIter<'a> { todo!() }
 
       fn len_estimate(&self) -> usize { todo!() }
 
-      type Ind0AllIterValsIter<'a> = Once<&'a Self::T1> where Self: 'a;
-      type Ind0AllIter<'a> =  Once<(&'a Self::T0, Self::Ind0AllIterValsIter<'a>)> where Self: 'a;
+      type Ind0AllIterValsIter<'a>
+         = Once<&'a Self::T1>
+      where Self: 'a;
+      type Ind0AllIter<'a>
+         = Once<(&'a Self::T0, Self::Ind0AllIterValsIter<'a>)>
+      where Self: 'a;
       fn ind0_iter_all<'a>(&'a self) -> Self::Ind0AllIter<'a> { todo!() }
       fn ind0_len_estimate(&self) -> usize { todo!() }
 
-      type Ind0ValsIter<'a> = Once<&'a Self::T1> where Self: 'a;
+      type Ind0ValsIter<'a>
+         = Once<&'a Self::T1>
+      where Self: 'a;
       fn ind0_index_get<'a>(&'a self, _key: &Self::T0) -> Option<Self::Ind0ValsIter<'a>> { todo!() }
 
-      type Ind1AllIterValsIter<'a> = Once<&'a Self::T0> where Self: 'a;
-      type Ind1AllIter<'a> =  Once<(&'a Self::T1, Self::Ind1AllIterValsIter<'a>)> where Self: 'a;
+      type Ind1AllIterValsIter<'a>
+         = Once<&'a Self::T0>
+      where Self: 'a;
+      type Ind1AllIter<'a>
+         = Once<(&'a Self::T1, Self::Ind1AllIterValsIter<'a>)>
+      where Self: 'a;
       fn ind1_iter_all<'a>(&'a self) -> Self::Ind1AllIter<'a> { todo!() }
       fn ind1_len_estimate(&self) -> usize { todo!() }
 
-      type Ind1ValsIter<'a> = Once<&'a Self::T0> where Self: 'a;
+      type Ind1ValsIter<'a>
+         = Once<&'a Self::T0>
+      where Self: 'a;
       fn ind1_index_get<'a>(&'a self, _key: &Self::T1) -> Option<Self::Ind1ValsIter<'a>> { todo!() }
       fn insert(&mut self, _x0: Self::T0, _x1: Self::T1) -> bool { todo!() }
    }
@@ -106,5 +120,4 @@ pub(crate) mod test {
       foo(x, y) <-- foo(x, y), foo(& (*y as u32), &(*x as usize));
 
    }
-
 }

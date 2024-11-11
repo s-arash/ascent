@@ -2,10 +2,11 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
+
+use ascent::ascent;
+use ascent::lattice::Dual;
 use ascent_tests::ascent_m_par;
 use stopwatch::Stopwatch;
-use ascent::{ascent};
-use ascent::lattice::Dual;
 
 mod tc {
    use ascent::ascent;
@@ -58,8 +59,8 @@ fn bench_tc(nodes_count: i32) {
    println!("path size: {}", tc.path.len());
 }
 
-fn test_dl_lattice1(){
-   ascent!{
+fn test_dl_lattice1() {
+   ascent! {
       lattice shortest_path(i32, i32, Dual<u32>);
       relation edge(i32, i32, u32);
 
@@ -76,14 +77,12 @@ fn test_dl_lattice1(){
    prog.run();
    // println!("shortest_path ({} tuples):", prog.shortest_path.len());
    //println!("{:?}", prog.shortest_path);
-   for _i in prog.shortest_path.iter() {
-
-   }
+   for _i in prog.shortest_path.iter() {}
    // println!("{}", AscentProgram::summary());
    // assert!(rels_equal(prog.shortest_path, [(1,2, Dual(30)), (1, 3, Dual(40)), (1,4, Dual(130)), (2,3, Dual(50)), (2, 4, Dual(100))]))
 }
 
-fn bench_lattice(){
+fn bench_lattice() {
    let iterations = 100;
    let before = Instant::now();
    for _ in 0..iterations {
@@ -92,7 +91,6 @@ fn bench_lattice(){
    let elapsed = before.elapsed();
    println!("average time: {:?}", elapsed / iterations);
 }
-
 
 fn bench_tc_path_join_path(nodes_count: i32) {
    ascent_m_par! {
@@ -118,8 +116,7 @@ fn bench_tc_path_join_path(nodes_count: i32) {
    println!("path size: {}", tc.path.len());
 }
 
-fn bench_hash(){
-
+fn bench_hash() {
    let mut hm = HashMap::new();
    let mut bt = BTreeMap::new();
 
@@ -132,7 +129,7 @@ fn bench_hash(){
       hm.insert((i, i, i), i * 2);
    }
    println!("hm took {:?}", before.elapsed());
-   
+
    let before = Instant::now();
    for i in random_nums.iter() {
       bt.insert((i, i, i), i * 2);
@@ -140,7 +137,6 @@ fn bench_hash(){
    println!("btree took {:?}", before.elapsed());
 }
 fn bench_tc_for_graph(graph: Vec<(i32, i32)>, name: &str) {
-
    let before = Instant::now();
    let mut tc = tc::AscentProgram::default();
    tc.edge = graph;

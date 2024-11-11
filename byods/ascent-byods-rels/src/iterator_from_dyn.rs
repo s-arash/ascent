@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
-
-pub struct IteratorFromDyn<'a, T> { 
+pub struct IteratorFromDyn<'a, T> {
    iter: Box<dyn Iterator<Item = T> + 'a>,
    producer: Rc<dyn Fn() -> Box<dyn Iterator<Item = T> + 'a> + 'a>,
 }
@@ -20,13 +19,9 @@ impl<'a, T> Iterator for IteratorFromDyn<'a, T> {
    type Item = T;
 
    #[inline(always)]
-   fn next(&mut self) -> Option<Self::Item> {
-      self.iter.next()
-   }
+   fn next(&mut self) -> Option<Self::Item> { self.iter.next() }
 }
 
 impl<'a, T> Clone for IteratorFromDyn<'a, T> {
-   fn clone(&self) -> Self {
-      Self { iter: (self.producer)(), producer: self.producer.clone() }
-   }
+   fn clone(&self) -> Self { Self { iter: (self.producer)(), producer: self.producer.clone() } }
 }

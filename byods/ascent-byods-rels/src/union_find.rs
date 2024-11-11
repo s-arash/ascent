@@ -1,11 +1,10 @@
-use hashbrown::{HashMap, HashSet};
-use std::hash::{Hash, BuildHasherDefault};
+use std::hash::{BuildHasherDefault, Hash};
 use std::iter::{FlatMap, Repeat, Zip};
 
-use hashbrown::hash_set::Iter as HashSetIter;
-
 #[cfg(feature = "par")]
-use ascent::rayon::prelude::{ParallelIterator, IntoParallelRefIterator};
+use ascent::rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use hashbrown::hash_set::Iter as HashSetIter;
+use hashbrown::{HashMap, HashSet};
 use rustc_hash::FxHasher;
 
 use crate::utils::merge_sets;
@@ -30,8 +29,14 @@ pub type IterAllIterator<'a, T> = FlatMap<
       Zip<HashSetIter<'a, T>, Repeat<&'a T>>,
       for<'aa> fn((&'aa T, HashSetIter<'aa, T>)) -> Zip<HashSetIter<'aa, T>, Repeat<&'aa T>>,
    >,
-   fn(&HashSet<T, BuildHasherDefault<FxHasher>>,) -> FlatMap<Zip<HashSetIter<T>, Repeat<HashSetIter<T>>>,Zip<HashSetIter<T>, Repeat<&T>>,for<'aa> fn((&'aa T, HashSetIter<'aa, T>)) -> Zip<HashSetIter<'aa, T>, Repeat<&'aa T>>,>,>;
-
+   fn(
+      &HashSet<T, BuildHasherDefault<FxHasher>>,
+   ) -> FlatMap<
+      Zip<HashSetIter<T>, Repeat<HashSetIter<T>>>,
+      Zip<HashSetIter<T>, Repeat<&T>>,
+      for<'aa> fn((&'aa T, HashSetIter<'aa, T>)) -> Zip<HashSetIter<'aa, T>, Repeat<&'aa T>>,
+   >,
+>;
 
 #[cfg(feature = "par")]
 pub struct IterAllParIterator<'a, T: Clone + Hash + Eq>(&'a EqRel<T>);
@@ -40,14 +45,17 @@ impl<'a, T: Clone + Hash + Eq + Sync> ParallelIterator for IterAllParIterator<'a
    type Item = (&'a T, &'a T);
 
    fn drive_unindexed<C>(self, consumer: C) -> C::Result
-   where C: ascent::rayon::iter::plumbing::UnindexedConsumer<Self::Item> 
-   {
-      self.0.sets.par_iter()
-      .flat_map::<fn(_) -> _, _>(|s| s.par_iter().map_with(s, |s, x| s.par_iter().map_with(x, |x, y| (*x, y))).flatten())
-      .drive_unindexed(consumer)
+   where C: ascent::rayon::iter::plumbing::UnindexedConsumer<Self::Item> {
+      self
+         .0
+         .sets
+         .par_iter()
+         .flat_map::<fn(_) -> _, _>(|s| {
+            s.par_iter().map_with(s, |s, x| s.par_iter().map_with(x, |x, y| (*x, y))).flatten()
+         })
+         .drive_unindexed(consumer)
    }
 }
-
 
 impl<T: Clone + Hash + Eq> EqRel<T> {
    fn get_dominant_id(&self, id: usize) -> usize {
@@ -56,7 +64,9 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
          None => id,
       }
    }
-   pub(crate) fn elem_set(&self, elem: &T) -> Option<usize> { self.elem_ids.get(elem).map(|id| self.get_dominant_id(*id)) }
+   pub(crate) fn elem_set(&self, elem: &T) -> Option<usize> {
+      self.elem_ids.get(elem).map(|id| self.get_dominant_id(*id))
+   }
 
    fn get_dominant_id_update(&mut self, id: usize) -> usize {
       match self.set_subsumptions.get(&id) {
@@ -70,7 +80,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
          None => id,
       }
    }
-   pub(crate) fn elem_set_update(&mut self, elem: &T) -> Option<usize> { 
+   pub(crate) fn elem_set_update(&mut self, elem: &T) -> Option<usize> {
       let id = self.elem_ids.get(elem)?;
       Some(self.get_dominant_id_update(*id))
    }
@@ -96,7 +106,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
             self.elem_ids.insert(y, x_set);
             true
          },
-         (Some(x_set), Some(y_set)) => {
+         (Some(x_set), Some(y_set)) =>
             if x_set != y_set {
                let y_set_taken = std::mem::take(&mut self.sets[y_set]);
                merge_sets(&mut self.sets[x_set], y_set_taken);
@@ -104,8 +114,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
                true
             } else {
                false
-            }
-         }
+            },
       }
    }
 
@@ -116,7 +125,8 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
    }
 
    #[cfg(feature = "par")]
-   pub fn c_set_of(&self, x: &T) -> Option<&'_ hashbrown::hash_set::HashSet<T, BuildHasherDefault<FxHasher>>> where T: Sync{
+   pub fn c_set_of(&self, x: &T) -> Option<&'_ hashbrown::hash_set::HashSet<T, BuildHasherDefault<FxHasher>>>
+   where T: Sync {
       let set = self.elem_set(x)?;
       let res = Some(&self.sets[set]);
       res
@@ -124,7 +134,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
 
    // TODO not used
    #[allow(dead_code)]
-   fn set_of_inc_x<'a> (&'a self, x: &'a T) -> impl Iterator<Item = &'a T> {
+   fn set_of_inc_x<'a>(&'a self, x: &'a T) -> impl Iterator<Item = &'a T> {
       let set = self.set_of(x);
       let x_itself = if set.is_none() { Some(x) } else { None };
       set.into_iter().flatten().chain(x_itself)
@@ -139,8 +149,8 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
    }
 
    #[cfg(feature = "par")]
-   pub fn c_iter_all<'a>(&'a self) -> IterAllParIterator<'a, T> where T: Sync 
-   {
+   pub fn c_iter_all<'a>(&'a self) -> IterAllParIterator<'a, T>
+   where T: Sync {
       IterAllParIterator(self)
    }
 
@@ -161,9 +171,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
       }
    }
 
-   pub fn count_exact(&self) -> usize {
-      self.sets.iter().map(|s| s.len() * s.len()).sum()
-   }
+   pub fn count_exact(&self) -> usize { self.sets.iter().map(|s| s.len() * s.len()).sum() }
 }
 
 #[test]
@@ -196,4 +204,3 @@ fn test_eq_rel_combine() {
    eqrel1.combine(eqrel2);
    assert!(eqrel1.contains(&1, &13));
 }
-

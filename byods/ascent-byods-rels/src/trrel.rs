@@ -1,6 +1,6 @@
 //! transitive relations for Ascent
 
-pub use crate::eqrel::rel_codegen as rel_codegen;
+pub use crate::eqrel::rel_codegen;
 
 #[doc(hidden)]
 #[macro_export]
@@ -117,7 +117,7 @@ macro_rules! arrs_eq {
 
 #[test]
 fn test_arrs_eq() {
-   let test1 = arrs_eq!([1, 2], [1, 2]); 
+   let test1 = arrs_eq!([1, 2], [1, 2]);
    assert!(test1);
    assert!(!arrs_eq!([1], [1, 2]));
    assert!(arrs_eq!([1], [1]));
@@ -129,11 +129,5 @@ fn test_arrs_eq() {
 #[allow(dead_code)]
 fn _test_trrel_rel_ind_common() {
    let _ind_common1: crate::trrel::rel_ind_common!(rel, (u64, u32, u32), [[], [0, 1], [0], [0, 1, 2]], ser, ());
-   let _ind_common2: crate::trrel::rel_ind_common!(
-      rel,
-      (u32, u64, u64),
-      [[0, 1, 2], [0], [1], [0, 1]],
-      ser, 
-      ()
-   );
+   let _ind_common2: crate::trrel::rel_ind_common!(rel, (u32, u64, u64), [[0, 1, 2], [0], [1], [0, 1]], ser, ());
 }

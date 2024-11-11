@@ -6,9 +6,9 @@ ascent! {
     // Facts:
 
     relation number(isize);
-    
+
     // Rules:
-    
+
     relation divisible(isize, isize);
 
     divisible(x, 3) <-- number(x), if x % 3 == 0;
@@ -32,46 +32,27 @@ ascent! {
 }
 
 fn main() {
-    let mut prog = AscentProgram::default();
-    
-    prog.number = (1..=15).map(|n| (n,)).collect();
+   let mut prog = AscentProgram::default();
 
-    prog.run();
+   prog.number = (1..=15).map(|n| (n,)).collect();
 
-    let AscentProgram { mut fizz, mut buzz, mut fizz_buzz, mut other, ..} = prog;
+   prog.run();
 
-    fizz.sort_by_key(|(key,)| *key);
+   let AscentProgram { mut fizz, mut buzz, mut fizz_buzz, mut other, .. } = prog;
 
-    assert_eq!(fizz, vec![
-        (3,),
-        (6,),
-        (9,),
-        (12,),
-    ]);
+   fizz.sort_by_key(|(key,)| *key);
 
-    buzz.sort_by_key(|(key,)| *key);
+   assert_eq!(fizz, vec![(3,), (6,), (9,), (12,),]);
 
-    assert_eq!(buzz, vec![
-        (5,),
-        (10,),
-    ]);
+   buzz.sort_by_key(|(key,)| *key);
 
-    fizz_buzz.sort_by_key(|(key,)| *key);
+   assert_eq!(buzz, vec![(5,), (10,),]);
 
-    assert_eq!(fizz_buzz, vec![
-        (15,),
-    ]);
+   fizz_buzz.sort_by_key(|(key,)| *key);
 
-    other.sort_by_key(|(key,)| *key);
+   assert_eq!(fizz_buzz, vec![(15,),]);
 
-    assert_eq!(other, vec![
-        (1,),
-        (2,),
-        (4,),
-        (7,),
-        (8,),
-        (11,),
-        (13,),
-        (14,)
-    ]);
+   other.sort_by_key(|(key,)| *key);
+
+   assert_eq!(other, vec![(1,), (2,), (4,), (7,), (8,), (11,), (13,), (14,)]);
 }

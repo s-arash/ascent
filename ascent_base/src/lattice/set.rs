@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::{BTreeSet};
+use std::collections::BTreeSet;
 use std::hash::Hash;
 use std::ops::Deref;
 
@@ -10,7 +10,6 @@ use super::Lattice;
 pub struct Set<T: PartialEq + Eq + Hash + Ord>(pub BTreeSet<T>);
 
 impl<T: PartialEq + Eq + Hash + Ord> Set<T> {
-
    /// Creates a `Set` containing only `item`
    pub fn singleton(item: T) -> Self {
       let mut set = BTreeSet::new();
@@ -20,15 +19,13 @@ impl<T: PartialEq + Eq + Hash + Ord> Set<T> {
 }
 
 impl<T: PartialEq + Eq + Hash + Ord> Default for Set<T> {
-   fn default() -> Self {Self(Default::default())}
+   fn default() -> Self { Self(Default::default()) }
 }
 
-impl<T: PartialEq + Eq + Hash + Ord> Deref for Set<T>{
+impl<T: PartialEq + Eq + Hash + Ord> Deref for Set<T> {
    type Target = BTreeSet<T>;
 
-   fn deref(&self) -> &Self::Target {
-      &self.0
-   }
+   fn deref(&self) -> &Self::Target { &self.0 }
 }
 
 impl<T: Eq + Hash + Ord> PartialOrd for Set<T> {
@@ -74,8 +71,8 @@ impl<T: Eq + Hash + Ord> Lattice for Set<T> {
    }
 
    fn meet(mut self, other: Self) -> Self {
-       self.meet_mut(other);
-       self
+      self.meet_mut(other);
+      self
    }
 
    fn join(mut self, other: Self) -> Self {
