@@ -13,8 +13,7 @@ default = ["console_error_panic_hook"]
 [dependencies]
 ascent = { path = "../ascent", features = ["wasm-bindgen"] }
 
-# pinning to this version because higher versions don't work on rust 1.66
-bumpalo = "=3.14"
+bumpalo = "3.16"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
