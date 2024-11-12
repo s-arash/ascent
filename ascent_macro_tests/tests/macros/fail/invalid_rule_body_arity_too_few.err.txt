@@ -1,0 +1,5 @@
+error: Wrong arity for relation fact. Actual arity: 1
+  --> /tests/macros/fail/invalid_rule_body_arity_too_few.rs:11:18
+   |
+11 |     rule(42) <-- fact();
+   |                  ^^^^

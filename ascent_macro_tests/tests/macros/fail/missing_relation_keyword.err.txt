@@ -1,0 +1,5 @@
+error: relation fact not defined
+ --> /tests/macros/fail/missing_relation_keyword.rs:7:5
+  |
+7 |     fact(usize);
+  |     ^^^^

@@ -1,0 +1,5 @@
+error: relation non_existent_rule not defined
+ --> /tests/macros/fail/non_existent_head_rule.rs:9:5
+  |
+9 |     non_existent_rule(n) <-- rule(n);
+  |     ^^^^^^^^^^^^^^^^^

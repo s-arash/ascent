@@ -1,0 +1,5 @@
+error: use of aggregated relation a cannot be stratified
+  --> /tests/macros/fail/unstratifiable_negation.rs:11:14
+   |
+11 |     b(x) <-- !a(x);
+   |              ^

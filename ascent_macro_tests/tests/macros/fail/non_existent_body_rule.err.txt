@@ -1,0 +1,5 @@
+error: Relation non_existent_rule not defined
+ --> /tests/macros/fail/non_existent_body_rule.rs:9:17
+  |
+9 |     rule(n) <-- non_existent_rule();
+  |                 ^^^^^^^^^^^^^^^^^
