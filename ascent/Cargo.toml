@@ -18,8 +18,8 @@ readme = "../README.MD"
 ascent_macro = { workspace = true }
 ascent_base = { workspace = true }
 cfg-if = "1.0"
-rustc-hash = "1.1"
 hashbrown = {version = "0.14", features = ["raw"]}
+rustc-hash = "2.0"
 instant = "0.1"
 dashmap = { version = "5.5", features = ["raw-api", "rayon"], optional = true }
 rayon = { version = "1.5", optional = true }
