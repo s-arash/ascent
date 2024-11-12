@@ -720,13 +720,13 @@ macro_rules! to_trrel2 {
       ;
 
 
-      impl<'a, T0, T1, T2> Default for [<To $name>]<T0, T1, T2> 
+      impl<'a, T0, T1, T2> Default for [<To $name>]<T0, T1, T2>
       where T0: Clone + Hash + Eq, T1: Clone + Hash + Eq, T2: Clone + Hash + Eq//, TBinRel: ByodsBinRel<T0 = T1, T1 = T2>
       {
          fn default() -> Self { Self(PhantomData) }
       }
 
-      impl<T0, T1, T2, TBinRel, const HAS_REVERSE_MAP1: bool, const HAS_REVERSE_MAP2: bool> 
+      impl<T0, T1, T2, TBinRel, const HAS_REVERSE_MAP1: bool, const HAS_REVERSE_MAP2: bool>
       ToRelIndex<BinRelToTernaryWrapper<HAS_REVERSE_MAP1, HAS_REVERSE_MAP2, T0, T1, T2, TBinRel>> for [<To $name>]<T0, T1, T2>
       where T0: Clone + Hash + Eq, T1: Clone + Hash + Eq, T2: Clone + Hash + Eq, TBinRel: ByodsBinRel<T0 = T1, T1 = T2>,
             //TWrapper: Deref<Target = BinRelToTernary<T0, T1, T2, TBinRel>>
@@ -738,8 +738,8 @@ macro_rules! to_trrel2 {
 
          type RelIndexWrite<'a> = NoopRelIndexWrite<$key, $val> where Self: 'a, BinRelToTernaryWrapper<HAS_REVERSE_MAP1, HAS_REVERSE_MAP2, T0, T1, T2, TBinRel>: 'a;
          #[inline(always)]
-         fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut BinRelToTernaryWrapper<HAS_REVERSE_MAP1, HAS_REVERSE_MAP2, T0, T1, T2, TBinRel>) -> Self::RelIndexWrite<'a> { 
-            NoopRelIndexWrite::default() 
+         fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut BinRelToTernaryWrapper<HAS_REVERSE_MAP1, HAS_REVERSE_MAP2, T0, T1, T2, TBinRel>) -> Self::RelIndexWrite<'a> {
+            NoopRelIndexWrite::default()
          }
       }
    }};

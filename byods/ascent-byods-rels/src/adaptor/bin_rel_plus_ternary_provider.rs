@@ -89,8 +89,8 @@ mod test {
             // reverse_map_1 required:
             {$crate::inds_contain!($indices, [1]) || $crate::inds_contain!($indices, [1, 2])},
             // reverse_map_2 required:
-            {$crate::inds_contain!($indices, [2]) || $crate::inds_contain!($indices, [1, 2])}, 
-            $col0, $col1, $col2, 
+            {$crate::inds_contain!($indices, [2]) || $crate::inds_contain!($indices, [1, 2])},
+            $col0, $col1, $col2,
             $crate::adaptor::bin_rel_provider::test::DummyRel<$col1, $col2>
          >
       };

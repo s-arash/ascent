@@ -84,7 +84,7 @@ macro_rules! trrel_rel_ind_common {
          // reverse_map_1 required:
          {$crate::inds_contain!($indices, [1]) || $crate::inds_contain!($indices, [1, 2])},
          // reverse_map_2 required:
-         {$crate::inds_contain!($indices, [2]) || $crate::inds_contain!($indices, [1, 2])}, 
+         {$crate::inds_contain!($indices, [2]) || $crate::inds_contain!($indices, [1, 2])},
          $col0, $col1>
    };
 }

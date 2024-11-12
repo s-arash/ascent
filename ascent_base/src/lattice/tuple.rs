@@ -16,7 +16,7 @@ macro_rules! tuple_lattice_impl {
                }
             }
          }
-         
+
          fn join_mut(&mut self, other: Self) -> bool {
             use std::cmp::Ordering::*;
             match (&*self).cmp(&other) {
@@ -31,17 +31,17 @@ macro_rules! tuple_lattice_impl {
          fn meet(self, other: Self) -> Self {
             self.min(other)
          }
-      
+
          fn join(self, other: Self) -> Self {
             self.max(other)
          }
       }
-      
+
       impl< $([<T $i>]),* > BoundedLattice for ($([<T $i>]),*,) where $([<T $i>]: BoundedLattice + Ord),* {
          fn bottom() -> Self {
             ($([<T $i>]::bottom(),)*)
          }
-      
+
          fn top() -> Self {
             ($([<T $i>]::top(),)*)
          }

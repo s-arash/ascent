@@ -459,15 +459,15 @@ macro_rules! to_rel_ind {
          fn default() -> Self { Self(PhantomData) }
       }
 
-      impl<T: Clone + Hash + Eq, Rel> ToRelIndex<Rel> for [<To $name>]<T> 
+      impl<T: Clone + Hash + Eq, Rel> ToRelIndex<Rel> for [<To $name>]<T>
       where Rel: ToTrRelIndCommon<T>
       {
          type RelIndex<'a> = $name<'a, T> where Self: 'a, Rel: 'a;
          fn to_rel_index<'a>(&'a self, rel: &'a Rel) -> Self::RelIndex<'a> { $name(rel.to_tr_rel_ind()) }
 
          type RelIndexWrite<'a> = NoopRelIndexWrite<$key, $val> where Self: 'a, Rel: 'a;
-         fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> { 
-            NoopRelIndexWrite::default() 
+         fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> {
+            NoopRelIndexWrite::default()
          }
       }
    }};

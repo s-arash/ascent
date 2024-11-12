@@ -227,15 +227,15 @@ macro_rules! to_rel_ind {
          fn default() -> Self { Self(PhantomData) }
       }
 
-      impl<T0, T1, Rel> ToRelIndex<Rel> for [<To $name>]<T0, T1> 
+      impl<T0, T1, Rel> ToRelIndex<Rel> for [<To $name>]<T0, T1>
       where Rel: ByodsBinRel<T0 = T0, T1 = T1>,
       {
          type RelIndex<'a> = $name<'a, Rel> where Self: 'a, Rel: 'a;
          fn to_rel_index<'a>(&'a self, rel: &'a Rel) -> Self::RelIndex<'a> { $name(rel) }
 
          type RelIndexWrite<'a> = NoopRelIndexWrite<$key, $val> where Self: 'a, Rel: 'a;
-         fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> { 
-            NoopRelIndexWrite::default() 
+         fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> {
+            NoopRelIndexWrite::default()
          }
       }
    }};

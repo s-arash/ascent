@@ -495,7 +495,7 @@ macro_rules! to_trrel2 {
          fn default() -> Self { Self(PhantomData) }
       }
 
-      impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq, Rel> ToRelIndex<Rel> for [<To $name>]<T0, T1> 
+      impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq, Rel> ToRelIndex<Rel> for [<To $name>]<T0, T1>
       where Rel: std::ops::DerefMut<Target = TrRel2IndCommon<T0, T1>>
       {
          type RelIndex<'a> = $name<'a, T0, T1> where Self: 'a, Rel: 'a;
@@ -504,8 +504,8 @@ macro_rules! to_trrel2 {
 
          type RelIndexWrite<'a> = NoopRelIndexWrite<$key, $val> where Self: 'a, Rel: 'a;
          #[inline(always)]
-         fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> { 
-            NoopRelIndexWrite::default() 
+         fn to_rel_index_write<'a>(&'a mut self, _rel: &'a mut Rel) -> Self::RelIndexWrite<'a> {
+            NoopRelIndexWrite::default()
          }
       }
    }};

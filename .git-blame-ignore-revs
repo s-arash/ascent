@@ -1,0 +1,6 @@
+# guide: https://gist.github.com/kateinoigakukun/b0bc920e587851bfffa98b9e279175f2
+# Run this command for this to take effect:
+# $ git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Fmt (#54)
+d8db7dc7eb9760b2e81d0168cfa931549ed28085
