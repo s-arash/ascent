@@ -57,10 +57,10 @@ impl AscentConfig {
       ];
       for attr in attrs.iter() {
          if !recognized_attrs.iter().any(|recognized_attr| attr.meta.path().is_ident(recognized_attr)) {
-            let recognized_attrs: Vec<_> = recognized_attrs.iter().map(|attr| format!("`{attr}`")).collect();
+            let recognized_attrs = recognized_attrs.iter().map(|attr| format!("`{attr}`")).join(", ");
             return Err(Error::new_spanned(
                attr,
-               format!("unrecognized attribute. recognized attributes are: {}", recognized_attrs.join(", ")),
+               format!("unrecognized attribute. recognized attributes are: {recognized_attrs}"),
             ));
          }
       }
