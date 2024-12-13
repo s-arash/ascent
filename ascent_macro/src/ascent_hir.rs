@@ -326,7 +326,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             // TODO may someday this will work
             let other_var = grounded_vars.iter().find(|&x| x == &v).unwrap();
             let other_err = Error::new(other_var.span(), "variable being shadowed");
-            let mut err = Error::new(v.span(), format!("`{}` shadows another variable with the same name", v));
+            let mut err = Error::new(v.span(), format!("`{v}` shadows another variable with the same name"));
             err.combine(other_err);
             return Err(err);
          }
