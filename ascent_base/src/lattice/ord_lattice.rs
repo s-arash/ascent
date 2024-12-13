@@ -1,7 +1,13 @@
+use std::fmt::{Debug, Display, Formatter};
+
 use crate::Lattice;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OrdLattice<T>(pub T);
+
+impl<T: Debug> Debug for OrdLattice<T> {
+   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.0.fmt(f) }
+}
 
 impl<T: Ord> Lattice for OrdLattice<T> {
    #[inline(always)]
