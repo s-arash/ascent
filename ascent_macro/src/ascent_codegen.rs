@@ -32,13 +32,13 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          #(#rel_attrs)*
          #[doc = #rel_indices_comment]
          pub #name: #rel_type,
-         pub #rel_ind_common: #rel_ind_common_type,
+         #rel_ind_common: #rel_ind_common_type,
       });
       field_defaults.push(quote! {#name : Default::default(), #rel_ind_common: Default::default(),});
       if rel.is_lattice && mir.is_parallel {
          let lattice_mutex_name = lattice_insertion_mutex_var_name(rel);
          relation_fields.push(quote! {
-            pub #lattice_mutex_name: ::std::vec::Vec<std::sync::Mutex<()>>,
+            #lattice_mutex_name: ::std::vec::Vec<std::sync::Mutex<()>>,
          });
          field_defaults.push(quote! {#lattice_mutex_name: {
             let len = ::ascent::internal::shards_count();
@@ -51,7 +51,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          let name = &ind.ir_name();
          let rel_index_type = rel_index_type(ind, mir);
          relation_fields.push(quote! {
-            pub #name: #rel_index_type,
+            #name: #rel_index_type,
          });
          field_defaults.push(quote! {#name : Default::default(),});
       }
@@ -270,8 +270,8 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          scc_times: [std::time::Duration; #sccs_count],
          scc_iters: [usize; #sccs_count],
          #(#rule_time_fields)*
-         pub update_time_nanos: std::sync::atomic::AtomicU64,
-         pub update_indices_duration: std::time::Duration,
+         update_time_nanos: std::sync::atomic::AtomicU64,
+         update_indices_duration: std::time::Duration,
       }
       impl #impl_impl_generics #struct_name #impl_ty_generics #impl_where_clause {
          #run_func
