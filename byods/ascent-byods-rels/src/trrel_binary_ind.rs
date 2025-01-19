@@ -317,7 +317,8 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for TrRelInd0<'a, T> {
       Some(res)
    }
 
-   fn len(&self) -> usize { self.0.unwrap_old().map.len() }
+   fn len_estimate(&self) -> usize { self.0.unwrap_old().map.len() }
+   fn is_empty(&'a self) -> bool { self.0.unwrap_old().map.is_empty() }
 }
 
 pub struct TrRelInd1<'a, T: Clone + Hash + Eq>(pub(crate) &'a TrRelIndCommon<T>);
@@ -353,7 +354,8 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for TrRelInd1<'a, T> {
       Some(res)
    }
 
-   fn len(&self) -> usize { self.0.rel().reverse_map.len() }
+   fn len_estimate(&self) -> usize { self.0.rel().reverse_map.len() }
+   fn is_empty(&'a self) -> bool { self.0.rel().reverse_map.is_empty() }
 }
 
 pub struct TrRelIndNone<'a, T: Clone + Hash + Eq>(&'a TrRelIndCommon<T>);
@@ -381,7 +383,7 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for TrRelIndNone<'a, T> {
       Some(IteratorFromDyn::new(res))
    }
 
-   fn len(&self) -> usize { 1 }
+   fn len_estimate(&self) -> usize { 1 }
 }
 
 pub struct TrRelIndFullWrite<'a, T: Clone + Hash + Eq>(&'a mut TrRelIndCommon<T>);
@@ -443,12 +445,14 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for TrRelIndFull<'a, T> {
       if self.0.rel().map.get(&key.0)?.contains(&key.1) { Some(std::iter::once(())) } else { None }
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 3;
       let sum: usize = self.0.rel().map.values().take(sample_size).map(|x| x.len()).sum();
       let map_len = self.0.rel().map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
+
+   fn is_empty(&'a self) -> bool { self.0.rel().map.is_empty() }
 }
 
 macro_rules! to_rel_ind {

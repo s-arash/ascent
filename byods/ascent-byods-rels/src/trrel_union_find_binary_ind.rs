@@ -233,7 +233,7 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
          Rel1::ValueIteratorType: Clone,
       {
          let mut changed = false;
-         if rel1.len() < rel2_rev.len() {
+         if rel1.len_estimate() < rel2_rev.len_estimate() {
             for (x, x_set) in rel1.iter_all() {
                if let Some(x_rev_set) = rel2_rev.index_get(x) {
                   for w in x_rev_set {

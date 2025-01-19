@@ -97,6 +97,13 @@ impl MirBodyItem {
       }
    }
 
+   pub fn clause(&self) -> Option<&MirBodyClause> {
+      match self {
+         MirBodyItem::Clause(mir_body_clause) => Some(mir_body_clause),
+         _ => None,
+      }
+   }
+
    pub fn bound_vars(&self) -> Vec<Ident> {
       match self {
          MirBodyItem::Clause(cl) => {

@@ -68,7 +68,10 @@ where T: RelIndexRead<'a>
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType> { (**self).index_get(key) }
 
    #[inline(always)]
-   fn len(&self) -> usize { (**self).len() }
+   fn len_estimate(&self) -> usize { (**self).len_estimate() }
+
+   #[inline(always)]
+   fn is_empty(&'a self) -> bool { (**self).is_empty() }
 }
 
 impl<'a, T> RelIndexReadAll<'a> for &'a T

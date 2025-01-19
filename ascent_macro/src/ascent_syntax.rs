@@ -598,10 +598,10 @@ pub(crate) struct DsAttributeContents {
 
 impl Parse for DsAttributeContents {
    fn parse(input: ParseStream) -> Result<Self> {
-      let path = syn::Path::parse_mod_style(&input)?;
+      let path = syn::Path::parse_mod_style(input)?;
       let args = if input.peek(Token![:]) {
          input.parse::<Token![:]>()?;
-         TokenStream::parse(&input)?
+         TokenStream::parse(input)?
       } else {
          TokenStream::default()
       };

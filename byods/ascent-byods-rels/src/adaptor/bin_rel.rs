@@ -60,7 +60,8 @@ impl<'a, TBinRel: ByodsBinRel> RelIndexRead<'a> for ByodsBinRelInd0<'a, TBinRel>
       Some(res)
    }
 
-   fn len(&'a self) -> usize { self.0.ind0_len_estimate() }
+   fn len_estimate(&'a self) -> usize { self.0.ind0_len_estimate() }
+   fn is_empty(&'a self) -> bool { self.0.is_empty() }
 }
 
 impl<'a, TBinRel: ByodsBinRel> RelIndexReadAll<'a> for ByodsBinRelInd0<'a, TBinRel> {
@@ -99,7 +100,8 @@ impl<'a, TBinRel: ByodsBinRel> RelIndexRead<'a> for ByodsBinRelInd1<'a, TBinRel>
       Some(res)
    }
 
-   fn len(&'a self) -> usize { self.0.ind1_len_estimate() }
+   fn len_estimate(&'a self) -> usize { self.0.ind1_len_estimate() }
+   fn is_empty(&'a self) -> bool { self.0.is_empty() }
 }
 
 impl<'a, TBinRel: ByodsBinRel> RelIndexReadAll<'a> for ByodsBinRelInd1<'a, TBinRel> {
@@ -136,7 +138,8 @@ impl<'a, TBinRel: ByodsBinRel> RelIndexRead<'a> for ByodsBinRelInd0_1<'a, TBinRe
       if self.0.contains(&key.0, &key.1) { Some(once(())) } else { None }
    }
 
-   fn len(&'a self) -> usize { self.0.len_estimate() }
+   fn len_estimate(&'a self) -> usize { self.0.len_estimate() }
+   fn is_empty(&'a self) -> bool { self.0.is_empty() }
 }
 
 impl<'a, TBinRel: ByodsBinRel> RelIndexReadAll<'a> for ByodsBinRelInd0_1<'a, TBinRel> {
@@ -200,7 +203,7 @@ impl<'a, TBinRel: ByodsBinRel> RelIndexRead<'a> for ByodsBinRelIndNone<'a, TBinR
       Some(IteratorFromDyn::new(res))
    }
 
-   fn len(&'a self) -> usize { 1 }
+   fn len_estimate(&'a self) -> usize { 1 }
 }
 
 impl<'a, TBinRel: ByodsBinRel> RelIndexReadAll<'a> for ByodsBinRelIndNone<'a, TBinRel> {

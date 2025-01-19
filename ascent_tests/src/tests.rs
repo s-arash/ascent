@@ -972,3 +972,23 @@ fn test_ds_attr() {
 
    assert_rels_eq!(res.bar, [(0, 1)]);
 }
+
+#[test]
+fn test_rel_empty_check() {
+   let res = ascent_run_m_par! {
+      relation edge(i32, i32);
+      relation path(i32, i32);
+      relation legit(i32);
+
+      path(x, z) <-- edge(x, y), path(y, z), legit(x);
+      path(x, y) <-- edge(x, y), legit(*&x);
+
+      legit(0);
+      legit(y) <-- legit(x), path(x, y);
+
+      edge(x, x + 1) <-- for x in 0..9;
+   };
+
+   println!("{:?}", res.path);
+   assert_eq!(res.path.len(), 9 * 10 / 2);
+}

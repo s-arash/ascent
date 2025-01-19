@@ -131,11 +131,12 @@ where
       Some(IteratorFromDyn::new(|| trrel.iter_all()))
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 4;
       let sum = self.0.map.values().map(|x| x.len_estimate()).sum::<usize>();
       sum * self.0.map.len() / sample_size.min(self.0.map.len()).max(1)
    }
+   fn is_empty(&'a self) -> bool { self.0.map.is_empty() }
 }
 
 pub struct BinRelToTernaryInd0_1<'a, T0, T1, T2, TBinRel>(&'a BinRelToTernary<T0, T1, T2, TBinRel>)
@@ -189,12 +190,13 @@ where
       Some(res)
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 3;
       let sum = self.0.map.values().take(sample_size).map(|trrel| trrel.ind0_len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
+   fn is_empty(&'a self) -> bool { self.0.map.is_empty() }
 }
 
 pub struct BinRelToTernaryInd0_2<'a, T0, T1, T2, TBinRel>(&'a BinRelToTernary<T0, T1, T2, TBinRel>)
@@ -248,12 +250,13 @@ where
       Some(res)
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 3;
       let sum = self.0.map.values().take(sample_size).map(|trrel| trrel.ind1_len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
+   fn is_empty(&'a self) -> bool { self.0.map.is_empty() }
 }
 
 pub struct BinRelToTernaryInd1<'a, T0, T1, T2, TBinRel>(&'a BinRelToTernary<T0, T1, T2, TBinRel>)
@@ -314,7 +317,8 @@ where
 
    fn index_get(&'a self, (x1,): &Self::Key) -> Option<Self::IteratorType> { self.get(x1) }
 
-   fn len(&self) -> usize { self.0.reverse_map1.as_ref().unwrap().len() }
+   fn len_estimate(&self) -> usize { self.0.reverse_map1.as_ref().unwrap().len() }
+   fn is_empty(&'a self) -> bool { self.0.reverse_map1.as_ref().unwrap().is_empty() }
 }
 
 pub struct BinRelToTernaryInd2<'a, T0, T1, T2, TBinRel>(&'a BinRelToTernary<T0, T1, T2, TBinRel>)
@@ -374,7 +378,8 @@ where
 
    fn index_get(&'a self, (x2,): &Self::Key) -> Option<Self::IteratorType> { self.get(x2) }
 
-   fn len(&self) -> usize { self.0.reverse_map2.as_ref().unwrap().len() }
+   fn len_estimate(&self) -> usize { self.0.reverse_map2.as_ref().unwrap().len() }
+   fn is_empty(&'a self) -> bool { self.0.reverse_map2.as_ref().unwrap().is_empty() }
 }
 
 pub struct BinRelToTernaryInd1_2<'a, T0, T1, T2, TBinRel>(&'a BinRelToTernary<T0, T1, T2, TBinRel>)
@@ -433,7 +438,7 @@ where
       Some(IteratorFromDyn::new(res))
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       // TODO random estimate, could be very wrong
       self.0.reverse_map1.as_ref().unwrap().len() * self.0.reverse_map2.as_ref().unwrap().len()
          / ((self.0.map.len() as f32).sqrt() as usize)
@@ -480,7 +485,7 @@ where
       Some(IteratorFromDyn::new(res))
    }
 
-   fn len(&self) -> usize { 1 }
+   fn len_estimate(&self) -> usize { 1 }
 }
 
 pub struct BinRelToTernaryInd0_1_2<'a, T0, T1, T2, TBinRel>(&'a BinRelToTernary<T0, T1, T2, TBinRel>)
@@ -544,12 +549,13 @@ where
       if self.0.map.get(x0)?.contains(x1, x2) { Some(once(())) } else { None }
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 3;
       let sum = self.0.map.values().take(sample_size).map(|rel| rel.len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
+   fn is_empty(&'a self) -> bool { self.0.map.is_empty() }
 }
 
 pub struct BinRelToTernaryInd0_1_2Write<'a, T0, T1, T2, TBinRel>(&'a mut BinRelToTernary<T0, T1, T2, TBinRel>)
