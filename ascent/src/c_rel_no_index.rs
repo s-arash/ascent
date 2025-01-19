@@ -57,7 +57,9 @@ impl<'a, V: 'a> RelIndexRead<'a> for CRelNoIndex<V> {
    }
 
    #[inline(always)]
-   fn len(&self) -> usize { 1 }
+   fn len_estimate(&self) -> usize { 1 }
+
+   fn is_empty(&'a self) -> bool { false }
 }
 
 impl<'a, V: 'a + Sync + Send> CRelIndexRead<'a> for CRelNoIndex<V> {
@@ -92,7 +94,7 @@ impl<'a, V: 'a> RelIndexWrite for CRelNoIndex<V> {
 impl<'a, V: 'a> RelIndexMerge for CRelNoIndex<V> {
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
-      assert_eq!(from.len(), to.len());
+      assert_eq!(from.len_estimate(), to.len_estimate());
       // not necessary because we have a mut reference
       // assert!(!from.frozen);
       // assert!(!to.frozen);

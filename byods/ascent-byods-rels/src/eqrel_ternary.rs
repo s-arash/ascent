@@ -224,7 +224,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for EqRe
       Some(IteratorFromDyn::new(producer))
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 4;
       let (count, sum) = self
          .0
@@ -288,7 +288,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for EqRe
       Some(IteratorFromDyn::new(|| eqrel.iter_all_added()))
    }
 
-   fn len(&self) -> usize { self.0.map.len() }
+   fn len_estimate(&self) -> usize { self.0.map.len() }
 }
 
 pub struct EqRel2Ind1<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a EqRel2IndCommon<T0, T1>);
@@ -331,7 +331,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for EqRe
       Some(IteratorFromDyn::new(res))
    }
 
-   fn len(&self) -> usize { self.0.reverse_map.as_ref().unwrap().len() }
+   fn len_estimate(&self) -> usize { self.0.reverse_map.as_ref().unwrap().len() }
 }
 
 pub struct EqRel2Ind1_2<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a EqRel2IndCommon<T0, T1>);
@@ -382,9 +382,9 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for EqRe
       Some(IteratorFromDyn::new(res))
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 4;
-      let sum = self.0.map.values().take(sample_size).map(|eqrel| eqrel.len()).sum::<usize>();
+      let sum = self.0.map.values().take(sample_size).map(|eqrel| eqrel.len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum / sample_size.min(map_len).max(1)
    }
@@ -442,9 +442,9 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for EqRe
       if self.contains_key(key) { Some(std::iter::once(&())) } else { None }
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 4;
-      let sum = self.0.map.values().take(sample_size).map(|eqrel| eqrel.len()).sum::<usize>();
+      let sum = self.0.map.values().take(sample_size).map(|eqrel| eqrel.len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
@@ -480,7 +480,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for EqRe
       Some(IteratorFromDyn::new(|| self.0.iter_all_added()))
    }
 
-   fn len(&self) -> usize { 1 }
+   fn len_estimate(&self) -> usize { 1 }
 }
 
 macro_rules! to_eq_rel2 {

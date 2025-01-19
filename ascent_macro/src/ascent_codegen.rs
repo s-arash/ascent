@@ -826,7 +826,32 @@ fn compile_mir_rule(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> proc_macro
    } else {
       0
    };
-   compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, 0)
+   let rule_body_clauses = rule.body_items.iter().filter_map(|bi| bi.clause()).collect_vec();
+   let check_any_empty_rel_can_help =
+      rule_body_clauses.len() > 1 && !(rule.simple_join_start_index.is_some() && rule_body_clauses.len() == 2);
+   let any_empty_rel_code = check_any_empty_rel_can_help
+      .then(|| {
+         rule_body_clauses
+            .iter()
+            .map(|bclause| {
+               let rel_expr = expr_for_rel(&bclause.rel, mir);
+               quote_spanned! { bclause.rel_args_span=> #rel_expr.is_empty() }
+            })
+            .reduce(|l, r| quote! { #l || #r})
+      })
+      .flatten();
+
+   let rule_compiled = compile_mir_rule_inner(rule, scc, mir, par_iter_to_ind, head_update_code, 0);
+   if let Some(any_empty_rel_code) = any_empty_rel_code {
+      quote! {
+         let any_rel_empty = #any_empty_rel_code;
+         if !any_rel_empty {
+            #rule_compiled
+         }
+      }
+   } else {
+      rule_compiled
+   }
 }
 
 fn compile_mir_rule_inner(
@@ -844,20 +869,19 @@ fn compile_mir_rule_inner(
       let rule_cp2_compiled =
          compile_mir_rule_inner(&rule_cp2, _scc, mir, par_iter_to_ind, head_update_code, clause_ind);
 
-      if let [MirBodyItem::Clause(bcl1), MirBodyItem::Clause(bcl2)] = &rule.body_items[clause_ind..clause_ind + 2] {
-         let rel1_var_name = expr_for_rel(&bcl1.rel, mir);
-         let rel2_var_name = expr_for_rel(&bcl2.rel, mir);
-
-         return quote_spanned! {bcl1.rel_args_span=>
-            if #rel1_var_name.len() <= #rel2_var_name.len() {
-               #rule_cp1_compiled
-            } else {
-               #rule_cp2_compiled
-            }
-         };
-      } else {
+      let [MirBodyItem::Clause(bcl1), MirBodyItem::Clause(bcl2)] = &rule.body_items[clause_ind..clause_ind + 2] else {
          panic!("unexpected body items in reorderable rule")
-      }
+      };
+      let rel1_var_name = expr_for_rel(&bcl1.rel, mir);
+      let rel2_var_name = expr_for_rel(&bcl2.rel, mir);
+
+      return quote_spanned! {bcl1.rel_args_span=>
+         if #rel1_var_name.len_estimate() <= #rel2_var_name.len_estimate() {
+            #rule_cp1_compiled
+         } else {
+            #rule_cp2_compiled
+         }
+      };
    }
    if clause_ind < rule.body_items.len() {
       let bitem = &rule.body_items[clause_ind];

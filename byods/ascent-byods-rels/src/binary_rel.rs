@@ -116,7 +116,8 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for MapRelIndexAdaptor<'a, T> {
       Some(res)
    }
 
-   fn len(&'a self) -> usize { self.0.len() }
+   fn len_estimate(&'a self) -> usize { self.0.len() }
+   fn is_empty(&'a self) -> bool { self.0.is_empty() }
 }
 
 pub struct RelIndexValTransformer<T, F> {
@@ -143,7 +144,8 @@ where
       Some(res)
    }
 
-   fn len(&'a self) -> usize { self.rel.len() }
+   fn len_estimate(&'a self) -> usize { self.rel.len_estimate() }
+   fn is_empty(&'a self) -> bool { self.rel.is_empty() }
 }
 
 impl<'a, T: 'a, F: 'a, V: 'a, U: 'a> RelIndexReadAll<'a> for RelIndexValTransformer<T, F>

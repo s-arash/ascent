@@ -146,11 +146,12 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
       Some(IteratorFromDyn::new(|| trrel.rel().iter_all()))
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 4;
       let sum = self.0.map.values().map(|x| x.rel().count_estimate()).sum::<usize>();
       sum * self.0.map.len() / sample_size.min(self.0.map.len()).max(1)
    }
+   fn is_empty(&'a self) -> bool { self.0.map.is_empty() }
 }
 
 pub struct TrRel2Ind0_1<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a TrRel2IndCommon<T0, T1>);
@@ -187,12 +188,13 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
       Some(res)
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 3;
-      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd0(&trrel).len()).sum::<usize>();
+      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd0(&trrel).len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
+   fn is_empty(&'a self) -> bool { self.0.map.is_empty() }
 }
 
 pub struct TrRel2Ind0_2<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a TrRel2IndCommon<T0, T1>);
@@ -226,12 +228,13 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
       Some(res)
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 3;
-      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd1(&trrel).len()).sum::<usize>();
+      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd1(&trrel).len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
+   fn is_empty(&'a self) -> bool { self.0.map.is_empty() }
 }
 
 pub struct TrRel2Ind1<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a TrRel2IndCommon<T0, T1>);
@@ -269,7 +272,8 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
 
    fn index_get(&'a self, (x1,): &Self::Key) -> Option<Self::IteratorType> { self.get(x1) }
 
-   fn len(&self) -> usize { self.0.reverse_map1.as_ref().unwrap().len() }
+   fn len_estimate(&self) -> usize { self.0.reverse_map1.as_ref().unwrap().len() }
+   fn is_empty(&'a self) -> bool { self.0.reverse_map1.as_ref().unwrap().is_empty() }
 }
 
 pub struct TrRel2Ind2<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a TrRel2IndCommon<T0, T1>);
@@ -306,7 +310,8 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
 
    fn index_get(&'a self, (x2,): &Self::Key) -> Option<Self::IteratorType> { self.get(x2) }
 
-   fn len(&self) -> usize { self.0.reverse_map2.as_ref().unwrap().len() }
+   fn len_estimate(&self) -> usize { self.0.reverse_map2.as_ref().unwrap().len() }
+   fn is_empty(&'a self) -> bool { self.0.reverse_map2.as_ref().unwrap().is_empty() }
 }
 
 pub struct TrRel2Ind1_2<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a TrRel2IndCommon<T0, T1>);
@@ -349,7 +354,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
       Some(IteratorFromDyn::new(res))
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       // TODO random estimate, could be very wrong
       self.0.reverse_map1.as_ref().unwrap().len() * self.0.reverse_map2.as_ref().unwrap().len()
          / ((self.0.map.len() as f32).sqrt() as usize)
@@ -379,7 +384,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
       Some(IteratorFromDyn::new(res))
    }
 
-   fn len(&self) -> usize { 1 }
+   fn len_estimate(&self) -> usize { 1 }
 }
 
 #[repr(transparent)]
@@ -421,12 +426,13 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
       if self.0.map.get(x0)?.rel().contains(x1, x2) { Some(once(())) } else { None }
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let sample_size = 3;
       let sum = self.0.map.values().take(sample_size).map(|trrel| trrel.rel().count_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
+   fn is_empty(&'a self) -> bool { self.0.map.is_empty() }
 }
 
 pub struct TrRel2IndFullWrite<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a mut TrRel2IndCommon<T0, T1>);

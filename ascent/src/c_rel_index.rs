@@ -130,12 +130,16 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelIndexRead<'a> for CRelIndex<K, V> 
       Some(res)
    }
 
-   fn len(&self) -> usize {
-      // approximate len
+   fn len_estimate(&self) -> usize {
       let sample_size = 4;
       let shards = self.unwrap_frozen().shards();
       let (count, sum) = shards.iter().take(sample_size).fold((0, 0), |(c, s), shard| (c + 1, s + shard.read().len()));
       sum * shards.len() / count
+   }
+
+   fn is_empty(&'a self) -> bool {
+      let shards = self.unwrap_frozen().shards();
+      shards.iter().all(|s| s.read().is_empty())
    }
 }
 

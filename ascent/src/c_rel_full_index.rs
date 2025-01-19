@@ -122,7 +122,9 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelIndexRead<'a> for CRelFullIndex<K,
       Some(res)
    }
 
-   fn len(&self) -> usize { self.unwrap_frozen().len() }
+   fn len_estimate(&self) -> usize { self.unwrap_frozen().len() }
+
+   fn is_empty(&'a self) -> bool { self.unwrap_frozen().len() == 0 }
 }
 
 impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Sync> CRelIndexRead<'a> for CRelFullIndex<K, V> {

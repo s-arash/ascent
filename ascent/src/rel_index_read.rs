@@ -13,7 +13,13 @@ pub trait RelIndexRead<'a> {
    type Value;
    type IteratorType: Iterator<Item = Self::Value> + Clone + 'a;
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType>;
-   fn len(&'a self) -> usize;
+   fn len_estimate(&'a self) -> usize;
+
+   /// Is the relation **definitely** empty?
+   /// 
+   /// It is OK for implementations to return `false` even if the relation may be empty,
+   /// as this is used to enable certain optimizations.
+   fn is_empty(&'a self) -> bool { false }
 }
 
 pub trait RelIndexReadAll<'a> {
@@ -36,7 +42,10 @@ impl<'a, K: Eq + std::hash::Hash + 'a, V: Clone + 'a> RelIndexRead<'a> for RelIn
    }
 
    #[inline(always)]
-   fn len(&self) -> usize { Self::len(self) }
+   fn len_estimate(&self) -> usize { Self::len(self) }
+
+   #[inline(always)]
+   fn is_empty(&'a self) -> bool { Self::is_empty(self) }
 }
 
 impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for RelIndexType1<K, V> {
@@ -67,7 +76,10 @@ impl<'a, K: Eq + std::hash::Hash, V: 'a + Clone> RelIndexRead<'a> for HashBrownR
    }
 
    #[inline(always)]
-   fn len(&self) -> usize { Self::len(self) }
+   fn len_estimate(&self) -> usize { Self::len(self) }
+
+   #[inline(always)]
+   fn is_empty(&'a self) -> bool { Self::is_empty(self) }
 }
 
 impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for HashBrownRelFullIndexType<K, V> {
@@ -98,7 +110,9 @@ impl<'a, K: Eq + std::hash::Hash, V: 'a + Clone> RelIndexRead<'a> for LatticeInd
    }
 
    #[inline(always)]
-   fn len(&self) -> usize { Self::len(self) }
+   fn len_estimate(&self) -> usize { Self::len(self) }
+   #[inline(always)]
+   fn is_empty(&'a self) -> bool { Self::is_empty(self) }
 }
 
 impl<'a, K: Eq + std::hash::Hash + 'a, V: 'a + Clone> RelIndexReadAll<'a> for LatticeIndexType<K, V> {
@@ -154,7 +168,10 @@ where
    }
 
    #[inline(always)]
-   fn len(&self) -> usize { self.ind1.len() + self.ind2.len() }
+   fn len_estimate(&self) -> usize { self.ind1.len_estimate() + self.ind2.len_estimate() }
+
+   #[inline]
+   fn is_empty(&'a self) -> bool { self.ind1.is_empty() && self.ind2.is_empty() }
 }
 
 // impl <'a, Ind> RelIndexRead<'a> for RelIndexCombined<'a, Ind, Ind>

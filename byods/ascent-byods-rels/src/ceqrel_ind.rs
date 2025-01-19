@@ -130,7 +130,7 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for EqRelInd0_1<'a, T> {
 
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType> { self.0.index_get(key) }
 
-   fn len(&self) -> usize { self.0.len() }
+   fn len_estimate(&self) -> usize { self.0.len_estimate() }
 }
 
 impl<'a, T: Clone + Hash + Eq + Sync> CRelIndexRead<'a> for EqRelInd0_1<'a, T> {
@@ -199,7 +199,7 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for EqRelInd0<'a, T> {
       Some(IteratorFromDyn::new(producer))
    }
 
-   fn len(&self) -> usize { self.0.unwrap_frozen().combined.elem_ids.len() }
+   fn len_estimate(&self) -> usize { self.0.unwrap_frozen().combined.elem_ids.len() }
 }
 
 impl<'a, T: Clone + Hash + Eq + Sync> CRelIndexRead<'a> for EqRelInd0<'a, T> {
@@ -430,7 +430,7 @@ impl<'a, T: Clone + Hash + Eq + 'a> RelIndexRead<'a> for CEqRelIndCommon<T> {
       if self_.combined.contains(x, y) && !self_.old.contains(x, y) { Some(std::iter::once(())) } else { None }
    }
 
-   fn len(&self) -> usize {
+   fn len_estimate(&self) -> usize {
       let self_ = self.unwrap_frozen();
       let sample_size = 3;
       let sum: usize = self_.combined.sets.iter().take(sample_size).map(|s| s.len().pow(2)).sum();
@@ -540,7 +540,7 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for EqRelIndNone<'a, T> {
       Some(IteratorFromDyn::new(|| self.0.iter_all_added()))
    }
 
-   fn len(&self) -> usize { 1 }
+   fn len_estimate(&self) -> usize { 1 }
 }
 
 impl<'a, T: Clone + Hash + Eq + Sync> CRelIndexRead<'a> for EqRelIndNone<'a, T> {
