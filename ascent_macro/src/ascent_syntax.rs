@@ -32,9 +32,14 @@ use crate::utils::{
 // example: https://gitlab.gnome.org/federico/gnome-class/-/blob/master/src/parser/mod.rs
 
 mod kw {
+   use derive_syn_parse::Parse;
+   use syn::Token;
+
    syn::custom_keyword!(relation);
    syn::custom_keyword!(lattice);
-   syn::custom_punctuation!(LongLeftArrow, <--);
+   #[allow(dead_code)] // for unused fields of LongLeftArrow
+   #[derive(Parse)]
+   pub struct LongLeftArrow(Token![<], Token![-], Token![-]);
    syn::custom_keyword!(agg);
    syn::custom_keyword!(ident);
    syn::custom_keyword!(expr);
@@ -451,16 +456,10 @@ impl Parse for RuleNode {
       };
 
       if input.peek(Token![;]) {
-         // println!("fact rule!!!");
          input.parse::<Token![;]>()?;
          Ok(RuleNode { head_clauses, body_items: vec![] /*Punctuated::default()*/ })
       } else {
-         input.parse::<Token![<]>()?;
-         input.parse::<Token![-]>()?;
-         input.parse::<Token![-]>()?;
-         // NOTE this does not work with quote!
-         // input.parse::<kw::LongLeftArrow>()?;
-
+         input.parse::<kw::LongLeftArrow>()?;
          let body_items = Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty(input)?;
          input.parse::<Token![;]>()?;
          Ok(RuleNode { head_clauses, body_items: body_items.into_iter().collect() })
@@ -599,13 +598,10 @@ pub(crate) struct DsAttributeContents {
 
 impl Parse for DsAttributeContents {
    fn parse(input: ParseStream) -> Result<Self> {
-      let content = input;
-      // parenthesized!(content in input);
-
-      let path = syn::Path::parse_mod_style(&content)?;
-      let args = if content.peek(Token![:]) {
-         content.parse::<Token![:]>()?;
-         TokenStream::parse(&content)?
+      let path = syn::Path::parse_mod_style(&input)?;
+      let args = if input.peek(Token![:]) {
+         input.parse::<Token![:]>()?;
+         TokenStream::parse(&input)?
       } else {
          TokenStream::default()
       };
