@@ -3,7 +3,7 @@ use crate::internal::{
 };
 use crate::rel_index_read::{RelIndexRead, RelIndexReadAll};
 
-impl<'a, T> RelIndexWrite for &'a mut T
+impl<T> RelIndexWrite for &mut T
 where T: RelIndexWrite
 {
    type Key = T::Key;
@@ -13,7 +13,7 @@ where T: RelIndexWrite
    fn index_insert(&mut self, key: Self::Key, value: Self::Value) { (**self).index_insert(key, value) }
 }
 
-impl<'a, T> RelFullIndexWrite for &'a mut T
+impl<T> RelFullIndexWrite for &mut T
 where T: RelFullIndexWrite
 {
    type Key = T::Key;
@@ -25,7 +25,7 @@ where T: RelFullIndexWrite
    }
 }
 
-impl<'a, T> CRelIndexWrite for &'a T
+impl<T> CRelIndexWrite for &T
 where T: CRelIndexWrite
 {
    type Key = T::Key;
@@ -35,7 +35,7 @@ where T: CRelIndexWrite
    fn index_insert(&self, key: Self::Key, value: Self::Value) { (**self).index_insert(key, value) }
 }
 
-impl<'a, T> CRelFullIndexWrite for &'a T
+impl<T> CRelFullIndexWrite for &T
 where T: CRelFullIndexWrite
 {
    type Key = T::Key;
@@ -45,7 +45,7 @@ where T: CRelFullIndexWrite
    fn insert_if_not_present(&self, key: &Self::Key, v: Self::Value) -> bool { (**self).insert_if_not_present(key, v) }
 }
 
-impl<'a, T> RelIndexMerge for &'a mut T
+impl<T> RelIndexMerge for &mut T
 where T: RelIndexMerge
 {
    fn move_index_contents(from: &mut Self, to: &mut Self) { T::move_index_contents(*from, *to) }

@@ -12,7 +12,7 @@ impl<'a, T1> TupleOfBorrowed for &'a (T1,) {
    fn tuple_of_borrowed(self) -> Self::Tuple { (&self.0,) }
 }
 
-impl<'a, T1> TupleOfBorrowed for (&'a T1,) {
+impl<T1> TupleOfBorrowed for (&T1,) {
    type Tuple = Self;
 
    #[inline(always)]

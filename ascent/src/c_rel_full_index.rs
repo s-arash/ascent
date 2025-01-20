@@ -141,14 +141,14 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Sync> CRelIndexRead<'a> for CRelFull
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelFullIndexRead<'a> for CRelFullIndex<K, V> {
+impl<K: Clone + Hash + Eq, V> RelFullIndexRead<'_> for CRelFullIndex<K, V> {
    type Key = K;
 
    #[inline(always)]
    fn contains_key(&self, key: &Self::Key) -> bool { self.unwrap_frozen().contains_key(key) }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelFullIndexWrite for CRelFullIndex<K, V> {
+impl<K: Clone + Hash + Eq, V> RelFullIndexWrite for CRelFullIndex<K, V> {
    type Key = K;
    type Value = V;
 
@@ -164,7 +164,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> RelFullIndexWrite for CRelFullIndex<K
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelFullIndexWrite for CRelFullIndex<K, V> {
+impl<K: Clone + Hash + Eq, V> CRelFullIndexWrite for CRelFullIndex<K, V> {
    type Key = K;
    type Value = V;
 
@@ -224,7 +224,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Send + Sync> C
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexWrite for CRelFullIndex<K, V> {
+impl<K: Clone + Hash + Eq + Send + Sync, V: Send + Sync> RelIndexWrite for CRelFullIndex<K, V> {
    type Key = K;
    type Value = V;
 
@@ -244,7 +244,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexMerge for CRelFullIndex<K, V> {
+impl<K: Clone + Hash + Eq + Send + Sync, V: Send + Sync> RelIndexMerge for CRelFullIndex<K, V> {
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
 
@@ -272,7 +272,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexM
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelIndexWrite for CRelFullIndex<K, V> {
+impl<K: Clone + Hash + Eq, V> CRelIndexWrite for CRelFullIndex<K, V> {
    type Key = K;
    type Value = V;
 

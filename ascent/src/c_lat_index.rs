@@ -122,9 +122,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone + Hash + Eq + Sync> CRelIndexR
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Hash + Eq + Send + Sync> RelIndexWrite
-   for CLatIndex<K, V>
-{
+impl<K: Clone + Hash + Eq + Send + Sync, V: Clone + Hash + Eq + Send + Sync> RelIndexWrite for CLatIndex<K, V> {
    type Key = K;
    type Value = V;
 
@@ -145,9 +143,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Hash + Eq + Se
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Clone + Hash + Eq + Send + Sync> RelIndexMerge
-   for CLatIndex<K, V>
-{
+impl<K: Clone + Hash + Eq + Send + Sync, V: Clone + Hash + Eq + Send + Sync> RelIndexMerge for CLatIndex<K, V> {
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
       let from = from.unwrap_mut_unfrozen();
@@ -221,7 +217,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: 'a + Clone + Hash + Eq + Sy
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Clone + Hash + Eq> CRelIndexWrite for CLatIndex<K, V> {
+impl<K: Clone + Hash + Eq, V: Clone + Hash + Eq> CRelIndexWrite for CLatIndex<K, V> {
    type Key = K;
    type Value = V;
 

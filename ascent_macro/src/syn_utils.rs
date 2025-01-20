@@ -497,7 +497,7 @@ pub fn token_stream_idents(ts: TokenStream) -> Vec<Ident> {
 
 pub fn expr_visit_macros_mut(expr: &mut Expr, visitor: &mut dyn FnMut(&mut ExprMacro)) {
    struct Visitor<'a>(&'a mut dyn FnMut(&mut ExprMacro));
-   impl<'a> syn::visit_mut::VisitMut for Visitor<'a> {
+   impl syn::visit_mut::VisitMut for Visitor<'_> {
       fn visit_expr_macro_mut(&mut self, node: &mut ExprMacro) { (self.0)(node) }
    }
    Visitor(visitor).visit_expr_mut(expr)

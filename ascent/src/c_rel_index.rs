@@ -157,7 +157,7 @@ impl<'a, K: 'a + Clone + Hash + Eq, V: 'a + Sync> CRelIndexRead<'a> for CRelInde
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexWrite for CRelIndex<K, V> {
+impl<K: Clone + Hash + Eq + Send + Sync, V: Send + Sync> RelIndexWrite for CRelIndex<K, V> {
    type Key = K;
    type Value = V;
 
@@ -178,7 +178,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexW
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq + Send + Sync, V: 'a + Send + Sync> RelIndexMerge for CRelIndex<K, V> {
+impl<K: Clone + Hash + Eq + Send + Sync, V: Send + Sync> RelIndexMerge for CRelIndex<K, V> {
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
       let from = from.unwrap_mut_unfrozen();
@@ -233,7 +233,7 @@ pub struct DashMapViewParIter<'a, K, V, S> {
    shards: &'a [RwLock<hashbrown::HashMap<K, SharedValue<V>, S>>],
 }
 
-impl<'a, K, V, S> Clone for DashMapViewParIter<'a, K, V, S> {
+impl<K, V, S> Clone for DashMapViewParIter<'_, K, V, S> {
    fn clone(&self) -> Self { Self { shards: self.shards } }
 }
 
@@ -306,7 +306,7 @@ impl<'a, K: 'a + Clone + Hash + Eq + Sync + Send, V: Clone + 'a + Sync + Send> C
    }
 }
 
-impl<'a, K: 'a + Clone + Hash + Eq, V: 'a> CRelIndexWrite for CRelIndex<K, V> {
+impl<K: Clone + Hash + Eq, V> CRelIndexWrite for CRelIndex<K, V> {
    type Key = K;
    type Value = V;
 

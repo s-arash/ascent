@@ -211,7 +211,7 @@ impl<K: Clone + Hash + Eq, V> RelFullIndexWrite for HashBrownRelFullIndexType<K,
    }
 }
 
-impl<'a, K: Hash + Eq, V> RelFullIndexRead<'a> for HashBrownRelFullIndexType<K, V> {
+impl<K: Hash + Eq, V> RelFullIndexRead<'_> for HashBrownRelFullIndexType<K, V> {
    type Key = K;
 
    fn contains_key(&self, key: &Self::Key) -> bool { self.contains_key(key) }
