@@ -118,9 +118,9 @@ fn test_constant_propagation() {
 fn test_constant_propagation_lattice() {
    let const_1 = ConstPropagation::Constant(1);
 
-   let mut x = const_1.clone();
-   assert!(!x.join_mut(const_1.clone()));
-   assert!(!x.meet_mut(const_1.clone()));
+   let mut x = const_1;
+   assert!(!x.join_mut(const_1));
+   assert!(!x.meet_mut(const_1));
    assert!(!x.join_mut(ConstPropagation::Bottom));
    assert!(!x.meet_mut(ConstPropagation::Top));
 
