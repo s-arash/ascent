@@ -565,7 +565,7 @@ where
    T2: Clone + Hash + Eq,
    TBinRel: ByodsBinRel<T0 = T1, T1 = T2>;
 
-impl<'a, T0, T1, T2, TBinRel> RelIndexMerge for BinRelToTernaryInd0_1_2Write<'a, T0, T1, T2, TBinRel>
+impl<T0, T1, T2, TBinRel> RelIndexMerge for BinRelToTernaryInd0_1_2Write<'_, T0, T1, T2, TBinRel>
 where
    T0: Clone + Hash + Eq,
    T1: Clone + Hash + Eq,
@@ -575,7 +575,7 @@ where
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {} // noop
 }
 
-impl<'a, T0, T1, T2, TBinRel> RelFullIndexWrite for BinRelToTernaryInd0_1_2Write<'a, T0, T1, T2, TBinRel>
+impl<T0, T1, T2, TBinRel> RelFullIndexWrite for BinRelToTernaryInd0_1_2Write<'_, T0, T1, T2, TBinRel>
 where
    T0: Clone + Hash + Eq,
    T1: Clone + Hash + Eq,
@@ -609,7 +609,7 @@ where
    }
 }
 
-impl<'a, T0, T1, T2, TBinRel> RelIndexWrite for BinRelToTernaryInd0_1_2Write<'a, T0, T1, T2, TBinRel>
+impl<T0, T1, T2, TBinRel> RelIndexWrite for BinRelToTernaryInd0_1_2Write<'_, T0, T1, T2, TBinRel>
 where
    T0: Clone + Hash + Eq,
    T1: Clone + Hash + Eq,
@@ -674,7 +674,7 @@ where
    T1: Clone + Hash + Eq,
    T2: Clone + Hash + Eq;
 
-impl<'a, T0, T1, T2> Default for ToBinRelToTernaryInd0_1_2<T0, T1, T2>
+impl<T0, T1, T2> Default for ToBinRelToTernaryInd0_1_2<T0, T1, T2>
 where
    T0: Clone + Hash + Eq,
    T1: Clone + Hash + Eq,

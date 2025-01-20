@@ -388,18 +388,18 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for TrRelIndNone<'a, T> {
 
 pub struct TrRelIndFullWrite<'a, T: Clone + Hash + Eq>(&'a mut TrRelIndCommon<T>);
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for TrRelIndFullWrite<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndFullWrite<'_, T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {} //noop
 }
 
-impl<'a, T: Clone + Hash + Eq> RelFullIndexWrite for TrRelIndFullWrite<'a, T> {
+impl<T: Clone + Hash + Eq> RelFullIndexWrite for TrRelIndFullWrite<'_, T> {
    type Key = (T, T);
    type Value = ();
 
    fn insert_if_not_present(&mut self, (x, y): &Self::Key, (): Self::Value) -> bool { self.0.insert_by_ref(x, y) }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for TrRelIndFullWrite<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for TrRelIndFullWrite<'_, T> {
    type Key = (T, T);
    type Value = ();
 

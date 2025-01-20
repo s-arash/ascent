@@ -149,7 +149,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
    }
 
    #[cfg(feature = "par")]
-   pub fn c_iter_all<'a>(&'a self) -> IterAllParIterator<'a, T>
+   pub fn c_iter_all(&self) -> IterAllParIterator<'_, T>
    where T: Sync {
       IterAllParIterator(self)
    }

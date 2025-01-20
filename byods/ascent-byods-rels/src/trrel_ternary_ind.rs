@@ -437,11 +437,11 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
 
 pub struct TrRel2IndFullWrite<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a mut TrRel2IndCommon<T0, T1>);
 
-impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexMerge for TrRel2IndFullWrite<'a, T0, T1> {
+impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexMerge for TrRel2IndFullWrite<'_, T0, T1> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {} // noop
 }
 
-impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelFullIndexWrite for TrRel2IndFullWrite<'a, T0, T1> {
+impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelFullIndexWrite for TrRel2IndFullWrite<'_, T0, T1> {
    type Key = (T0, T1, T1);
 
    type Value = ();
@@ -471,7 +471,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelFullIndexWrite for TrR
    }
 }
 
-impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexWrite for TrRel2IndFullWrite<'a, T0, T1> {
+impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexWrite for TrRel2IndFullWrite<'_, T0, T1> {
    type Key = (T0, T1, T1);
 
    type Value = ();

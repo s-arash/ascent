@@ -16,14 +16,14 @@ pub trait ByodsBinRel: RelIndexMerge + Default {
 
    type AllIter<'a>: Iterator<Item = (&'a Self::T0, &'a Self::T1)>
    where Self: 'a;
-   fn iter_all<'a>(&'a self) -> Self::AllIter<'a>;
+   fn iter_all(&self) -> Self::AllIter<'_>;
    fn len_estimate(&self) -> usize;
 
    type Ind0AllIterValsIter<'a>: Iterator<Item = &'a Self::T1>
    where Self: 'a;
    type Ind0AllIter<'a>: Iterator<Item = (&'a Self::T0, Self::Ind0AllIterValsIter<'a>)>
    where Self: 'a;
-   fn ind0_iter_all<'a>(&'a self) -> Self::Ind0AllIter<'a>;
+   fn ind0_iter_all(&self) -> Self::Ind0AllIter<'_>;
    fn ind0_len_estimate(&self) -> usize;
 
    type Ind0ValsIter<'a>: Iterator<Item = &'a Self::T1> + Clone
@@ -34,7 +34,7 @@ pub trait ByodsBinRel: RelIndexMerge + Default {
    where Self: 'a;
    type Ind1AllIter<'a>: Iterator<Item = (&'a Self::T1, Self::Ind1AllIterValsIter<'a>)>
    where Self: 'a;
-   fn ind1_iter_all<'a>(&'a self) -> Self::Ind1AllIter<'a>;
+   fn ind1_iter_all(&self) -> Self::Ind1AllIter<'_>;
    fn ind1_len_estimate(&self) -> usize;
 
    type Ind1ValsIter<'a>: Iterator<Item = &'a Self::T0> + Clone
@@ -166,18 +166,18 @@ impl<'a, TBinRel: ByodsBinRel> RelFullIndexRead<'a> for ByodsBinRelInd0_1<'a, TB
 
 pub struct ByodsBinRelInd0_1Write<'a, TBinRel>(&'a mut TBinRel);
 
-impl<'a, TBinRel> RelIndexMerge for ByodsBinRelInd0_1Write<'a, TBinRel> {
+impl<TBinRel> RelIndexMerge for ByodsBinRelInd0_1Write<'_, TBinRel> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {} //noop
 }
 
-impl<'a, TBinRel: ByodsBinRel> RelIndexWrite for ByodsBinRelInd0_1Write<'a, TBinRel> {
+impl<TBinRel: ByodsBinRel> RelIndexWrite for ByodsBinRelInd0_1Write<'_, TBinRel> {
    type Key = (TBinRel::T0, TBinRel::T1);
    type Value = ();
 
    fn index_insert(&mut self, key: Self::Key, (): Self::Value) { self.0.insert(key.0, key.1); }
 }
 
-impl<'a, TBinRel: ByodsBinRel> RelFullIndexWrite for ByodsBinRelInd0_1Write<'a, TBinRel>
+impl<TBinRel: ByodsBinRel> RelFullIndexWrite for ByodsBinRelInd0_1Write<'_, TBinRel>
 where
    TBinRel::T0: Clone,
    TBinRel::T1: Clone,
