@@ -301,10 +301,8 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
 }
 
 fn get_ds_attr(attrs: &[Attribute]) -> syn::Result<Option<DsAttributeContents>> {
-   let ds_attrs = attrs
-      .iter()
-      .filter(|attr| attr.meta.path().get_ident().map_or(false, |ident| ident == REL_DS_ATTR))
-      .collect_vec();
+   let ds_attrs =
+      attrs.iter().filter(|attr| attr.meta.path().get_ident().is_some_and(|ident| ident == REL_DS_ATTR)).collect_vec();
    match &ds_attrs[..] {
       [] => Ok(None),
       [attr] => {

@@ -128,8 +128,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
    pub fn c_set_of(&self, x: &T) -> Option<&'_ hashbrown::hash_set::HashSet<T, BuildHasherDefault<FxHasher>>>
    where T: Sync {
       let set = self.elem_set(x)?;
-      let res = Some(&self.sets[set]);
-      res
+      Some(&self.sets[set])
    }
 
    // TODO not used
@@ -158,6 +157,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
 
    pub fn combine(&mut self, other: Self) {
       for set in other.sets.into_iter() {
+         #[allow(clippy::comparison_chain)]
          if set.len() == 1 {
             let repr = set.into_iter().next().unwrap();
             self.add(repr.clone(), repr);

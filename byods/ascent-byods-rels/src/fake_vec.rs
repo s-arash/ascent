@@ -13,6 +13,8 @@ impl<T> FakeVec<T> {
    #[inline(always)]
    pub fn push(&self, _: T) {}
 
+   pub fn is_empty(&self) -> bool { self.len() == 0 }
+
    pub fn len(&self) -> usize { 0 }
 
    pub fn iter(&self) -> std::iter::Empty<&T> { std::iter::empty() }

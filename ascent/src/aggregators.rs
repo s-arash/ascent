@@ -16,20 +16,29 @@ use std::iter::Sum;
 use std::ops::Add;
 
 /// computes the minimum of the input column
-pub fn min<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
-where N: Ord + Clone {
+pub fn min<'a, N>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
+where
+   N: Ord + Clone,
+   N: 'a,
+{
    inp.map(|tuple| tuple.0).min().cloned().into_iter()
 }
 
 /// computes the maximum of the input column
-pub fn max<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
-where N: Ord + Clone {
+pub fn max<'a, N>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
+where
+   N: Ord + Clone,
+   N: 'a,
+{
    inp.map(|tuple| tuple.0).max().cloned().into_iter()
 }
 
 /// computes the sum of the input column
-pub fn sum<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
-where N: Ord + Add + Clone + Sum<N> {
+pub fn sum<'a, N>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = N>
+where
+   N: Ord + Add + Clone + Sum<N>,
+   N: 'a,
+{
    let sum = inp.map(|tuple| tuple.0).cloned().sum::<N>();
    std::iter::once(sum)
 }
@@ -65,18 +74,22 @@ pub fn count(inp: impl Iterator<Item = ()>) -> impl Iterator<Item = usize> {
 }
 
 /// computes the average of the input column, returning an `f64`
-pub fn mean<'a, N: 'a>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = f64>
-where N: Clone + Into<f64> {
+pub fn mean<'a, N>(inp: impl Iterator<Item = (&'a N,)>) -> impl Iterator<Item = f64>
+where
+   N: Clone + Into<f64>,
+   N: 'a,
+{
    let (sum, count) = inp.fold((0.0, 0usize), |(sum, count), tuple| (tuple.0.clone().into() + sum, count + 1));
    let res = if count == 0 { None } else { Some(sum / count as f64) };
    res.into_iter()
 }
 
 /// computes the value at the given percentile of the input column
-pub fn percentile<'a, TItem: 'a, TInputIter>(p: f64) -> impl Fn(TInputIter) -> std::option::IntoIter<TItem>
+pub fn percentile<'a, TItem, TInputIter>(p: f64) -> impl Fn(TInputIter) -> std::option::IntoIter<TItem>
 where
    TInputIter: Iterator<Item = (&'a TItem,)>,
    TItem: Ord + Clone,
+   TItem: 'a,
 {
    move |inp| {
       let mut sorted: Vec<_> = inp.map(|tuple| tuple.0.clone()).collect();

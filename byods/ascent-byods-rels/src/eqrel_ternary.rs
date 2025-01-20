@@ -341,7 +341,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexReadAll<'a> for E
    type Value = (&'a T0,);
 
    type ValueIteratorType =
-      Map<hashbrown::hash_set::Intersection<'a, T0, BuildHasherDefault<FxHasher>>, for<'aa> fn(&'aa T0) -> (&T0,)>;
+      Map<hashbrown::hash_set::Intersection<'a, T0, BuildHasherDefault<FxHasher>>, for<'aa> fn(&'aa T0) -> (&'aa T0,)>;
 
    type AllIteratorType = Box<dyn Iterator<Item = (Self::Key, Self::ValueIteratorType)> + 'a>;
 

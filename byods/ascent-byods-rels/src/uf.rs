@@ -37,9 +37,15 @@ pub mod elems {
       }
 
       #[inline]
-      fn to_usize(&self) -> usize {
-         debug_assert!(usize::try_from(self.0).is_ok());
-         self.0 as usize
+      fn to_usize(self) -> usize {
+         #[cfg(feature = "compact")]
+         {
+            debug_assert!(usize::try_from(self.0).is_ok());
+            self.0 as usize
+         }
+
+         #[cfg(not(feature = "compact"))]
+         self.0
       }
    }
 
@@ -106,11 +112,11 @@ pub mod elems {
          let other_rank = other.rank.get();
          if self_rank >= other_rank {
             self.union(other);
-            return self.parent.get();
+            self.parent.get()
          } else {
             other.union(self);
-            return other.parent.get();
-         };
+            other.parent.get()
+         }
       }
    }
 
