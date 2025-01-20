@@ -16,7 +16,7 @@ pub trait RelIndexRead<'a> {
    fn len_estimate(&'a self) -> usize;
 
    /// Is the relation **definitely** empty?
-   /// 
+   ///
    /// It is OK for implementations to return `false` even if the relation may be empty,
    /// as this is used to enable certain optimizations.
    fn is_empty(&'a self) -> bool { false }
