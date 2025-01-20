@@ -117,7 +117,7 @@ pub(crate) mod test {
       relation foo(u32, usize);
 
       foo(*x as u32, *y as usize) <-- foo(y, x);
-      foo(x, y) <-- foo(x, y), foo(& (*y as u32), &(*x as usize));
+      foo(x, y) <-- foo(x, y), foo(& (*y as u32), (*x as usize));
 
    }
 }

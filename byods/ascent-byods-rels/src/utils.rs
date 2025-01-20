@@ -159,7 +159,7 @@ impl<T: Clone + Hash + Eq, S: BuildHasher> AltHashSet<T, S> {
 
    pub fn drain(&mut self) -> impl Iterator<Item = T> + '_ { self.0.drain().map(|kv| kv.0) }
 
-   pub fn intersection<'a>(&'a self, other: &'a Self) -> impl Iterator<Item = &T> + 'a {
+   pub fn intersection<'a>(&'a self, other: &'a Self) -> impl Iterator<Item = &'a T> + 'a {
       let (small, big) = if self.len() < other.len() { (self, other) } else { (other, self) };
       small.iter().filter(|&x| big.contains(x))
    }

@@ -172,7 +172,7 @@ pub mod elems {
       /// Doesn't include the node with the given ID.
       #[allow(dead_code)]
       pub(super) fn iter_class(&self, start: Id) -> Option<impl Iterator<Item = (Id, &Elem<T>)>> {
-         Class::new(&self, start)
+         Class::new(self, start)
       }
 
       /// Returns an iterator over the class of the node with the given [`Id`].
@@ -181,7 +181,7 @@ pub mod elems {
       ///
       /// SAFETY: The ID must exist.
       pub(super) unsafe fn iter_class_unchecked(&self, start: Id) -> impl Iterator<Item = (Id, &Elem<T>)> {
-         Class::new_unchecked(&self, start)
+         Class::new_unchecked(self, start)
       }
 
       /// Iterate over the equivalence classes
@@ -193,7 +193,7 @@ pub mod elems {
       /// roots that its already seen.
       #[allow(dead_code)]
       pub(super) fn iter_classes(&self) -> impl Iterator<Item = impl Iterator<Item = (Id, &Elem<T>)>> {
-         Classes::new(&self)
+         Classes::new(self)
       }
 
       #[inline]
@@ -244,7 +244,7 @@ pub mod elems {
                }
 
                id = n.parent.get();
-               n = &parent;
+               n = parent;
             }
 
             let root = id;
@@ -289,7 +289,7 @@ pub mod elems {
       type Output = Elem<T>;
 
       #[inline]
-      fn index(&self, index: Id) -> &Self::Output { &self.get(index).unwrap() }
+      fn index(&self, index: Id) -> &Self::Output { self.get(index).unwrap() }
    }
 
    /// Iterator over a single equivalence class

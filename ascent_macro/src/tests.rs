@@ -374,7 +374,7 @@ fn exp_condensation() {
    // ^       |       ^       |
    // |       v       |       v
    // d <---- c       h <---- g
-   graph.extend_with_edges(&[(a, b), (b, c), (c, d), (d, a), (b, e), (e, f), (f, g), (g, h), (h, e)]);
+   graph.extend_with_edges([(a, b), (b, c), (c, d), (d, a), (b, e), (e, f), (f, g), (g, h), (h, e)]);
    let acyclic_condensed_graph = condensation(graph.clone(), true);
    #[allow(non_snake_case)]
    let (A, B) = (NodeIndex::new(0), NodeIndex::new(1));
@@ -419,7 +419,7 @@ fn write_to_scratchpad_base(
    let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
    std::fs::write("src/scratchpad.rs", prefix.to_string()).unwrap();
    std::fs::write("src/scratchpad.rs", code_in_template).unwrap();
-   std::process::Command::new("rustfmt").args(&["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
+   std::process::Command::new("rustfmt").args(["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
    code
 }
 

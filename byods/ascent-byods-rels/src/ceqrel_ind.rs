@@ -524,7 +524,7 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for CEqRelIndCommon<T> {
       delta.old = total.combined.clone();
 
       // delta.combined.combine(new.combined.clone());
-      delta.combined.combine(std::mem::take(&mut new.unwrap_mut_unfrozen()));
+      delta.combined.combine(std::mem::take(new.unwrap_mut_unfrozen()));
    }
 }
 

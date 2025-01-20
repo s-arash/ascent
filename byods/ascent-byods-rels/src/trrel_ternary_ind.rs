@@ -190,7 +190,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
 
    fn len_estimate(&self) -> usize {
       let sample_size = 3;
-      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd0(&trrel).len_estimate()).sum::<usize>();
+      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd0(trrel).len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
@@ -230,7 +230,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
 
    fn len_estimate(&self) -> usize {
       let sample_size = 3;
-      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd1(&trrel).len_estimate()).sum::<usize>();
+      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd1(trrel).len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
