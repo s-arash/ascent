@@ -154,7 +154,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
       IterAllParIterator(self)
    }
 
-   pub fn contains(&self, x: &T, y: &T) -> bool { self.elem_set(x).map_or(false, |set| self.sets[set].contains(y)) }
+   pub fn contains(&self, x: &T, y: &T) -> bool { self.elem_set(x).is_some_and(|set| self.sets[set].contains(y)) }
 
    pub fn combine(&mut self, other: Self) {
       for set in other.sets.into_iter() {

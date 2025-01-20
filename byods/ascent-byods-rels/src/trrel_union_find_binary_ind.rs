@@ -291,20 +291,20 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
                   cached_delta_delta_map_x_for_can_add = Some(x.clone());
                };
             }
-            !cached_delta_delta_map_entry_for_can_add.map_or(false, |s| s.contains(y))
+            !cached_delta_delta_map_entry_for_can_add.is_some_and(|s| s.contains(y))
                && {
                   if cached_delta_total_map_x_for_can_add.as_ref() != Some(x) {
                      cached_delta_total_map_entry_for_can_add = delta_total_map.get(x);
                      cached_delta_total_map_x_for_can_add = Some(x.clone());
                   };
-                  !cached_delta_total_map_entry_for_can_add.map_or(false, |s| s.contains(y))
+                  !cached_delta_total_map_entry_for_can_add.is_some_and(|s| s.contains(y))
                }
                && {
                   if cached_total_map_x_for_can_add.as_ref() != Some(x) {
                      cached_total_map_entry_for_can_add = total_rel.set_connections.get(x);
                      cached_total_map_x_for_can_add = Some(x.clone());
                   }
-                  !cached_total_map_entry_for_can_add.map_or(false, |s| s.contains(y))
+                  !cached_total_map_entry_for_can_add.is_some_and(|s| s.contains(y))
                }
          };
 

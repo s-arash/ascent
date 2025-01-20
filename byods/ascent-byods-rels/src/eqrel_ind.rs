@@ -232,7 +232,7 @@ impl<T: Clone + Hash + Eq> EqRelIndCommon<T> {
       let set = self.combined.set_of(x)?;
       // let old_set = self.old.set_of(x).into_iter().flatten();
       let old_set = self.old.elem_set(x).map(|id| &self.old.sets[id]);
-      Some(set.filter(move |y| !old_set.map_or(false, |os| os.contains(*y))))
+      Some(set.filter(move |y| !old_set.is_some_and(|os| os.contains(*y))))
    }
 
    pub(crate) fn added_contains(&self, x: &T, y: &T) -> bool {

@@ -376,7 +376,7 @@ impl<'a, T: Clone + Hash + Eq + Sync> ParallelIterator for SetOfAddedParIter<'a,
 
    fn drive_unindexed<C>(self, consumer: C) -> C::Result
    where C: ascent::rayon::iter::plumbing::UnindexedConsumer<Self::Item> {
-      self.set.par_iter().filter(move |y| !self.old_set.map_or(false, |os| os.contains(*y))).drive_unindexed(consumer)
+      self.set.par_iter().filter(move |y| !self.old_set.is_some_and(|os| os.contains(*y))).drive_unindexed(consumer)
    }
 }
 
@@ -397,7 +397,7 @@ impl<T: Clone + Hash + Eq> CEqRelIndCommon<T> {
       let set = self_.combined.set_of(x)?;
       // let old_set = self.old.set_of(x).into_iter().flatten();
       let old_set = self_.old.elem_set(x).map(|id| &self_.old.sets[id]);
-      Some(set.filter(move |y| !old_set.map_or(false, |os| os.contains(*y))))
+      Some(set.filter(move |y| !old_set.is_some_and(|os| os.contains(*y))))
    }
 
    pub(crate) fn c_set_of_added(&self, x: &T) -> Option<SetOfAddedParIter<'_, T>>

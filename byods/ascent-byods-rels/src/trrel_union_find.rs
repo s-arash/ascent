@@ -134,7 +134,7 @@ impl<T: Clone + Hash + Eq> TrRelUnionFind<T> {
       }
       // We have different sets, neither is new
 
-      if self.set_connections.get(&y_set).map_or(false, |y_set| y_set.contains(&x_set)) {
+      if self.set_connections.get(&y_set).is_some_and(|y_set| y_set.contains(&x_set)) {
          // There exists a back-edge, collapse for anti-symmetry
          let mut to_be_merged = self.set_connections[&y_set]
             .intersection(&self.reverse_set_connections[&x_set])
@@ -308,7 +308,7 @@ impl<T: Clone + Hash + Eq> TrRelUnionFind<T> {
    }
 
    pub fn contains(&self, x: &T, y: &T) -> bool {
-      self.elem_set(x).map_or(false, |set| {
+      self.elem_set(x).is_some_and(|set| {
          self.sets[set].contains(y) || {
             // TODO
             self.get_set_connections(set).into_iter().flatten().any(|s| self.sets[s].contains(y))

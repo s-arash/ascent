@@ -419,7 +419,7 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
       .map(|bcls| {
          // rule is reorderable if it is a simple join and the second clause does not depend on items
          // before the first clause (e.g., let z = &1, foo(x, y), bar(y, z) is not reorderable)
-         let reorderable = rule.simple_join_start_index.map_or(false, |ind| {
+         let reorderable = rule.simple_join_start_index.is_some_and(|ind| {
             let pre_first_clause_vars = bcls.iter().take(ind).flat_map(MirBodyItem::bound_vars);
             !intersects(pre_first_clause_vars, bcls[ind + 1].bound_vars())
          });
