@@ -1,4 +1,4 @@
-use std::hash::{BuildHasherDefault, Hash};
+use std::hash::{BuildHasher as _, BuildHasherDefault, Hash};
 use std::iter::{Map, once};
 
 use ascent::internal::{
@@ -11,7 +11,7 @@ use rustc_hash::FxHasher;
 use crate::iterator_from_dyn::IteratorFromDyn;
 use crate::trrel_binary::MyHashSetIter;
 use crate::trrel_binary_ind::{TrRelInd0, TrRelInd1, TrRelIndCommon};
-use crate::utils::{AltHashSet, AltHashSetIter, hash_one};
+use crate::utils::{AltHashSet, AltHashSetIter};
 
 #[derive(DerefMut, Deref)]
 pub struct TrRel2IndCommonWrapper<
@@ -447,7 +447,7 @@ impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelFullIndexWrite for TrRel2I
    type Value = ();
 
    fn insert_if_not_present(&mut self, (x0, x1, x2): &Self::Key, (): Self::Value) -> bool {
-      let x0_hash = hash_one(self.0.map.hasher(), x0);
+      let x0_hash = self.0.map.hasher().hash_one(x0);
 
       if !self
          .0

@@ -1,6 +1,5 @@
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{BuildHasher, Hash};
 
-use hashbrown;
 use hashbrown::{Equivalent, HashMap, HashSet};
 
 use crate::iterator_from_dyn::IteratorFromDyn;
@@ -118,14 +117,6 @@ pub(crate) fn move_hash_map_of_alt_hash_set_contents<K, V, S1, S2>(
          },
       }
    }
-}
-
-// #[allow(dead_code)]
-#[inline]
-pub fn hash_one<S: BuildHasher, T: Hash>(hahser: &S, x: &T) -> u64 {
-   let mut hasher = hahser.build_hasher();
-   x.hash(&mut hasher);
-   hasher.finish()
 }
 
 pub struct AltHashSet<T, S>(pub(crate) HashMap<T, (), S>);

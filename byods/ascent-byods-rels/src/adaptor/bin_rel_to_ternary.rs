@@ -1,4 +1,4 @@
-use std::hash::{BuildHasherDefault, Hash};
+use std::hash::{BuildHasher as _, BuildHasherDefault, Hash};
 use std::iter::{Map, once};
 use std::marker::PhantomData;
 
@@ -10,7 +10,7 @@ use rustc_hash::FxHasher;
 
 use super::bin_rel::ByodsBinRel;
 use crate::iterator_from_dyn::IteratorFromDyn;
-use crate::utils::{AltHashSet, hash_one};
+use crate::utils::AltHashSet;
 
 pub struct BinRelToTernary<T0, T1, T2, TBinRel>
 where
@@ -586,7 +586,7 @@ where
    type Value = ();
 
    fn insert_if_not_present(&mut self, (x0, x1, x2): &Self::Key, (): Self::Value) -> bool {
-      let x0_hash = hash_one(self.0.map.hasher(), x0);
+      let x0_hash = self.0.map.hasher().hash_one(x0);
 
       if !self
          .0
