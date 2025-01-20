@@ -327,10 +327,9 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
    } else {
       quote! {
          {{
-            #![allow(clippy::all)]
+            #![allow(unused_imports, noop_method_call, suspicious_double_ref_op, clippy::all)]
             #res
             let mut __run_res: #struct_name #ty_ty_generics = #struct_name::default();
-            #[allow(unused_imports, noop_method_call, suspicious_double_ref_op)]
             {
                ascent::internal::comment("running...");
                #run_code
