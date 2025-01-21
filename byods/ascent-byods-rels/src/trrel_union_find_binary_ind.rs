@@ -54,7 +54,7 @@ impl<T: Clone + Hash + Eq> TrRelDelta<T> {
       let res = || sets_of_x.iter().flat_map(|&s| self.total.sets[s].iter());
       Some(IteratorFromDyn::new(res))
    }
-   fn ind_0_iter_all<'a>(&'a self) -> IteratorFromDyn<(&'a T, IteratorFromDyn<&'_ T>)> {
+   fn ind_0_iter_all(&self) -> IteratorFromDyn<(&T, IteratorFromDyn<&T>)> {
       let res = || {
          self.set_connections.iter().flat_map(|(set_id, set_connections)| {
             let xs = &self.total.sets[*set_id];
@@ -66,7 +66,7 @@ impl<T: Clone + Hash + Eq> TrRelDelta<T> {
       };
       IteratorFromDyn::new(res)
    }
-   fn ind_1_iter_all<'a>(&'a self) -> IteratorFromDyn<(&'a T, IteratorFromDyn<&'_ T>)> {
+   fn ind_1_iter_all(&self) -> IteratorFromDyn<(&T, IteratorFromDyn<&T>)> {
       let res = || {
          self.rev_set_connections.iter().flat_map(|(set_id, rev_set_connections)| {
             let xs = &self.total.sets[*set_id];
@@ -90,7 +90,7 @@ impl<T: Clone + Hash + Eq> TrRelDelta<T> {
       if x_set_connections.contains(&y_set) { Some(std::iter::once(())) } else { None }
    }
 
-   fn iter_all<'a>(&'a self) -> impl Iterator<Item = (&'a T, &'a T)> + 'a {
+   fn iter_all(&self) -> impl Iterator<Item = (&'_ T, &'_ T)> + '_ {
       let res = self.set_connections.iter().flat_map(move |(x_set, y_sets)| {
          self.total.sets[*x_set].iter().flat_map(move |x| {
             y_sets
@@ -206,7 +206,7 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
       for (x, y) in new_rel.iter() {
          let x_id = total_rel.add_node(x.clone());
          let y_id = total_rel.add_node(y.clone());
-         new_classes_map.entry(x_id.clone()).or_default().insert(y_id);
+         new_classes_map.entry(x_id).or_default().insert(y_id);
          new_classes_rev_map.entry(y_id).or_default().insert(x_id);
       }
       // println!("merge. new_classes_map.len(): {}, new_classes_rev_map.len(): {}", new_classes_map.len(), new_classes_rev_map.len());
@@ -288,23 +288,23 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
             {
                if cached_delta_delta_map_x_for_can_add.as_ref() != Some(x) {
                   cached_delta_delta_map_entry_for_can_add = delta_delta_map.get(x);
-                  cached_delta_delta_map_x_for_can_add = Some(x.clone());
+                  cached_delta_delta_map_x_for_can_add = Some(*x);
                };
             }
-            !cached_delta_delta_map_entry_for_can_add.map_or(false, |s| s.contains(y))
+            !cached_delta_delta_map_entry_for_can_add.is_some_and(|s| s.contains(y))
                && {
                   if cached_delta_total_map_x_for_can_add.as_ref() != Some(x) {
                      cached_delta_total_map_entry_for_can_add = delta_total_map.get(x);
-                     cached_delta_total_map_x_for_can_add = Some(x.clone());
+                     cached_delta_total_map_x_for_can_add = Some(*x);
                   };
-                  !cached_delta_total_map_entry_for_can_add.map_or(false, |s| s.contains(y))
+                  !cached_delta_total_map_entry_for_can_add.is_some_and(|s| s.contains(y))
                }
                && {
                   if cached_total_map_x_for_can_add.as_ref() != Some(x) {
                      cached_total_map_entry_for_can_add = total_rel.set_connections.get(x);
-                     cached_total_map_x_for_can_add = Some(x.clone());
+                     cached_total_map_x_for_can_add = Some(*x);
                   }
-                  !cached_total_map_entry_for_can_add.map_or(false, |s| s.contains(y))
+                  !cached_total_map_entry_for_can_add.is_some_and(|s| s.contains(y))
                }
          };
 
@@ -384,7 +384,7 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
       = Box<dyn Iterator<Item = (&'a T, &'a T)> + 'a>
    where Self: 'a;
 
-   fn iter_all<'a>(&'a self) -> Self::AllIter<'a> {
+   fn iter_all(&self) -> Self::AllIter<'_> {
       match self {
          TrRelIndCommon::Delta { rel, .. } => Box::new(rel.iter_all()),
          TrRelIndCommon::Total { rel, .. } => Box::new(rel.iter_all()),
@@ -420,7 +420,7 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
       = IteratorFromDyn<'a, (&'a T, Self::Ind0AllIterValsIter<'a>)>
    where Self: 'a;
 
-   fn ind0_iter_all<'a>(&'a self) -> Self::Ind0AllIter<'a> {
+   fn ind0_iter_all(&self) -> Self::Ind0AllIter<'_> {
       match self {
          TrRelIndCommon::Delta { rel, .. } => rel.ind_0_iter_all(),
          TrRelIndCommon::Total { rel, .. } => {
@@ -477,7 +477,7 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
       = IteratorFromDyn<'a, (&'a T, Self::Ind1AllIterValsIter<'a>)>
    where Self: 'a;
 
-   fn ind1_iter_all<'a>(&'a self) -> Self::Ind1AllIter<'a> {
+   fn ind1_iter_all(&self) -> Self::Ind1AllIter<'_> {
       match self {
          TrRelIndCommon::Delta { rel, .. } => rel.ind_1_iter_all(),
          TrRelIndCommon::Total { rel, .. } => {

@@ -78,7 +78,7 @@ pub(crate) mod test {
       type AllIter<'a>
          = Once<(&'a T0, &'a T1)>
       where Self: 'a;
-      fn iter_all<'a>(&'a self) -> Self::AllIter<'a> { todo!() }
+      fn iter_all(&self) -> Self::AllIter<'_> { todo!() }
 
       fn len_estimate(&self) -> usize { todo!() }
 
@@ -88,7 +88,7 @@ pub(crate) mod test {
       type Ind0AllIter<'a>
          = Once<(&'a Self::T0, Self::Ind0AllIterValsIter<'a>)>
       where Self: 'a;
-      fn ind0_iter_all<'a>(&'a self) -> Self::Ind0AllIter<'a> { todo!() }
+      fn ind0_iter_all(&self) -> Self::Ind0AllIter<'_> { todo!() }
       fn ind0_len_estimate(&self) -> usize { todo!() }
 
       type Ind0ValsIter<'a>
@@ -102,7 +102,7 @@ pub(crate) mod test {
       type Ind1AllIter<'a>
          = Once<(&'a Self::T1, Self::Ind1AllIterValsIter<'a>)>
       where Self: 'a;
-      fn ind1_iter_all<'a>(&'a self) -> Self::Ind1AllIter<'a> { todo!() }
+      fn ind1_iter_all(&self) -> Self::Ind1AllIter<'_> { todo!() }
       fn ind1_len_estimate(&self) -> usize { todo!() }
 
       type Ind1ValsIter<'a>
@@ -117,7 +117,7 @@ pub(crate) mod test {
       relation foo(u32, usize);
 
       foo(*x as u32, *y as usize) <-- foo(y, x);
-      foo(x, y) <-- foo(x, y), foo(& (*y as u32), &(*x as usize));
+      foo(x, y) <-- foo(x, y), foo(& (*y as u32), (*x as usize));
 
    }
 }

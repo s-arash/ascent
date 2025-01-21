@@ -229,20 +229,20 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
                   cached_delta_delta_map_x_for_can_add = Some(x.clone());
                };
             }
-            !cached_delta_delta_map_entry_for_can_add.map_or(false, |s| s.contains(y))
+            !cached_delta_delta_map_entry_for_can_add.is_some_and(|s| s.contains(y))
                && {
                   if cached_delta_total_map_x_for_can_add.as_ref() != Some(x) {
                      cached_delta_total_map_entry_for_can_add = delta_total_map.get(x);
                      cached_delta_total_map_x_for_can_add = Some(x.clone());
                   };
-                  !cached_delta_total_map_entry_for_can_add.map_or(false, |s| s.contains(y))
+                  !cached_delta_total_map_entry_for_can_add.is_some_and(|s| s.contains(y))
                }
                && {
                   if cached_total_map_x_for_can_add.as_ref() != Some(x) {
                      cached_total_map_entry_for_can_add = total_rel.map.get(x);
                      cached_total_map_x_for_can_add = Some(x.clone());
                   }
-                  !cached_total_map_entry_for_can_add.map_or(false, |s| s.contains(y))
+                  !cached_total_map_entry_for_can_add.is_some_and(|s| s.contains(y))
                }
          };
 
@@ -388,18 +388,18 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for TrRelIndNone<'a, T> {
 
 pub struct TrRelIndFullWrite<'a, T: Clone + Hash + Eq>(&'a mut TrRelIndCommon<T>);
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for TrRelIndFullWrite<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndFullWrite<'_, T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {} //noop
 }
 
-impl<'a, T: Clone + Hash + Eq> RelFullIndexWrite for TrRelIndFullWrite<'a, T> {
+impl<T: Clone + Hash + Eq> RelFullIndexWrite for TrRelIndFullWrite<'_, T> {
    type Key = (T, T);
    type Value = ();
 
    fn insert_if_not_present(&mut self, (x, y): &Self::Key, (): Self::Value) -> bool { self.0.insert_by_ref(x, y) }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for TrRelIndFullWrite<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for TrRelIndFullWrite<'_, T> {
    type Key = (T, T);
    type Value = ();
 
@@ -412,7 +412,7 @@ impl<'a, T: Clone + Hash + Eq> RelFullIndexRead<'a> for TrRelIndFull<'a, T> {
    type Key = (T, T);
 
    fn contains_key(&'a self, key: &Self::Key) -> bool {
-      self.0.rel().map.get(&key.0).map_or(false, |s| s.contains(&key.1))
+      self.0.rel().map.get(&key.0).is_some_and(|s| s.contains(&key.1))
    }
 }
 

@@ -89,14 +89,14 @@ impl<T> Default for ToEqRelInd0_1<T> {
 pub struct EqRelInd0_1<'a, T: Clone + Hash + Eq>(&'a EqRelIndCommon<T>);
 pub struct EqRelInd0_1Write<'a, T: Clone + Hash + Eq>(&'a mut EqRelIndCommon<T>);
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for EqRelInd0_1Write<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for EqRelInd0_1Write<'_, T> {
    type Key = (T, T);
    type Value = ();
 
    fn index_insert(&mut self, key: Self::Key, value: Self::Value) { self.0.index_insert(key, value) }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for EqRelInd0_1Write<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for EqRelInd0_1Write<'_, T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {
       //noop
    }
@@ -111,7 +111,7 @@ impl<T: Clone + Hash + Eq> RelFullIndexWrite for EqRelIndCommon<T> {
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelFullIndexWrite for EqRelInd0_1Write<'a, T> {
+impl<T: Clone + Hash + Eq> RelFullIndexWrite for EqRelInd0_1Write<'_, T> {
    type Key = <EqRelIndCommon<T> as RelFullIndexWrite>::Key;
    type Value = <EqRelIndCommon<T> as RelFullIndexWrite>::Value;
    fn insert_if_not_present(&mut self, key: &Self::Key, v: Self::Value) -> bool { self.0.insert_if_not_present(key, v) }
@@ -203,7 +203,7 @@ impl<'a, T: Clone + Hash + Eq> RelIndexReadAll<'a> for EqRelInd0<'a, T> {
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for EqRelInd0<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for EqRelInd0<'_, T> {
    type Key = (T,);
    type Value = (T,);
    fn index_insert(&mut self, _key: Self::Key, _value: Self::Value) {
@@ -211,7 +211,7 @@ impl<'a, T: Clone + Hash + Eq> RelIndexWrite for EqRelInd0<'a, T> {
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for EqRelInd0<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for EqRelInd0<'_, T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {
       //noop
    }
@@ -232,7 +232,7 @@ impl<T: Clone + Hash + Eq> EqRelIndCommon<T> {
       let set = self.combined.set_of(x)?;
       // let old_set = self.old.set_of(x).into_iter().flatten();
       let old_set = self.old.elem_set(x).map(|id| &self.old.sets[id]);
-      Some(set.filter(move |y| !old_set.map_or(false, |os| os.contains(*y))))
+      Some(set.filter(move |y| !old_set.is_some_and(|os| os.contains(*y))))
    }
 
    pub(crate) fn added_contains(&self, x: &T, y: &T) -> bool {
@@ -284,7 +284,7 @@ impl<'a, T: Clone + Hash + Eq> RelFullIndexRead<'a> for EqRelIndCommon<T> {
    fn contains_key(&'a self, (x, y): &Self::Key) -> bool { self.combined.contains(x, y) && !self.old.contains(x, y) }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for EqRelIndCommon<T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for EqRelIndCommon<T> {
    type Key = (T, T);
    type Value = ();
 
@@ -293,7 +293,7 @@ impl<'a, T: Clone + Hash + Eq> RelIndexWrite for EqRelIndCommon<T> {
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for EqRelIndCommon<T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for EqRelIndCommon<T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {
       unimplemented!("merge_delta_to_total_new_to_delta must be used instead")
    }
@@ -335,14 +335,14 @@ impl<'a, T: Clone + Hash + Eq> RelIndexReadAll<'a> for EqRelIndNone<'a, T> {
    fn iter_all(&'a self) -> Self::AllIteratorType { self.index_get(&()).map(|iter| ((), iter)).into_iter() }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for EqRelIndNone<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for EqRelIndNone<'_, T> {
    type Key = ();
    type Value = (T, T);
    fn index_insert(&mut self, _key: Self::Key, _value: Self::Value) { /* noop */
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for EqRelIndNone<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for EqRelIndNone<'_, T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) { /* noop */
    }
 }

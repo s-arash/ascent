@@ -70,14 +70,14 @@ pub struct EqRelInd0_1<'a, T: Clone + Hash + Eq>(&'a CEqRelIndCommon<T>);
 pub struct EqRelInd0_1Write<'a, T: Clone + Hash + Eq>(&'a mut CEqRelIndCommon<T>);
 pub struct EqRelInd0_1CWrite<'a, T: Clone + Hash + Eq>(&'a CEqRelIndCommon<T>);
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for EqRelInd0_1Write<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for EqRelInd0_1Write<'_, T> {
    type Key = (T, T);
    type Value = ();
 
    fn index_insert(&mut self, key: Self::Key, value: Self::Value) { self.0.index_insert(key, value) }
 }
 
-impl<'a, T: Clone + Hash + Eq> CRelIndexWrite for EqRelInd0_1CWrite<'a, T> {
+impl<T: Clone + Hash + Eq> CRelIndexWrite for EqRelInd0_1CWrite<'_, T> {
    type Key = (T, T);
    type Value = ();
 
@@ -86,7 +86,7 @@ impl<'a, T: Clone + Hash + Eq> CRelIndexWrite for EqRelInd0_1CWrite<'a, T> {
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for EqRelInd0_1Write<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for EqRelInd0_1Write<'_, T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) { /* noop */
    }
 }
@@ -109,13 +109,13 @@ impl<T: Clone + Hash + Eq> CRelFullIndexWrite for CEqRelIndCommon<T> {
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelFullIndexWrite for EqRelInd0_1Write<'a, T> {
+impl<T: Clone + Hash + Eq> RelFullIndexWrite for EqRelInd0_1Write<'_, T> {
    type Key = <CEqRelIndCommon<T> as RelFullIndexWrite>::Key;
    type Value = <CEqRelIndCommon<T> as RelFullIndexWrite>::Value;
    fn insert_if_not_present(&mut self, key: &Self::Key, v: Self::Value) -> bool { self.0.insert_if_not_present(key, v) }
 }
 
-impl<'a, T: Clone + Hash + Eq> CRelFullIndexWrite for EqRelInd0_1CWrite<'a, T> {
+impl<T: Clone + Hash + Eq> CRelFullIndexWrite for EqRelInd0_1CWrite<'_, T> {
    type Key = <CEqRelIndCommon<T> as CRelFullIndexWrite>::Key;
    type Value = <CEqRelIndCommon<T> as CRelFullIndexWrite>::Value;
    fn insert_if_not_present(&self, key: &Self::Key, v: Self::Value) -> bool {
@@ -281,21 +281,21 @@ impl<'a, T: Clone + Hash + Eq + Sync + Send> CRelIndexReadAll<'a> for EqRelInd0<
    fn c_iter_all(&'a self) -> Self::AllIteratorType { EqRelInd0CRelIndexReadAllIter(self.0.unwrap_frozen()) }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for EqRelInd0<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for EqRelInd0<'_, T> {
    type Key = (T,);
    type Value = (T,);
    fn index_insert(&mut self, _key: Self::Key, _value: Self::Value) { /* noop */
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> CRelIndexWrite for EqRelInd0<'a, T> {
+impl<T: Clone + Hash + Eq> CRelIndexWrite for EqRelInd0<'_, T> {
    type Key = (T,);
    type Value = (T,);
    fn index_insert(&self, _key: Self::Key, _value: Self::Value) { /* noop */
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for EqRelInd0<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for EqRelInd0<'_, T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) { /* noop */
    }
 }
@@ -376,7 +376,7 @@ impl<'a, T: Clone + Hash + Eq + Sync> ParallelIterator for SetOfAddedParIter<'a,
 
    fn drive_unindexed<C>(self, consumer: C) -> C::Result
    where C: ascent::rayon::iter::plumbing::UnindexedConsumer<Self::Item> {
-      self.set.par_iter().filter(move |y| !self.old_set.map_or(false, |os| os.contains(*y))).drive_unindexed(consumer)
+      self.set.par_iter().filter(move |y| !self.old_set.is_some_and(|os| os.contains(*y))).drive_unindexed(consumer)
    }
 }
 
@@ -397,7 +397,7 @@ impl<T: Clone + Hash + Eq> CEqRelIndCommon<T> {
       let set = self_.combined.set_of(x)?;
       // let old_set = self.old.set_of(x).into_iter().flatten();
       let old_set = self_.old.elem_set(x).map(|id| &self_.old.sets[id]);
-      Some(set.filter(move |y| !old_set.map_or(false, |os| os.contains(*y))))
+      Some(set.filter(move |y| !old_set.is_some_and(|os| os.contains(*y))))
    }
 
    pub(crate) fn c_set_of_added(&self, x: &T) -> Option<SetOfAddedParIter<'_, T>>
@@ -492,14 +492,14 @@ impl<'a, T: Clone + Hash + Eq> RelFullIndexRead<'a> for CEqRelIndCommon<T> {
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for CEqRelIndCommon<T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for CEqRelIndCommon<T> {
    type Key = (T, T);
    type Value = ();
 
    fn index_insert(&mut self, key: Self::Key, _value: Self::Value) { self.unwrap_mut_unfrozen().add(key.0, key.1); }
 }
 
-impl<'a, T: Clone + Hash + Eq> CRelIndexWrite for CEqRelIndCommon<T> {
+impl<T: Clone + Hash + Eq> CRelIndexWrite for CEqRelIndCommon<T> {
    type Key = (T, T);
    type Value = ();
 
@@ -508,7 +508,7 @@ impl<'a, T: Clone + Hash + Eq> CRelIndexWrite for CEqRelIndCommon<T> {
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for CEqRelIndCommon<T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for CEqRelIndCommon<T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {
       unimplemented!("merge_delta_to_total_new_to_delta must be used instead")
    }
@@ -524,7 +524,7 @@ impl<'a, T: Clone + Hash + Eq> RelIndexMerge for CEqRelIndCommon<T> {
       delta.old = total.combined.clone();
 
       // delta.combined.combine(new.combined.clone());
-      delta.combined.combine(std::mem::take(&mut new.unwrap_mut_unfrozen()));
+      delta.combined.combine(std::mem::take(new.unwrap_mut_unfrozen()));
    }
 }
 
@@ -575,21 +575,21 @@ impl<'a, T: Clone + Hash + Eq + Sync> CRelIndexReadAll<'a> for EqRelIndNone<'a, 
    fn c_iter_all(&'a self) -> Self::AllIteratorType { ascent::rayon::iter::once(((), self.0.c_iter_all_added())) }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexWrite for EqRelIndNone<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexWrite for EqRelIndNone<'_, T> {
    type Key = ();
    type Value = (T, T);
    fn index_insert(&mut self, _key: Self::Key, _value: Self::Value) { /* noop */
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> CRelIndexWrite for EqRelIndNone<'a, T> {
+impl<T: Clone + Hash + Eq> CRelIndexWrite for EqRelIndNone<'_, T> {
    type Key = ();
    type Value = (T, T);
    fn index_insert(&self, _key: Self::Key, _value: Self::Value) { /* noop */
    }
 }
 
-impl<'a, T: Clone + Hash + Eq> RelIndexMerge for EqRelIndNone<'a, T> {
+impl<T: Clone + Hash + Eq> RelIndexMerge for EqRelIndNone<'_, T> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) { /* noop */
    }
 }

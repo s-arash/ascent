@@ -79,7 +79,7 @@ impl<'a, V: 'a + Sync + Send> CRelIndexRead<'a> for CRelNoIndex<V> {
    }
 }
 
-impl<'a, V: 'a> RelIndexWrite for CRelNoIndex<V> {
+impl<V> RelIndexWrite for CRelNoIndex<V> {
    type Key = ();
    type Value = V;
 
@@ -91,7 +91,7 @@ impl<'a, V: 'a> RelIndexWrite for CRelNoIndex<V> {
    }
 }
 
-impl<'a, V: 'a> RelIndexMerge for CRelNoIndex<V> {
+impl<V> RelIndexMerge for CRelNoIndex<V> {
    fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
       assert_eq!(from.len_estimate(), to.len_estimate());
@@ -114,7 +114,7 @@ impl<'a, V: 'a> RelIndexMerge for CRelNoIndex<V> {
    }
 }
 
-impl<'a, V: 'a> CRelIndexWrite for CRelNoIndex<V> {
+impl<V> CRelIndexWrite for CRelNoIndex<V> {
    type Key = ();
    type Value = V;
 

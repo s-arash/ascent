@@ -15,13 +15,13 @@ impl<'a, T> IteratorFromDyn<'a, T> {
       Self::from_box_clo(move || Box::new(producer()))
    }
 }
-impl<'a, T> Iterator for IteratorFromDyn<'a, T> {
+impl<T> Iterator for IteratorFromDyn<'_, T> {
    type Item = T;
 
    #[inline(always)]
    fn next(&mut self) -> Option<Self::Item> { self.iter.next() }
 }
 
-impl<'a, T> Clone for IteratorFromDyn<'a, T> {
+impl<T> Clone for IteratorFromDyn<'_, T> {
    fn clone(&self) -> Self { Self { iter: (self.producer)(), producer: self.producer.clone() } }
 }

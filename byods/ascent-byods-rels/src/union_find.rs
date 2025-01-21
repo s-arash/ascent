@@ -128,8 +128,7 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
    pub fn c_set_of(&self, x: &T) -> Option<&'_ hashbrown::hash_set::HashSet<T, BuildHasherDefault<FxHasher>>>
    where T: Sync {
       let set = self.elem_set(x)?;
-      let res = Some(&self.sets[set]);
-      res
+      Some(&self.sets[set])
    }
 
    // TODO not used
@@ -149,15 +148,16 @@ impl<T: Clone + Hash + Eq> EqRel<T> {
    }
 
    #[cfg(feature = "par")]
-   pub fn c_iter_all<'a>(&'a self) -> IterAllParIterator<'a, T>
+   pub fn c_iter_all(&self) -> IterAllParIterator<'_, T>
    where T: Sync {
       IterAllParIterator(self)
    }
 
-   pub fn contains(&self, x: &T, y: &T) -> bool { self.elem_set(x).map_or(false, |set| self.sets[set].contains(y)) }
+   pub fn contains(&self, x: &T, y: &T) -> bool { self.elem_set(x).is_some_and(|set| self.sets[set].contains(y)) }
 
    pub fn combine(&mut self, other: Self) {
       for set in other.sets.into_iter() {
+         #[allow(clippy::comparison_chain)]
          if set.len() == 1 {
             let repr = set.into_iter().next().unwrap();
             self.add(repr.clone(), repr);

@@ -1,4 +1,4 @@
-use std::hash::{BuildHasherDefault, Hash};
+use std::hash::{BuildHasher as _, BuildHasherDefault, Hash};
 use std::iter::{Map, once};
 use std::marker::PhantomData;
 
@@ -10,7 +10,7 @@ use rustc_hash::FxHasher;
 
 use super::bin_rel::ByodsBinRel;
 use crate::iterator_from_dyn::IteratorFromDyn;
-use crate::utils::{AltHashSet, hash_one};
+use crate::utils::AltHashSet;
 
 pub struct BinRelToTernary<T0, T1, T2, TBinRel>
 where
@@ -565,7 +565,7 @@ where
    T2: Clone + Hash + Eq,
    TBinRel: ByodsBinRel<T0 = T1, T1 = T2>;
 
-impl<'a, T0, T1, T2, TBinRel> RelIndexMerge for BinRelToTernaryInd0_1_2Write<'a, T0, T1, T2, TBinRel>
+impl<T0, T1, T2, TBinRel> RelIndexMerge for BinRelToTernaryInd0_1_2Write<'_, T0, T1, T2, TBinRel>
 where
    T0: Clone + Hash + Eq,
    T1: Clone + Hash + Eq,
@@ -575,7 +575,7 @@ where
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {} // noop
 }
 
-impl<'a, T0, T1, T2, TBinRel> RelFullIndexWrite for BinRelToTernaryInd0_1_2Write<'a, T0, T1, T2, TBinRel>
+impl<T0, T1, T2, TBinRel> RelFullIndexWrite for BinRelToTernaryInd0_1_2Write<'_, T0, T1, T2, TBinRel>
 where
    T0: Clone + Hash + Eq,
    T1: Clone + Hash + Eq,
@@ -586,7 +586,7 @@ where
    type Value = ();
 
    fn insert_if_not_present(&mut self, (x0, x1, x2): &Self::Key, (): Self::Value) -> bool {
-      let x0_hash = hash_one(self.0.map.hasher(), x0);
+      let x0_hash = self.0.map.hasher().hash_one(x0);
 
       if !self
          .0
@@ -609,7 +609,7 @@ where
    }
 }
 
-impl<'a, T0, T1, T2, TBinRel> RelIndexWrite for BinRelToTernaryInd0_1_2Write<'a, T0, T1, T2, TBinRel>
+impl<T0, T1, T2, TBinRel> RelIndexWrite for BinRelToTernaryInd0_1_2Write<'_, T0, T1, T2, TBinRel>
 where
    T0: Clone + Hash + Eq,
    T1: Clone + Hash + Eq,
@@ -674,7 +674,7 @@ where
    T1: Clone + Hash + Eq,
    T2: Clone + Hash + Eq;
 
-impl<'a, T0, T1, T2> Default for ToBinRelToTernaryInd0_1_2<T0, T1, T2>
+impl<T0, T1, T2> Default for ToBinRelToTernaryInd0_1_2<T0, T1, T2>
 where
    T0: Clone + Hash + Eq,
    T1: Clone + Hash + Eq,

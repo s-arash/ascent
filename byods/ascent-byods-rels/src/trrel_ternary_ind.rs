@@ -1,4 +1,4 @@
-use std::hash::{BuildHasherDefault, Hash};
+use std::hash::{BuildHasher as _, BuildHasherDefault, Hash};
 use std::iter::{Map, once};
 
 use ascent::internal::{
@@ -11,7 +11,7 @@ use rustc_hash::FxHasher;
 use crate::iterator_from_dyn::IteratorFromDyn;
 use crate::trrel_binary::MyHashSetIter;
 use crate::trrel_binary_ind::{TrRelInd0, TrRelInd1, TrRelIndCommon};
-use crate::utils::{AltHashSet, AltHashSetIter, hash_one};
+use crate::utils::{AltHashSet, AltHashSetIter};
 
 #[derive(DerefMut, Deref)]
 pub struct TrRel2IndCommonWrapper<
@@ -190,7 +190,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
 
    fn len_estimate(&self) -> usize {
       let sample_size = 3;
-      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd0(&trrel).len_estimate()).sum::<usize>();
+      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd0(trrel).len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
@@ -230,7 +230,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
 
    fn len_estimate(&self) -> usize {
       let sample_size = 3;
-      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd1(&trrel).len_estimate()).sum::<usize>();
+      let sum = self.0.map.values().take(sample_size).map(|trrel| TrRelInd1(trrel).len_estimate()).sum::<usize>();
       let map_len = self.0.map.len();
       sum * map_len / sample_size.min(map_len).max(1)
    }
@@ -437,17 +437,17 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for TrRe
 
 pub struct TrRel2IndFullWrite<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(&'a mut TrRel2IndCommon<T0, T1>);
 
-impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexMerge for TrRel2IndFullWrite<'a, T0, T1> {
+impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexMerge for TrRel2IndFullWrite<'_, T0, T1> {
    fn move_index_contents(_from: &mut Self, _to: &mut Self) {} // noop
 }
 
-impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelFullIndexWrite for TrRel2IndFullWrite<'a, T0, T1> {
+impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelFullIndexWrite for TrRel2IndFullWrite<'_, T0, T1> {
    type Key = (T0, T1, T1);
 
    type Value = ();
 
    fn insert_if_not_present(&mut self, (x0, x1, x2): &Self::Key, (): Self::Value) -> bool {
-      let x0_hash = hash_one(self.0.map.hasher(), x0);
+      let x0_hash = self.0.map.hasher().hash_one(x0);
 
       if !self
          .0
@@ -471,7 +471,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelFullIndexWrite for TrR
    }
 }
 
-impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexWrite for TrRel2IndFullWrite<'a, T0, T1> {
+impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexWrite for TrRel2IndFullWrite<'_, T0, T1> {
    type Key = (T0, T1, T1);
 
    type Value = ();

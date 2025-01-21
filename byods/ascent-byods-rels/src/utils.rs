@@ -1,6 +1,5 @@
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{BuildHasher, Hash};
 
-use hashbrown;
 use hashbrown::{Equivalent, HashMap, HashSet};
 
 use crate::iterator_from_dyn::IteratorFromDyn;
@@ -120,14 +119,6 @@ pub(crate) fn move_hash_map_of_alt_hash_set_contents<K, V, S1, S2>(
    }
 }
 
-// #[allow(dead_code)]
-#[inline]
-pub fn hash_one<S: BuildHasher, T: Hash>(hahser: &S, x: &T) -> u64 {
-   let mut hasher = hahser.build_hasher();
-   x.hash(&mut hasher);
-   hasher.finish()
-}
-
 pub struct AltHashSet<T, S>(pub(crate) HashMap<T, (), S>);
 
 impl<T, S: Default> Default for AltHashSet<T, S> {
@@ -159,7 +150,7 @@ impl<T: Clone + Hash + Eq, S: BuildHasher> AltHashSet<T, S> {
 
    pub fn drain(&mut self) -> impl Iterator<Item = T> + '_ { self.0.drain().map(|kv| kv.0) }
 
-   pub fn intersection<'a>(&'a self, other: &'a Self) -> impl Iterator<Item = &T> + 'a {
+   pub fn intersection<'a>(&'a self, other: &'a Self) -> impl Iterator<Item = &'a T> + 'a {
       let (small, big) = if self.len() < other.len() { (self, other) } else { (other, self) };
       small.iter().filter(|&x| big.contains(x))
    }

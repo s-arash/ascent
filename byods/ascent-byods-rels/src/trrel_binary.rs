@@ -36,7 +36,7 @@ impl<T: Clone + Hash + Eq> TrRel<T> {
          return false;
       }
 
-      if self.map.get(&x).map_or(false, |s| s.contains(&y)) {
+      if self.map.get(&x).is_some_and(|s| s.contains(&y)) {
          return false;
       }
 
@@ -84,7 +84,7 @@ impl<T: Clone + Hash + Eq> TrRel<T> {
    }
 
    #[inline]
-   pub fn contains(&self, x: &T, y: &T) -> bool { self.map.get(x).map_or(false, |s| s.contains(y)) }
+   pub fn contains(&self, x: &T, y: &T) -> bool { self.map.get(x).is_some_and(|s| s.contains(y)) }
 
    pub fn count_estimate(&self) -> usize {
       let sample_size = 3;

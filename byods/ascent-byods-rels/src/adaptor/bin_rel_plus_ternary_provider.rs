@@ -1,5 +1,5 @@
-/// Re-export macros in this module for your binary relation data structure provider
-/// that you wish to be a ternary relation as well
+// Re-export macros in this module for your binary relation data structure provider
+// that you wish to be a ternary relation as well
 
 #[doc(hidden)]
 #[macro_export]

@@ -190,7 +190,7 @@ impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexMerge for EqRel2IndCo
       // TODO not sure about this
       if delta.reverse_map.is_some() {
          crate::utils::move_hash_map_of_hash_set_contents(
-            &mut delta.reverse_map.as_mut().unwrap(),
+            delta.reverse_map.as_mut().unwrap(),
             total.reverse_map.as_mut().unwrap(),
          );
          crate::utils::move_hash_map_of_hash_set_contents(
@@ -341,7 +341,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexReadAll<'a> for E
    type Value = (&'a T0,);
 
    type ValueIteratorType =
-      Map<hashbrown::hash_set::Intersection<'a, T0, BuildHasherDefault<FxHasher>>, for<'aa> fn(&'aa T0) -> (&T0,)>;
+      Map<hashbrown::hash_set::Intersection<'a, T0, BuildHasherDefault<FxHasher>>, for<'aa> fn(&'aa T0) -> (&'aa T0,)>;
 
    type AllIteratorType = Box<dyn Iterator<Item = (Self::Key, Self::ValueIteratorType)> + 'a>;
 
