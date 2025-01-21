@@ -173,6 +173,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       quote! {
          #[doc = "Runs the Ascent program to a fixed point."]
          pub fn run(&mut self) {
+            #![allow(clippy::all)]
             self.run_timeout(::std::time::Duration::MAX);
          }
       }
@@ -181,6 +182,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          #[allow(unused_imports, noop_method_call, suspicious_double_ref_op)]
          #[doc = "Runs the Ascent program to a fixed point."]
          pub fn run(&mut self) {
+            #![allow(clippy::all)]
             macro_rules! __check_return_conditions {() => {};}
             #run_usings
             self.update_indices_priv();
@@ -280,6 +282,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          // TODO remove pub update_indices at some point
          #[allow(noop_method_call, suspicious_double_ref_op)]
          fn update_indices_priv(&mut self) {
+            #![allow(clippy::all)]
             let before = ::ascent::internal::Instant::now();
             #update_indices_body
             self.update_indices_duration += before.elapsed();
@@ -290,14 +293,17 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
             self.update_indices_priv();
          }
          fn type_constraints() {
+            #![allow(clippy::all)]
             #(#type_constraints)*
          }
          #summary_fn
 
          pub fn relation_sizes_summary(&self) -> String {
+            #![allow(clippy::all)]
             #relation_sizes_body
          }
          pub fn scc_times_summary(&self) -> String {
+            #![allow(clippy::all)]
             #scc_times_summary_body
          }
       }
@@ -320,16 +326,16 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       res
    } else {
       quote! {
-         {
+         {{
+            #![allow(unused_imports, noop_method_call, suspicious_double_ref_op, clippy::all)]
             #res
             let mut __run_res: #struct_name #ty_ty_generics = #struct_name::default();
-            #[allow(unused_imports, noop_method_call, suspicious_double_ref_op)]
             {
                ascent::internal::comment("running...");
                #run_code
             }
             __run_res
-         }
+         }}
       }
    }
 }
