@@ -10,6 +10,8 @@ In addition, [this OOPSLA paper](https://dl.acm.org/doi/pdf/10.1145/3622840) des
 
 ## Examples
 
+See the [ascent/examples](ascent/examples) directory for a more complete set of examples.
+
 ### Computing all the connected nodes in a graph
 ```Rust
 ascent! {
@@ -33,7 +35,7 @@ ascent! {
    [dependencies]
    ascent = "*"
    ```
-4. Write some Ascent code in `main.rs`. Here is a complete example:
+4. Write some Ascent code in `src/main.rs`. Here is a complete example:
    ```rust
    use ascent::ascent;
    ascent! {
@@ -55,10 +57,6 @@ ascent! {
    ```bash
    cargo run
    ```
-
-## Examples
-
-See the [ascent/examples](ascent/examples) directory for a more complete set of examples.
 
 ## Features
 
