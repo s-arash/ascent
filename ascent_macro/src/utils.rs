@@ -233,6 +233,12 @@ fn check_lazy_set_contains<T: Hash + Eq>(hs: &mut HashSet<T>, iter: &mut impl It
    false
 }
 
+pub fn join_spans(spans: impl IntoIterator<Item = Span>) -> Span {
+   let mut spans = spans.into_iter();
+   let fst = spans.next().unwrap_or(Span::call_site());
+   spans.try_fold(fst, |acc, next| acc.join(next)).unwrap_or(fst)
+}
+
 pub fn intersects<T, Iter1, Iter2>(set1: Iter1, set2: Iter2) -> bool
 where
    T: Hash + Eq,

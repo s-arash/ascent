@@ -33,13 +33,22 @@ use crate::utils::{
 
 mod kw {
    use derive_syn_parse::Parse;
+   use proc_macro2::Span;
    use syn::Token;
+
+   use crate::utils::join_spans;
 
    syn::custom_keyword!(relation);
    syn::custom_keyword!(lattice);
    #[allow(dead_code)] // for unused fields of LongLeftArrow
    #[derive(Parse)]
    pub struct LongLeftArrow(Token![<], Token![-], Token![-]);
+   #[allow(unused)]
+   impl LongLeftArrow {
+      pub fn span(&self) -> Span {
+         join_spans([self.0.span, self.1.span, self.2.span])
+      }
+   }
    syn::custom_keyword!(agg);
    syn::custom_keyword!(ident);
    syn::custom_keyword!(expr);
