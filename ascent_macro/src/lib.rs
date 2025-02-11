@@ -16,7 +16,9 @@ extern crate quote;
 extern crate proc_macro;
 use ascent_syntax::{AscentProgram, desugar_ascent_program};
 use proc_macro::TokenStream;
-use syn::Result;
+use proc_macro2::Span;
+use syn::{parse_quote, Ident, Result};
+use syn::parse::{ParseStream, Parser};
 
 use crate::ascent_codegen::compile_mir;
 use crate::ascent_hir::compile_ascent_program_to_hir;
@@ -47,7 +49,7 @@ use crate::ascent_mir::compile_hir_to_mir;
 /// The type has a `run()` method, which runs the computation to a fixed point.
 #[proc_macro]
 pub fn ascent(input: TokenStream) -> TokenStream {
-   let res = ascent_impl(input.into(), false, false);
+   let res = ascent_impl(input.into(), AscentMacroKind { is_ascent_run: false, is_parallel: false });
 
    match res {
       Ok(res) => res.into(),
@@ -60,7 +62,7 @@ pub fn ascent(input: TokenStream) -> TokenStream {
 /// The difference is that `ascent_par` generates parallelized code.
 #[proc_macro]
 pub fn ascent_par(input: TokenStream) -> TokenStream {
-   let res = ascent_impl(input.into(), false, true);
+   let res = ascent_impl(input.into(), AscentMacroKind { is_ascent_run: false, is_parallel: true });
 
    match res {
       Ok(res) => res.into(),
@@ -86,7 +88,7 @@ pub fn ascent_par(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn ascent_run(input: TokenStream) -> TokenStream {
-   let res = ascent_impl(input.into(), true, false);
+   let res = ascent_impl(input.into(), AscentMacroKind { is_ascent_run: true, is_parallel: false });
 
    match res {
       Ok(res) => res.into(),
@@ -97,7 +99,7 @@ pub fn ascent_run(input: TokenStream) -> TokenStream {
 /// The parallelized version of `ascent_run`
 #[proc_macro]
 pub fn ascent_run_par(input: TokenStream) -> TokenStream {
-   let res = ascent_impl(input.into(), true, true);
+   let res = ascent_impl(input.into(), AscentMacroKind { is_ascent_run: true, is_parallel: true });
 
    match res {
       Ok(res) => res.into(),
@@ -105,10 +107,42 @@ pub fn ascent_run_par(input: TokenStream) -> TokenStream {
    }
 }
 
+#[derive(Clone, Copy, Default)]
+pub(crate) struct AscentMacroKind {
+   pub is_ascent_run: bool,
+   pub is_parallel: bool,
+}
+
+impl AscentMacroKind {
+   pub fn name(&self) -> &'static str {
+      match (self.is_ascent_run, self.is_parallel) {
+         (false, false) => "ascent",
+         (false, true) => "ascent_par",
+         (true, false) => "ascent_run",
+         (true, true) => "ascent_run_par",
+      }
+   }
+
+   pub fn macro_path(&self) -> syn::Path {
+      let name_ident = Ident::new(self.name(), Span::call_site());
+      parse_quote! {
+         ::ascent::#name_ident
+      }
+   }
+}
+
 pub(crate) fn ascent_impl(
-   input: proc_macro2::TokenStream, is_ascent_run: bool, is_parallel: bool,
+   input: proc_macro2::TokenStream, kind : AscentMacroKind,
 ) -> Result<proc_macro2::TokenStream> {
-   let prog: AscentProgram = syn::parse2(input)?;
+   let AscentMacroKind { is_ascent_run, is_parallel } = kind;
+   // let prog: AscentProgram = syn::parse2(input)?;
+   let prog = match Parser::parse2(move |input: ParseStream| ascent_syntax::parse_ascent_program(input, kind), input)? {
+      itertools::Either::Left(prog) => prog,
+      itertools::Either::Right(macro_back) => {
+         println!("{} output to include ascent source:\n{}", kind.name(), macro_back.0);
+         return Ok(macro_back.0)
+      },
+   };
    // println!("prog relations: {}", prog.relations.len());
    // println!("parse res: {} relations, {} rules", prog.relations.len(), prog.rules.len());
 

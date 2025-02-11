@@ -35,3 +35,23 @@ pub use dashmap;
 #[cfg(feature = "par")]
 pub use rayon;
 pub use {boxcar, hashbrown};
+
+#[macro_export]
+macro_rules! ascent_source {
+    ($name:ident : $($tok: tt)*) => {
+        $crate::ascent_source!([$name: $($tok)*], $);
+    };
+    ([$name:ident : $($tok: tt)*], $dollar: tt) => {
+        #[macro_export]
+        macro_rules! $name {
+            ({$dollar ($dollar cb: tt)*}, {$dollar($dollar before: tt)*}, {$dollar($dollar after: tt)*}) => {
+                $dollar ($dollar cb)*! { 
+                    $dollar ($dollar before)* 
+                    $($tok)* 
+                    $dollar($dollar after)* 
+                }
+            };
+        }
+        pub use $name;
+    };
+}

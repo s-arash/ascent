@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use ascent_base::util::update;
 use derive_syn_parse::Parse;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use syn::parse::{Parse, ParseStream, Parser};
@@ -24,6 +24,7 @@ use crate::utils::{
    Piper, expr_to_ident, expr_to_ident_mut, flatten_punctuated, is_wild_card, pat_to_ident, punctuated_map,
    punctuated_singleton, punctuated_try_map, punctuated_try_unwrap, spans_eq, token_stream_replace_macro_idents,
 };
+use crate::AscentMacroKind;
 
 // resources:
 // https://blog.rust-lang.org/2018/12/21/Procedural-Macros-in-Rust-2018.html
@@ -52,6 +53,8 @@ mod kw {
    syn::custom_keyword!(agg);
    syn::custom_keyword!(ident);
    syn::custom_keyword!(expr);
+
+   syn::custom_keyword!(include_tokens);
 }
 
 #[derive(Clone, Debug)]
@@ -117,7 +120,6 @@ fn parse_generics_with_where_clause(input: ParseStream) -> Result<Generics> {
    Ok(res)
 }
 
-// #[derive(Clone)]
 pub struct RelationNode {
    pub attrs: Vec<Attribute>,
    pub name: Ident,
@@ -536,6 +538,18 @@ pub struct MacroDefNode {
    body: TokenStream,
 }
 
+#[derive(Parse)]
+pub struct IncludeTokensNode {
+   _include_tokens_kw: kw::include_tokens,
+   _bang: Token![!],
+   #[paren]
+   _arg_paren: syn::token::Paren,
+   #[inside(_arg_paren)]
+   #[call(syn::Path::parse_mod_style)]
+   path: syn::Path,
+   _semi: Token![;]
+}
+
 // #[derive(Clone)]
 pub(crate) struct AscentProgram {
    pub rules: Vec<RuleNode>,
@@ -545,8 +559,10 @@ pub(crate) struct AscentProgram {
    pub macros: Vec<MacroDefNode>,
 }
 
-impl Parse for AscentProgram {
-   fn parse(input: ParseStream) -> Result<Self> {
+pub(crate) struct MacroBack(pub TokenStream);
+
+pub(crate) fn parse_ascent_program(input: ParseStream, ascent_macro_kind: AscentMacroKind) -> Result<Either<AscentProgram, MacroBack>> {
+      let input_clone = input.cursor();
       let attributes = Attribute::parse_inner(input)?;
       let mut struct_attrs = Attribute::parse_outer(input)?;
       let signatures = if input.peek(Token![pub]) || input.peek(Token![struct]) {
@@ -571,6 +587,17 @@ impl Parse for AscentProgram {
                return Err(Error::new(attrs[0].span(), "unexpected attribute(s)"));
             }
             macros.push(MacroDefNode::parse(input)?);
+         } else if input.peek(kw::include_tokens) {
+            if !attrs.is_empty() {
+               return Err(Error::new(attrs[0].span(), "unexpected attribute(s)"));
+            }
+            let before_tokens = input_clone.token_stream().into_iter().take_while(|tt| !spans_eq(&tt.span(), &input.span()))
+               .collect::<TokenStream>();
+            let include_node = IncludeTokensNode::parse(input)?;
+            let after_tokens: TokenStream = input.parse()?;
+            // let after_tokens = input.cursor().token_stream();
+            let reinvoke_output = handle_include(include_node, before_tokens, after_tokens, ascent_macro_kind)?;
+            return Ok(Either::Right(reinvoke_output));
          } else {
             if !attrs.is_empty() {
                return Err(Error::new(attrs[0].span(), "unexpected attribute(s)"));
@@ -578,9 +605,33 @@ impl Parse for AscentProgram {
             rules.push(RuleNode::parse(input)?);
          }
       }
-      Ok(AscentProgram { rules, relations, signatures, attributes, macros })
+      Ok(Either::Left(AscentProgram { rules, relations, signatures, attributes, macros }))
+}
+
+fn handle_include(include_node: IncludeTokensNode, before_tokens: TokenStream, after_tokens: TokenStream, ascent_macro_kind: AscentMacroKind) -> Result<MacroBack> {
+   
+   let mut include_macro_callback = include_node.path;
+   let ident = &mut include_macro_callback.segments.last_mut().expect("include_tokens path cannot be empty").ident;
+   let callback_ident = Ident::new(&format!("{ident}"), ident.span());
+   *ident = callback_ident;
+
+   let call_me_back = ascent_macro_kind.macro_path();
+   Ok(MacroBack(quote! {
+      #include_macro_callback! { {#call_me_back}, {#before_tokens}, {#after_tokens} }
+   }))
+}
+
+// TODO is this needed?
+impl Parse for AscentProgram {
+   fn parse(input: ParseStream) -> Result<Self> {
+      match parse_ascent_program(input, AscentMacroKind { is_ascent_run: false, is_parallel: false })? {
+         Either::Left(parsed) => Ok(parsed),
+         // TODO better error message
+         Either::Right(_) => Err(Error::new(Span::call_site(), "encountered macro callback output")),
+      } 
    }
 }
+
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub(crate) struct RelationIdentity {
