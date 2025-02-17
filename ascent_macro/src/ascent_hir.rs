@@ -5,7 +5,7 @@ use std::rc::Rc;
 use itertools::Itertools;
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::spanned::Spanned;
-use syn::{Attribute, Error, Expr, Pat, Path, Type, parse_quote, parse2};
+use syn::{Attribute, Error, Expr, Pat, Type, parse_quote, parse2};
 
 use crate::AscentProgram;
 use crate::ascent_syntax::{
@@ -95,8 +95,8 @@ pub(crate) struct AscentIr {
 pub(crate) struct RelationMetadata {
    pub initialization: Option<Rc<Expr>>,
    pub attributes: Rc<Vec<Attribute>>,
-   pub ds_macro_path: Path,
-   pub ds_macro_args: TokenStream,
+   /// Will be `Some()` iff the relation is not a lattice
+   pub ds_attr: Option<DsAttributeContents>,
 }
 
 pub(crate) struct IrRule {
@@ -252,7 +252,15 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       if let Some(init_expr) = &rel.initialization {
          relations_initializations.insert(rel_identity.clone(), Rc::new(init_expr.clone()));
       }
-      let ds_attribute = get_ds_attr(&rel.attrs)?.unwrap_or_else(|| config.default_ds.clone());
+      let ds_attribute = get_ds_attr(&rel.attrs)?;
+
+      let ds_attribute = match (ds_attribute, rel.is_lattice) {
+         (None, true) => None,
+         (None, false) => Some(config.default_ds.clone()),
+         (Some(attr), true) =>
+            return Err(Error::new(attr.path.span(), "`lattice`s cannot have custom data structure providers")),
+         (Some(attr), false) => Some(attr),
+      };
 
       relations_metadata.insert(rel_identity.clone(), RelationMetadata {
          initialization: rel.initialization.clone().map(Rc::new),
@@ -265,8 +273,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
                .cloned()
                .collect_vec(),
          ),
-         ds_macro_path: ds_attribute.path,
-         ds_macro_args: ds_attribute.args,
+         ds_attr: ds_attribute,
       });
       // relations_no_indices.insert(rel_identity, rel_no_index);
    }
