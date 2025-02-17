@@ -185,6 +185,29 @@ It may be useful to define macros that expand to either body items or head items
 
 You can find more about macros in Ascent macros [here](MACROS.MD).
 
+### `ascent_source!` and `include_source!`
+Ascent code can be written inside `ascent_source!` macro invocations to be later included in actual Ascent programs.
+This allows reusing Ascent code across different Ascent programs, and composing Ascent programs from different code "modules".
+```Rust
+mod ascent_code {
+   ascent::ascent_source! { my_awesome_analysis:
+      // some Ascent code
+   }
+}
+
+// elsewhere:
+ascent! {
+   struct MyAwesomeAnalysis;
+   include_source!(ascent_code::my_awesome_analysis);
+}
+
+ascent_par! {
+   struct MyAwesomeAnalysisParallelized;
+   include_source!(ascent_code::my_awesome_analysis);
+}
+
+```
+
 ### Misc
 - **`#![measure_rule_times]`** causes execution times of individual rules to be measured. Example: 
    ```Rust

@@ -257,7 +257,8 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
 
    let mut rel_codegens = vec![];
    for rel in mir.relations_ir_relations.keys() {
-      let macro_path = &mir.relations_metadata[rel].ds_macro_path;
+      let Some(ds_attr) = &mir.relations_metadata[rel].ds_attr else { continue };
+      let macro_path = &ds_attr.path;
       let macro_input = rel_ds_macro_input(rel, mir);
       rel_codegens.push(quote_spanned! { macro_path.span()=> #macro_path::rel_codegen!{#macro_input} });
    }
@@ -341,12 +342,16 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
 }
 
 fn rel_ind_common_type(rel: &RelationIdentity, mir: &AscentMir) -> Type {
-   if rel.is_lattice {
-      parse_quote! { () }
-   } else {
-      let macro_path = &mir.relations_metadata[rel].ds_macro_path;
-      let macro_input = rel_ds_macro_input(rel, mir);
-      parse_quote_spanned! { macro_path.span()=> #macro_path::rel_ind_common!(#macro_input) }
+   match &mir.relations_metadata[rel].ds_attr {
+      None => {
+         assert!(rel.is_lattice);
+         parse_quote! { () }
+      },
+      Some(ds_attr) => {
+         let macro_path = &ds_attr.path;
+         let macro_input = rel_ds_macro_input(rel, mir);
+         parse_quote_spanned! { macro_path.span()=> #macro_path::rel_ind_common!(#macro_input) }
+      },
    }
 }
 
@@ -376,7 +381,7 @@ fn rel_index_type(rel: &IrRelation, mir: &AscentMir) -> Type {
       };
       syn::parse2(res).unwrap()
    } else {
-      let macro_path = &mir.relations_metadata[&rel.relation].ds_macro_path;
+      let macro_path = &mir.relations_metadata[&rel.relation].ds_attr.as_ref().unwrap().path;
       let span = macro_path.span();
       let macro_input = rel_ds_macro_input(&rel.relation, mir);
       if rel.is_full_index() {
@@ -391,16 +396,20 @@ fn rel_index_type(rel: &IrRelation, mir: &AscentMir) -> Type {
 fn rel_type(rel: &RelationIdentity, mir: &AscentMir) -> Type {
    let field_types = tuple_type(&rel.field_types);
 
-   if rel.is_lattice {
-      if mir.is_parallel {
-         parse_quote! {::ascent::boxcar::Vec<::std::sync::RwLock<#field_types>>}
-      } else {
-         parse_quote! {::std::vec::Vec<#field_types>}
-      }
-   } else {
-      let macro_path = &mir.relations_metadata[rel].ds_macro_path;
-      let macro_input = rel_ds_macro_input(rel, mir);
-      parse_quote_spanned! {macro_path.span()=> #macro_path::rel!(#macro_input) }
+   match &mir.relations_metadata[rel].ds_attr {
+      None => {
+         assert!(rel.is_lattice);
+         if mir.is_parallel {
+            parse_quote! {::ascent::boxcar::Vec<::std::sync::RwLock<#field_types>>}
+         } else {
+            parse_quote! {::std::vec::Vec<#field_types>}
+         }
+      },
+      Some(ds_attr) => {
+         let macro_path = &ds_attr.path;
+         let macro_input = rel_ds_macro_input(rel, mir);
+         parse_quote_spanned! {macro_path.span()=> #macro_path::rel!(#macro_input) }
+      },
    }
 }
 
@@ -416,7 +425,7 @@ fn rel_ds_macro_input(rel: &RelationIdentity, mir: &AscentMir) -> TokenStream {
       .iter()
       .sorted_by_key(|r| &r.indices)
       .map(|ir_rel| rel_index_to_macro_input(&ir_rel.indices));
-   let args = &mir.relations_metadata[rel].ds_macro_args;
+   let args = &mir.relations_metadata[rel].ds_attr.as_ref().expect("must have the ds attribute").args;
    let par: Ident = if mir.is_parallel {
       parse_quote_spanned! {span=> par}
    } else {

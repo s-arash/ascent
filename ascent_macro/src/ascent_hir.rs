@@ -5,7 +5,7 @@ use std::rc::Rc;
 use itertools::Itertools;
 use proc_macro2::{Ident, Span, TokenStream};
 use syn::spanned::Spanned;
-use syn::{Attribute, Error, Expr, Pat, Path, Type, parse_quote, parse2};
+use syn::{Attribute, Error, Expr, Pat, Type, parse_quote, parse2};
 
 use crate::AscentProgram;
 use crate::ascent_syntax::{
@@ -83,7 +83,6 @@ pub(crate) struct AscentIr {
    pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
    pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
-   // pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
    pub relations_metadata: HashMap<RelationIdentity, RelationMetadata>,
    pub rules: Vec<IrRule>,
    pub signatures: Signatures,
@@ -95,8 +94,8 @@ pub(crate) struct AscentIr {
 pub(crate) struct RelationMetadata {
    pub initialization: Option<Rc<Expr>>,
    pub attributes: Rc<Vec<Attribute>>,
-   pub ds_macro_path: Path,
-   pub ds_macro_args: TokenStream,
+   /// Will be `Some()` iff the relation is not a lattice
+   pub ds_attr: Option<DsAttributeContents>,
 }
 
 pub(crate) struct IrRule {
@@ -231,7 +230,6 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
    let mut relations_full_indices = HashMap::with_capacity(num_relations);
    let mut relations_initializations = HashMap::new();
    let mut relations_metadata = HashMap::with_capacity(num_relations);
-   // let mut relations_no_indices = HashMap::new();
    let mut lattices_full_indices = HashMap::new();
    for rel in prog.relations.iter() {
       let rel_identity = RelationIdentity::from(rel);
@@ -247,12 +245,19 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       let rel_full_index = IrRelation::new(rel_identity.clone(), full_indices);
 
       relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_full_index.clone());
-      // relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_no_index.clone());
       relations_full_indices.insert(rel_identity.clone(), rel_full_index);
       if let Some(init_expr) = &rel.initialization {
          relations_initializations.insert(rel_identity.clone(), Rc::new(init_expr.clone()));
       }
-      let ds_attribute = get_ds_attr(&rel.attrs)?.unwrap_or_else(|| config.default_ds.clone());
+      let ds_attribute = get_ds_attr(&rel.attrs)?;
+
+      let ds_attribute = match (ds_attribute, rel.is_lattice) {
+         (None, true) => None,
+         (None, false) => Some(config.default_ds.clone()),
+         (Some(attr), true) =>
+            return Err(Error::new(attr.path.span(), "`lattice`s cannot have custom data structure providers")),
+         (Some(attr), false) => Some(attr),
+      };
 
       relations_metadata.insert(rel_identity.clone(), RelationMetadata {
          initialization: rel.initialization.clone().map(Rc::new),
@@ -265,10 +270,8 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
                .cloned()
                .collect_vec(),
          ),
-         ds_macro_path: ds_attribute.path,
-         ds_macro_args: ds_attribute.args,
+         ds_attr: ds_attribute,
       });
-      // relations_no_indices.insert(rel_identity, rel_no_index);
    }
    for (ir_rule, extra_relations) in ir_rules.iter() {
       for bitem in ir_rule.body_items.iter() {
@@ -293,7 +296,6 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       relations_full_indices,
       lattices_full_indices,
       relations_metadata,
-      // relations_no_indices,
       signatures,
       config,
       is_parallel,
