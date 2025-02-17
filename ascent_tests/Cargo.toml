@@ -8,16 +8,15 @@ edition = "2021"
 [dependencies]
 
 ascent = { path = "../ascent", default-features = false }
-stopwatch = "0.0.7"
 bencher = "0.1.5"
 derive_more = "0.99.16"
-itertools = "0.13"
+itertools = "0.14"
 quote = "1.0"
 arrayvec = "0.7"
 const-fnv1a-hash = "1.0.1"
 
 [dev-dependencies]
-rand = "0.8.4"
+rand = "0.9"
 
 [[bench]]
 name = "benches"
