@@ -1,6 +1,7 @@
 # macros!
 
-Macros can be defined inside Ascent programs to avoid having to repeat code.
+Macros can be defined inside Ascent programs to avoid having to repeat code. 
+These macros can expand to sequences of body or head clauses in Ascent rules.
 
 The syntax resembles (unstable) Rust macros 2.0.
 

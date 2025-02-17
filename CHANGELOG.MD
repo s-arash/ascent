@@ -9,6 +9,8 @@
 be backed by custom data structures (for improved algorithmic efficiency, modified semantics, etc.). 
 - Introduction of the crate [`ascent-byods-rels`](https://crates.io/crates/ascent-byods-rels), which contains a number of such data structures (for equivalence and transitive relations).
 
+- Introduction of `impl` directives with different bounds from `struct` declarations for generic parameters (#25)
+
 ## 0.5.0
 
 - Parallel evaluation: with introduction of `ascent_par!` and `ascent_run_par!` macros, Ascent programs can utilize multiple CPU cores to speed up evaluation.
