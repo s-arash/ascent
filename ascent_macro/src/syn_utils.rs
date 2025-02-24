@@ -509,3 +509,16 @@ pub fn expr_visit_idents_in_macros_mut(expr: &mut Expr, visitor: &mut dyn FnMut(
    };
    expr_visit_macros_mut(expr, &mut mac_visitor)
 }
+
+pub trait ResTokenStream2Ext {
+   fn into_token_stream(self) -> proc_macro::TokenStream;
+}
+
+impl ResTokenStream2Ext for syn::Result<proc_macro2::TokenStream> {
+   fn into_token_stream(self) -> proc_macro::TokenStream {
+      match self {
+         Ok(res) => res.into(),
+         Err(err) => proc_macro::TokenStream::from(err.to_compile_error()),
+      }
+   }
+}
