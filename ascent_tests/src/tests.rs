@@ -992,3 +992,20 @@ fn test_rel_empty_check() {
    println!("{:?}", res.path);
    assert_eq!(res.path.len(), 9 * 10 / 2);
 }
+
+#[test]
+fn test_multiple_rel_definitions() {
+   // When there are multiple definitions of a relation that agree on arity and column types,
+   // the last one wins
+   let res = ascent_run! {
+      relation r1(usize);
+      relation r1(usize) = vec![(1,), (2,)];
+
+      relation r2(usize) = vec![(3,), (4,)];
+      relation r2(usize);
+
+      r2(x) <-- r1(x);
+   };
+
+   assert_rels_eq!(res.r2, vec![(1,), (2,)]);
+}

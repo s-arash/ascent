@@ -13,7 +13,7 @@ use crate::ascent_syntax::{
    RuleNode, Signatures,
 };
 use crate::syn_utils::{expr_get_vars, pattern_get_vars};
-use crate::utils::{expr_to_ident, is_wild_card, tuple_type};
+use crate::utils::{dedup_all_keep_last_by, expr_to_ident, is_wild_card, tuple_type};
 
 #[derive(Clone)]
 pub(crate) struct AscentConfig {
@@ -233,8 +233,12 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
    let mut relations_metadata = HashMap::with_capacity(num_relations);
    // let mut relations_no_indices = HashMap::new();
    let mut lattices_full_indices = HashMap::new();
-   for rel in prog.relations.iter() {
-      let rel_identity = RelationIdentity::from(rel);
+
+   let mut rel_identities = prog.relations.iter().map(|rel| (rel, RelationIdentity::from(rel))).collect_vec();
+   dedup_all_keep_last_by(&mut rel_identities, |x, y| RelationIdentity::eq(&x.1, &y.1));
+
+   for (rel, rel_identity) in rel_identities {
+      let ds_attribute = get_ds_attr(&rel.attrs)?;
 
       if rel.is_lattice {
          let indices = (0..rel_identity.field_types.len() - 1).collect_vec();
@@ -252,9 +256,8 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       if let Some(init_expr) = &rel.initialization {
          relations_initializations.insert(rel_identity.clone(), Rc::new(init_expr.clone()));
       }
-      let ds_attribute = get_ds_attr(&rel.attrs)?;
-
-      let ds_attribute = match (ds_attribute, rel.is_lattice) {
+      
+      let ds_attr = match (ds_attribute, rel.is_lattice) {
          (None, true) => None,
          (None, false) => Some(config.default_ds.clone()),
          (Some(attr), true) =>
@@ -273,7 +276,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
                .cloned()
                .collect_vec(),
          ),
-         ds_attr: ds_attribute,
+         ds_attr,
       });
       // relations_no_indices.insert(rel_identity, rel_no_index);
    }
@@ -449,13 +452,9 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
    let mut head_clauses = vec![];
    for hcl_node in rule.head_clauses.iter() {
       let hcl_node = hcl_node.clause();
-      let rel = prog.relations.iter().find(|r| hcl_node.rel == r.name);
-      let rel = match rel {
-         Some(rel) => rel,
-         None => return Err(Error::new(hcl_node.rel.span(), format!("relation `{}` is not defined", hcl_node.rel))),
-      };
-
+      let rel = prog_get_relation(prog, &hcl_node.rel, hcl_node.args.len())?;
       let rel = RelationIdentity::from(rel);
+
       let head_clause = IrHeadClause {
          rel,
          args: hcl_node.args.iter().cloned().collect(),
@@ -514,7 +513,7 @@ pub fn get_indices_given_grounded_variables(args: &[Expr], vars: &[Ident]) -> Ve
 pub(crate) fn prog_get_relation<'a>(
    prog: &'a AscentProgram, name: &Ident, arity: usize,
 ) -> syn::Result<&'a RelationNode> {
-   let relation = prog.relations.iter().find(|r| name == &r.name);
+   let relation = prog.relations.iter().rev().find(|r| name == &r.name);
    match relation {
       Some(rel) =>
          if rel.field_types.len() != arity {

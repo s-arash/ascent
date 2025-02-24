@@ -274,3 +274,70 @@ fn test_subsumes_and_intersects() {
       assert_eq!(intersects(s1.iter(), s2.iter()), intersects_expected);
    }
 }
+
+#[allow(unused)]
+pub fn dedup_all<T: Eq>(vec: &mut Vec<T>) {
+   let mut delete = vec![false; vec.len()];
+   for i in 0..vec.len() {
+      if delete[i] {
+         continue;
+      }
+      for j in i + 1..vec.len() {
+         if vec[j] == vec[i] {
+            delete[j] = true;
+         }
+      }
+   }
+   let mut delete = delete.into_iter();
+   vec.retain(|_| !delete.next().unwrap());
+}
+
+#[allow(unused)]
+pub fn dedup_all_keep_last_by<T, F: Fn(&T, &T) -> bool>(vec: &mut Vec<T>, compare: F) {
+   let mut delete = vec![false; vec.len()];
+   for i in (0..vec.len()).rev() {
+      if delete[i] {
+         continue;
+      }
+      for j in (0..i).rev() {
+         if compare(&vec[j], &vec[i]) {
+            delete[j] = true;
+         }
+      }
+   }
+   let mut delete = delete.into_iter();
+   vec.retain(|_| !delete.next().unwrap());
+}
+
+#[allow(unused)]
+pub fn dedup_all_keep_last<T: Eq>(vec: &mut Vec<T>) { dedup_all_keep_last_by(vec, |x, y| x == y); }
+
+#[test]
+fn test_dedup_all() {
+   let test_cases = [
+      (vec![], vec![]),
+      (vec![1], vec![1]),
+      (vec![1, 1], vec![1]),
+      (vec![1, 2, 2, 3, 1, 1, 4, 5, 6, 3, 2], vec![1, 2, 3, 4, 5, 6]),
+      (vec![1, 1, 2, 2, 1, 3, 3, 3, 4], vec![1, 2, 3, 4]),
+   ];
+   for (mut inp, expected_out) in test_cases {
+      dedup_all(&mut inp);
+      assert_eq!(inp, expected_out);
+   }
+}
+
+#[test]
+fn test_dedup_all_keep_last() {
+   let test_cases = [
+      (vec![], vec![]),
+      (vec![1], vec![1]),
+      (vec![1, 1], vec![1]),
+      (vec![1, 2, 2, 3, 1, 1, 4, 5, 6, 3, 2], vec![1, 4, 5, 6, 3, 2]),
+      (vec![1, 1, 2, 2, 1, 3, 3, 3, 4], vec![2, 1, 3, 4]),
+   ];
+   for (mut inp, expected_out) in test_cases {
+      dedup_all_keep_last(&mut inp);
+      assert_eq!(inp, expected_out);
+   }
+}
