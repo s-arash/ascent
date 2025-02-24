@@ -1,5 +1,5 @@
 #![cfg(test)]
-use crate::ascent_impl;
+use crate::{AscentMacroKind, ascent_impl};
 
 #[test]
 fn test_agg_not_stratifiable() {
@@ -14,7 +14,7 @@ fn test_agg_not_stratifiable() {
 
       bar(x, x + 1) <-- baz(x);
    };
-   let res = ascent_impl(inp, false, false);
+   let res = ascent_impl(inp, AscentMacroKind::default());
    println!("res: {:?}", res);
    assert!(res.is_err());
    assert!(res.unwrap_err().to_string().contains("bar"));
