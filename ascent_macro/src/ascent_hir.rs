@@ -520,9 +520,9 @@ pub(crate) fn prog_get_relation<'a>(
             Err(Error::new(
                name.span(),
                format!(
-                  "wrong arity for relation `{name}` (expected {expected}, found {actual})",
-                  expected = arity,
-                  actual = rel.field_types.len()
+                  "wrong arity for relation `{name}` (expected {expected}, found {found})",
+                  expected = rel.field_types.len(),
+                  found = arity, 
                ),
             ))
          } else {

@@ -166,7 +166,7 @@ ascent! {
 
    ς(v.clone(), ρ2, a, tick(e, ρ, a, t, k)) <--
       ς(?e@Ref(x), ρ, a, t),
-      (σ(ρ[x], ?Value(v, ρ2)) ||
+      (σ(ρ[x], ?Value(v, ρ2)) |
       σnum(ρ[x], lit), let v = Lit(*lit), let ρ2 = ρ),
       σ(a, ?Kont(k));
 

@@ -18,7 +18,7 @@ fn test_macro_in_macro() {
       foo2(12, 11);
 
       macro foo($x: ident, $y: ident){
-         (foo1($x, $y) || foo2($x, $y)), if $x < $y,
+         (foo1($x, $y) | foo2($x, $y)), if $x < $y,
       }
 
       bar(x, y) <-- foo!(x, y);
@@ -51,7 +51,7 @@ fn test_macro_in_macro2() {
       relation res(Atomic);
 
       macro ae($x: ident) {
-         (res(?Atomic::Var(_var)), σ(_var, $x) ||
+         (res(?Atomic::Var(_var)), σ(_var, $x) |
           res(?Atomic::Val($x)))
       }
 
@@ -201,7 +201,7 @@ fn test_macro_in_macro7() {
       macro bar($x: ident, $y: expr) { bar(?Some($x), $y) }
 
       macro foo2($x: expr, $y: expr) {
-         foo!($x, $y), let x = $x, for x2 in [1, 2], ((foo(x, x2), let y = $y, let _ = println!("{}", y)) || if true, for y in [$y, $y]),
+         foo!($x, $y), let x = $x, for x2 in [1, 2], ((foo(x, x2), let y = $y, let _ = println!("{}", y)) | if true, for y in [$y, $y]),
          foo!(x + 0, y - 0), foo(x, y), foo!(x, y),
          let z = |x: i32| {x}, foo(z(*x), z(*y))
       }

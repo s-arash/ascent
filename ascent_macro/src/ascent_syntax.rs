@@ -177,21 +177,34 @@ fn peek_macro_invocation(parse_stream: ParseStream) -> bool {
 
 fn peek_if_or_let(parse_stream: ParseStream) -> bool { parse_stream.peek(Token![if]) || parse_stream.peek(Token![let]) }
 
+#[derive(Parse, Clone)]
+enum DisjunctionToken {
+   #[allow(unused)]
+   #[peek(Token![||], name = "||")]
+   OrOr(Token![||]),
+   #[allow(unused)]
+   #[peek(Token![|], name = "|")]
+   Or(Token![|]),
+}
+
 #[derive(Clone)]
 pub struct DisjunctionNode {
    paren: syn::token::Paren,
-   disjuncts: Punctuated<Punctuated<BodyItemNode, Token![,]>, Token![||]>,
+   disjuncts: Punctuated<Punctuated<BodyItemNode, Token![,]>, DisjunctionToken>,
 }
 
 impl Parse for DisjunctionNode {
    fn parse(input: ParseStream) -> Result<Self> {
       let content;
       let paren = parenthesized!(content in input);
-      let res: Punctuated<Punctuated<BodyItemNode, Token![,]>, Token![||]> =
-         Punctuated::<Punctuated<BodyItemNode, Token![,]>, Token![||]>::parse_terminated_with(
+      let res: Punctuated<Punctuated<BodyItemNode, Token![,]>, DisjunctionToken> =
+         Punctuated::<Punctuated<BodyItemNode, Token![,]>, DisjunctionToken>::parse_terminated_with(
             &content,
             Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty,
          )?;
+      if res.pairs().any(|pair| matches!(pair.punct(), Some(DisjunctionToken::OrOr(_)))) {
+         eprintln!("WARNING: In Ascent rules, use `|` as the disjunction token instead of `||`")
+      }
       Ok(DisjunctionNode { paren, disjuncts: res })
    }
 }
