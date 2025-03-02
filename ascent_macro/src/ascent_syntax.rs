@@ -5,17 +5,18 @@ use std::sync::Mutex;
 
 use ascent_base::util::update;
 use derive_syn_parse::Parse;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use syn::parse::{Parse, ParseStream, Parser};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
-   Attribute, Error, Expr, ExprMacro, Generics, Ident, ImplGenerics, Pat, Result, Token, Type, TypeGenerics,
+   Attribute, Error, Expr, ExprMacro, Generics, Ident, ImplGenerics, Pat, Path, Result, Token, Type, TypeGenerics,
    Visibility, WhereClause, braced, parenthesized, parse2,
 };
 
+use crate::AscentMacroKind;
 use crate::syn_utils::{
    expr_get_vars, expr_visit_free_vars_mut, expr_visit_idents_in_macros_mut, pattern_get_vars, pattern_visit_vars_mut,
    token_stream_idents, token_stream_replace_ident,
@@ -45,13 +46,13 @@ mod kw {
    pub struct LongLeftArrow(Token![<], Token![-], Token![-]);
    #[allow(unused)]
    impl LongLeftArrow {
-      pub fn span(&self) -> Span {
-         join_spans([self.0.span, self.1.span, self.2.span])
-      }
+      pub fn span(&self) -> Span { join_spans([self.0.span, self.1.span, self.2.span]) }
    }
    syn::custom_keyword!(agg);
    syn::custom_keyword!(ident);
    syn::custom_keyword!(expr);
+
+   syn::custom_keyword!(include_source);
 }
 
 #[derive(Clone, Debug)]
@@ -117,7 +118,7 @@ fn parse_generics_with_where_clause(input: ParseStream) -> Result<Generics> {
    Ok(res)
 }
 
-// #[derive(Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct RelationNode {
    pub attrs: Vec<Attribute>,
    pub name: Ident,
@@ -126,6 +127,7 @@ pub struct RelationNode {
    pub _semi_colon: Token![;],
    pub is_lattice: bool,
 }
+
 impl Parse for RelationNode {
    fn parse(input: ParseStream) -> Result<Self> {
       let is_lattice = input.peek(kw::lattice);
@@ -549,6 +551,18 @@ pub struct MacroDefNode {
    body: TokenStream,
 }
 
+#[derive(Parse)]
+pub struct IncludeSourceNode {
+   pub include_source_kw: kw::include_source,
+   _bang: Token![!],
+   #[paren]
+   _arg_paren: syn::token::Paren,
+   #[inside(_arg_paren)]
+   #[call(syn::Path::parse_mod_style)]
+   path: syn::Path,
+   _semi: Token![;],
+}
+
 // #[derive(Clone)]
 pub(crate) struct AscentProgram {
    pub rules: Vec<RuleNode>,
@@ -558,40 +572,85 @@ pub(crate) struct AscentProgram {
    pub macros: Vec<MacroDefNode>,
 }
 
+/// The output that should be emitted when an `include_source!()` is encountered
+pub(crate) struct IncludeSourceMacroCall {
+   /// the encountered `include_source!()`
+   pub include_node: IncludeSourceNode,
+   pub before_tokens: TokenStream,
+   pub after_tokens: TokenStream,
+   pub ascent_macro_name: Path,
+}
+
+impl IncludeSourceMacroCall {
+   /// The output that should be emitted
+   pub fn macro_call_output(&self) -> TokenStream {
+      let Self { include_node, before_tokens, after_tokens, ascent_macro_name } = self;
+      let include_macro_callback = &include_node.path;
+      quote_spanned! {include_macro_callback.span()=>
+         #include_macro_callback! { {#ascent_macro_name}, {#before_tokens}, {#after_tokens} }
+      }
+   }
+}
+
+pub(crate) fn parse_ascent_program(
+   input: ParseStream, ascent_macro_name: Path,
+) -> Result<Either<AscentProgram, IncludeSourceMacroCall>> {
+   let input_clone = input.cursor();
+   let attributes = Attribute::parse_inner(input)?;
+   let mut struct_attrs = Attribute::parse_outer(input)?;
+   let signatures = if input.peek(Token![pub]) || input.peek(Token![struct]) {
+      let mut signatures = Signatures::parse(input)?;
+      signatures.declaration.attrs = std::mem::take(&mut struct_attrs);
+      Some(signatures)
+   } else {
+      None
+   };
+   let mut rules = vec![];
+   let mut relations = vec![];
+   let mut macros = vec![];
+   while !input.is_empty() {
+      let attrs =
+         if !struct_attrs.is_empty() { std::mem::take(&mut struct_attrs) } else { Attribute::parse_outer(input)? };
+      if input.peek(kw::relation) || input.peek(kw::lattice) {
+         let mut relation_node = RelationNode::parse(input)?;
+         relation_node.attrs = attrs;
+         relations.push(relation_node);
+      } else if input.peek(Token![macro]) {
+         if !attrs.is_empty() {
+            return Err(Error::new(attrs[0].span(), "unexpected attribute(s)"));
+         }
+         macros.push(MacroDefNode::parse(input)?);
+      } else if input.peek(kw::include_source) {
+         if !attrs.is_empty() {
+            return Err(Error::new(attrs[0].span(), "unexpected attribute(s)"));
+         }
+         let before_tokens = input_clone
+            .token_stream()
+            .into_iter()
+            .take_while(|tt| !spans_eq(&tt.span(), &input.span()))
+            .collect::<TokenStream>();
+         let include_node = IncludeSourceNode::parse(input)?;
+         let after_tokens: TokenStream = input.parse()?;
+         let include_source_macro_call =
+            IncludeSourceMacroCall { include_node, before_tokens, after_tokens, ascent_macro_name };
+         return Ok(Either::Right(include_source_macro_call));
+      } else {
+         if !attrs.is_empty() {
+            return Err(Error::new(attrs[0].span(), "unexpected attribute(s)"));
+         }
+         rules.push(RuleNode::parse(input)?);
+      }
+   }
+   Ok(Either::Left(AscentProgram { rules, relations, signatures, attributes, macros }))
+}
+
 impl Parse for AscentProgram {
    fn parse(input: ParseStream) -> Result<Self> {
-      let attributes = Attribute::parse_inner(input)?;
-      let mut struct_attrs = Attribute::parse_outer(input)?;
-      let signatures = if input.peek(Token![pub]) || input.peek(Token![struct]) {
-         let mut signatures = Signatures::parse(input)?;
-         signatures.declaration.attrs = std::mem::take(&mut struct_attrs);
-         Some(signatures)
-      } else {
-         None
-      };
-      let mut rules = vec![];
-      let mut relations = vec![];
-      let mut macros = vec![];
-      while !input.is_empty() {
-         let attrs =
-            if !struct_attrs.is_empty() { std::mem::take(&mut struct_attrs) } else { Attribute::parse_outer(input)? };
-         if input.peek(kw::relation) || input.peek(kw::lattice) {
-            let mut relation_node = RelationNode::parse(input)?;
-            relation_node.attrs = attrs;
-            relations.push(relation_node);
-         } else if input.peek(Token![macro]) {
-            if !attrs.is_empty() {
-               return Err(Error::new(attrs[0].span(), "unexpected attribute(s)"));
-            }
-            macros.push(MacroDefNode::parse(input)?);
-         } else {
-            if !attrs.is_empty() {
-               return Err(Error::new(attrs[0].span(), "unexpected attribute(s)"));
-            }
-            rules.push(RuleNode::parse(input)?);
-         }
+      match parse_ascent_program(input, AscentMacroKind::default().macro_path(Span::call_site()))? {
+         Either::Left(parsed) => Ok(parsed),
+         Either::Right(include) =>
+            Err(Error::new(include.include_node.include_source_kw.span(), "Encountered `include_source!`")),
       }
-      Ok(AscentProgram { rules, relations, signatures, attributes, macros })
    }
 }
 

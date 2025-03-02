@@ -6,7 +6,6 @@ use std::time::Instant;
 use ascent::ascent;
 use ascent::lattice::Dual;
 use ascent_tests::ascent_m_par;
-use stopwatch::Stopwatch;
 
 mod tc {
    use ascent::ascent;
@@ -51,11 +50,11 @@ fn bench_tc(nodes_count: i32) {
       tc.edge.push((i, i + 1));
    }
 
-   let mut stopwatch = Stopwatch::start_new();
+   let before = Instant::now();
    tc.run();
-   stopwatch.stop();
+   let elapsed = before.elapsed();
 
-   println!("tc for {} nodes took {:?}", nodes_count, stopwatch.elapsed());
+   println!("tc for {} nodes took {:?}", nodes_count, elapsed);
    println!("path size: {}", tc.path.len());
 }
 
@@ -108,10 +107,10 @@ fn bench_tc_path_join_path(nodes_count: i32) {
       tc.edge.push((i, i + 1));
    }
 
-   let mut stopwatch = Stopwatch::start_new();
+   let before = Instant::now();
    tc.run();
-   stopwatch.stop();
-   println!("tc path_join_path for {} nodes took {:?}", nodes_count, stopwatch.elapsed());
+   let elapsed = before.elapsed();
+   println!("tc path_join_path for {} nodes took {:?}", nodes_count, elapsed);
    // println!("summary: \n{}", tc.scc_times_summary());
    println!("path size: {}", tc.path.len());
 }
@@ -122,7 +121,7 @@ fn bench_hash() {
 
    let iters = 10_000_000;
 
-   let random_nums = rand::seq::index::sample(&mut rand::thread_rng(), iters, iters);
+   let random_nums = rand::seq::index::sample(&mut rand::rng(), iters, iters);
 
    let before = Instant::now();
    for i in random_nums.iter() {
