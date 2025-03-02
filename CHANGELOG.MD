@@ -1,6 +1,18 @@
+## 0.8.0
+
+- Composition feature: added the `ascent_source!` macro and the `include_source!` syntax (thanks to @JoranHonig
+for the suggestion (#44) and @StarGazerM for the idea).
+
+- Made index fields in generated Ascent code private (#58).
+
+- Added `|` as the disjunction token in disjunction clauses, deprecating `||`.
+
+- Added a small optimization where rule evaluation is skipped if any body relation is empty (#57)
+
 ## 0.7.0
 
 - Fixed unsoundness in `util::update` (#41)
+
 - Moved `ascent_par!` and required dependencies behind Cargo feature `par` (enabled by default)
 
 ## 0.6.0
