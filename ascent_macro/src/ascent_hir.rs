@@ -83,7 +83,6 @@ pub(crate) struct AscentIr {
    pub relations_ir_relations: HashMap<RelationIdentity, HashSet<IrRelation>>,
    pub relations_full_indices: HashMap<RelationIdentity, IrRelation>,
    pub lattices_full_indices: HashMap<RelationIdentity, IrRelation>,
-   // pub relations_no_indices: HashMap<RelationIdentity, IrRelation>,
    pub relations_metadata: HashMap<RelationIdentity, RelationMetadata>,
    pub rules: Vec<IrRule>,
    pub signatures: Signatures,
@@ -231,7 +230,6 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
    let mut relations_full_indices = HashMap::with_capacity(num_relations);
    let mut relations_initializations = HashMap::new();
    let mut relations_metadata = HashMap::with_capacity(num_relations);
-   // let mut relations_no_indices = HashMap::new();
    let mut lattices_full_indices = HashMap::new();
 
    let mut rel_identities = prog.relations.iter().map(|rel| (rel, RelationIdentity::from(rel))).collect_vec();
@@ -251,12 +249,11 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       let rel_full_index = IrRelation::new(rel_identity.clone(), full_indices);
 
       relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_full_index.clone());
-      // relations_ir_relations.entry(rel_identity.clone()).or_default().insert(rel_no_index.clone());
       relations_full_indices.insert(rel_identity.clone(), rel_full_index);
       if let Some(init_expr) = &rel.initialization {
          relations_initializations.insert(rel_identity.clone(), Rc::new(init_expr.clone()));
       }
-      
+
       let ds_attr = match (ds_attribute, rel.is_lattice) {
          (None, true) => None,
          (None, false) => Some(config.default_ds.clone()),
@@ -278,7 +275,6 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
          ),
          ds_attr,
       });
-      // relations_no_indices.insert(rel_identity, rel_no_index);
    }
    for (ir_rule, extra_relations) in ir_rules.iter() {
       for bitem in ir_rule.body_items.iter() {
@@ -303,7 +299,6 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       relations_full_indices,
       lattices_full_indices,
       relations_metadata,
-      // relations_no_indices,
       signatures,
       config,
       is_parallel,
@@ -522,7 +517,7 @@ pub(crate) fn prog_get_relation<'a>(
                format!(
                   "wrong arity for relation `{name}` (expected {expected}, found {found})",
                   expected = rel.field_types.len(),
-                  found = arity, 
+                  found = arity,
                ),
             ))
          } else {

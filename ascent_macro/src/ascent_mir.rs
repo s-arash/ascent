@@ -312,7 +312,6 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir> {
       relations_ir_relations: hir.relations_ir_relations.clone(),
       relations_full_indices: hir.relations_full_indices.clone(),
       lattices_full_indices: hir.lattices_full_indices.clone(),
-      // relations_no_indices: hir.relations_no_indices.clone(),
       relations_metadata: hir.relations_metadata.clone(),
       signatures: hir.signatures.clone(),
       config: hir.config.clone(),

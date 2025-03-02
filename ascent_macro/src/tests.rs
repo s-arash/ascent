@@ -2,7 +2,7 @@
 use petgraph::dot::{Config, Dot};
 use proc_macro2::TokenStream;
 
-use crate::ascent_impl;
+use crate::{AscentMacroKind, ascent_impl};
 
 #[test]
 fn test_macro0() {
@@ -413,7 +413,7 @@ fn exp_items_in_fn() {
 fn write_to_scratchpad_base(
    tokens: TokenStream, prefix: TokenStream, is_ascent_run: bool, is_parallel: bool,
 ) -> TokenStream {
-   let code = ascent_impl(tokens, is_ascent_run, is_parallel);
+   let code = ascent_impl(tokens, AscentMacroKind { is_ascent_run, is_parallel });
    let code = code.unwrap();
    let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
    let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
