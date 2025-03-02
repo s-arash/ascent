@@ -402,22 +402,32 @@ fn test_dl_disjunctions() {
       relation bar(i32, i32);
 
       small(x) <-- for x in 0..5;
-      foo1(0, 4);
-      foo1(1, 4);
-      foo1(2, 6);
+      foo1(0, 4); foo1(1, 4); foo1(2, 6);
 
-      foo2(3, 30);
-      foo2(2, 20);
-      foo2(8, 21);
-      foo2(9, 21);
+      foo2(3, 30); foo2(2, 20); foo2(8, 21); foo2(9, 21);
 
       bar(x.clone(), y.clone()) <-- ((for x in 3..10), small(x) || foo1(x,_y)), (foo2(x,y));
-
    };
    let mut prog = AscentProgram::default();
    prog.run();
    println!("bar: {:?}", prog.bar);
    assert_rels_eq!([(3, 30), (2, 20)], prog.bar);
+}
+
+#[test]
+fn test_dl_disjunctions2() {
+   let res = ascent_run! {
+      relation road(&'static str, &'static str);
+      relation rail(&'static str, &'static str);
+
+      road("A", "B"); road("B", "C"); rail("C", "D");
+
+      relation connected(&'static str, &'static str);
+
+      connected(x, y) <-- (road(x, y) | rail(x, y));
+      connected(x, z) <-- connected(x, y), (road(y, z) | rail(y, z));
+   };
+   assert!(res.connected.contains(&("A", "D")));
 }
 
 #[test]

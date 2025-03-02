@@ -19,7 +19,7 @@ ascent! {
 
     relation even_or_square(i32);
 
-    even_or_square(x) <-- (even(x) || square(x));
+    even_or_square(x) <-- (even(x) | square(x));
 }
 
 fn main() {
