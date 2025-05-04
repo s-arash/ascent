@@ -1,5 +1,6 @@
 # Logic programming in Rust
-[![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml) [![Crates.io](https://img.shields.io/crates/v/ascent?color=blue)](https://crates.io/crates/ascent)
+[![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml) 
+[![Crates.io](https://img.shields.io/crates/v/ascent?color=blue)](https://crates.io/crates/ascent)
 
 Ascent is a logic programming language (similar to Datalog) embedded in Rust via macros.
 
@@ -8,6 +9,8 @@ For more information, check out [the CC paper](https://s-arash.github.io/ascent/
 In addition, [this OOPSLA paper](https://dl.acm.org/doi/pdf/10.1145/3622840) describes the "Bring Your Own Data Structures to Datalog" aspect of Ascent.
 
 ## Examples
+
+See the [ascent/examples](https://github.com/s-arash/ascent/tree/master/ascent/examples) directory for a more complete set of examples.
 
 ### Computing all the connected nodes in a graph
 ```Rust
@@ -32,7 +35,7 @@ ascent! {
    [dependencies]
    ascent = "*"
    ```
-4. Write some Ascent code in `main.rs`. Here is a complete example:
+4. Write some Ascent code in `src/main.rs`. Here is a complete example:
    ```rust
    use ascent::ascent;
    ascent! {
@@ -54,6 +57,7 @@ ascent! {
    ```bash
    cargo run
    ```
+
 ## Features
 
 ### Lattices
@@ -77,6 +81,61 @@ ascent! {
 
 In this example, `Dual<T>` is the dual of the lattice `T`. We use `Dual<T>` because we are interested in shortest paths, given two path lengths `l1` and `l2` for any given pair of nodes, we only store `min(l1, l2)`.
 
+### Parallel Ascent
+
+Ascent is capable of producing parallel code. The macros `ascent_par!` and `ascent_run_par!` produce parallelized code. 
+Naturally, column types must be `Send + Sync` to work in parallel Ascent. 
+
+Parallel Ascent utilizes [`rayon`](https://crates.io/crates/rayon), so the parallelism level can be controlled either via `rayon`'s [`ThreadPoolBuilder`](https://docs.rs/rayon/latest/rayon/struct.ThreadPoolBuilder.html) or using the `RAYON_NUM_THREADS` environment variable (see [here](https://github.com/rayon-rs/rayon/blob/master/FAQ.md#how-many-threads-will-rayon-spawn) for more info).
+
+### BYODS
+
+[![ascent-byods-rels on crates.io](https://img.shields.io/crates/v/ascent-byods-rels?label=ascent-byods-rels&color=blue)](https://crates.io/crates/ascent-byods-rels)
+
+BYODS (short for [Bring Your Own Data Structures to Datalog](https://dl.acm.org/doi/pdf/10.1145/3622840)) is a feature of Ascent that enables relations to be backed by custom data structures. This feature allows improving the algorithmic complexity of Ascent programs by optimizing the data structures used to back relations. For example, a program that requires transitive closure computation of a large graph could improve its performance by choosing a union-find based data structure `trrel_uf` (defined in [`ascent-byods-rels`](https://crates.io/crates/ascent-byods-rels)) for the transitive closure relation:
+
+in `Cargo.toml`:
+```toml
+[dependencies]
+ascent-byods-rels = "*"
+ascent = "*"
+```
+
+```Rust
+use ascent_byods_rels::trrel_uf;
+ascent! {
+   relation edge(Node, Node);
+   
+   #[ds(trrel_uf)] // Makes the relation transitive
+   relation path(Node, Node);
+   
+   path(x, y) <-- edge(x, y);
+}
+```
+
+The `#[ds(trrel_uf)]` attribute directs the Ascent compiler to use the data structure provider defined in the module `trrel_uf` for the `path` relation.
+You can find a complete example of BYODS dramatically speeding up Ascent computations [here](./byods/ascent-byods-rels/examples/steensgaard/main.rs).
+
+See [BYODS.MD](BYODS.MD) for more information on BYODS.
+
+### `ascent_run!`
+
+In addition to `ascent!`, we provide the `ascent_run!` macro. Unlike `ascent!`, this macro evaluates the ascent program when invoked. The main advantage of `ascent_run!` is that local variables are in scope inside the Ascent program. For example, we can define a function for discovering the (optionally reflexive) transitive closure of a relation like so:
+
+```Rust
+fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
+   ascent_run! {
+      relation r(i32, i32) = r;
+      relation tc(i32, i32);
+      tc(x, y) <-- r(x, y);
+      tc(x, z) <-- r(x, y), tc(y, z);
+      tc(x, x), tc(y, y) <-- if reflexive, r(x, y);
+   }.tc
+}
+```
+In the above example, we initialize the relation `r` directly to shorten the program.
+
+We also provide `ascent_run_par!`, the parallel version of `ascent_run!`.
 ### Conditions and Generative Clauses
 The syntax is designed to be familiar to Rust users. In this example, `edge` is populated with non-reflexive edges from `node`. Note that any type that implements `Clone + Eq + Hash` can be used as a relation column.
 
@@ -98,7 +157,7 @@ Ascent supports stratified negation and aggregation. Aggregators are defined in 
 In the following example, the average grade of students is stored in `avg_grade`:
 
 ```Rust
-use ascent::aggregators::*;
+use ascent::aggregators::mean;
 type Student = u32;
 type Course = u32;
 type Grade = u16;
@@ -121,51 +180,33 @@ where N: Ord + Clone
 ```
 Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
 
-### Parallel Ascent
-
-Ascent is capable of producing parallel code. The macros `ascent_par!` and `ascent_run_par!` produce parallelized code. 
-Naturally, column types must be `Send + Sync` to work in parallel Ascent. 
-
-Parallel Ascent utilizes [`rayon`](https://crates.io/crates/rayon), so the parallelism level can be controlled either via `rayon`'s [`ThreadPoolBuilder`](https://docs.rs/rayon/latest/rayon/struct.ThreadPoolBuilder.html) or using the `RAYON_NUM_THREADS` environment variable (see [here](https://github.com/rayon-rs/rayon/blob/master/FAQ.md#how-many-threads-will-rayon-spawn) for more info).
-### `ascent_run!`
-
-In addition to `ascent!`, we provide the `ascent_run!` macro. Unlike `ascent!`, this macro evaluates the ascent program when invoked. The main advantage of `ascent_run!` is that local variables are in scope inside the Ascent program. For example, we can define a function for discovering the (optionally reflexive) transitive closure of a relation like so:
-
-```Rust
-fn tc(r: Vec<(i32, i32)>, reflexive: bool) -> Vec<(i32, i32)> {
-   ascent_run! {
-      relation r(i32, i32) = r;
-      relation tc(i32, i32);
-      tc(x, y) <-- r(x, y);
-      tc(x, z) <-- r(x, y), tc(y, z);
-      tc(x, x), tc(y, y) <-- if reflexive, r(x, y);
-   }.tc
-}
-```
-In the above example, we initialize the relation `r` directly to shorten the program.
-
-
 ### Macro definitions
 It may be useful to define macros that expand to either body items or head items. Ascent allows you to do this.
 
 You can find more about macros in Ascent macros [here](MACROS.MD).
 
-### BYODS
-BYODS (short for Bring Your Own Data Structures to Datalog) is an extension of Ascent that enables relations to be backed by custom data structures. This feature allows improving the algorithmic complexity of Ascent programs by optimizing the data structures used to back relations. For example, a program that requires transitive relation computation of a large graph could improve its performance by choosing a union-find based data structure for the transitive closure relation:
-
+### `ascent_source!` and `include_source!`
+You can write Ascent code inside `ascent_source!` macro invocations and later include them in actual Ascent programs.
+This allows reusing your Ascent code across different Ascent programs, and composing Ascent programs from different code "modules".
 ```Rust
-ascent! {
-   #[ds(trrel_uf)]
-   relation path(Node, Node);
-   
-   path(x, y) <-- edge(x, y);
+mod ascent_code {
+   ascent::ascent_source! { my_awesome_analysis:
+      // Ascent code for my awesome analysis
+   }
 }
+
+// elsewhere:
+ascent! {
+   struct MyAwesomeAnalysis;
+   include_source!(ascent_code::my_awesome_analysis);
+}
+
+ascent_par! {
+   struct MyAwesomeAnalysisParallelized;
+   include_source!(ascent_code::my_awesome_analysis);
+}
+
 ```
-
-The `#[ds(trrel_uf)]` attibute directs the Ascent compiler to use the data structure provider defined in the module `trrrel_uf` for the `path` relation. See [BYODS.MD](BYODS.MD) for more information on BYODS.
-
-(Note: custom data structure providers like `trrel_uf` have not been merged into the master branch yet.)
-
 
 ### Misc
 - **`#![measure_rule_times]`** causes execution times of individual rules to be measured. Example: 
