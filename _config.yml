@@ -1,1 +1,3 @@
-theme: jekyll-theme-slate
+theme: jekyll-theme-tactile
+title: "Ascent"
+description: "Logic Programming in Rust"

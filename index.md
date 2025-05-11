@@ -1,4 +1,4 @@
-# Logic programming in Rust
+<!-- # Logic programming in Rust -->
 [![Rust](https://github.com/s-arash/ascent/actions/workflows/rust.yml/badge.svg)](https://github.com/s-arash/ascent/actions/workflows/rust.yml) 
 [![Crates.io](https://img.shields.io/crates/v/ascent?color=blue)](https://crates.io/crates/ascent)
 
