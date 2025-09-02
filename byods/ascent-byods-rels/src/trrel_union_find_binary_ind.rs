@@ -149,9 +149,7 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
       panic!("merge_delta_to_total_new_to_delta must be called instead.")
    }
 
-   fn init(new: &mut Self, _delta: &mut Self, _total: &mut Self) {
-      *new = Self::New { rel: Default::default() };
-   }
+   fn init(new: &mut Self, _delta: &mut Self, _total: &mut Self) { *new = Self::New { rel: Default::default() }; }
 
    fn merge_delta_to_total_new_to_delta(new: &mut Self, delta: &mut Self, total: &mut Self) {
       let before = Instant::now();

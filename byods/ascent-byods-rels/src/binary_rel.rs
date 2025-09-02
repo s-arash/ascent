@@ -133,10 +133,8 @@ where
    type Key = T::Key;
    type Value = U;
 
-   type IteratorType = std::iter::Map<
-      std::iter::Zip<T::IteratorType, std::iter::Repeat<&'a Self>>,
-      for<'aa> fn((V, &'aa Self)) -> U,
-   >;
+   type IteratorType =
+      std::iter::Map<std::iter::Zip<T::IteratorType, std::iter::Repeat<&'a Self>>, for<'aa> fn((V, &'aa Self)) -> U>;
 
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType> {
       let res: Self::IteratorType =
