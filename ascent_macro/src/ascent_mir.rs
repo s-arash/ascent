@@ -92,28 +92,28 @@ pub(crate) enum MirBodyItem {
 impl MirBodyItem {
    pub fn unwrap_clause(&self) -> &MirBodyClause {
       match self {
-         MirBodyItem::Clause(cl) => cl,
+         Self::Clause(cl) => cl,
          _ => panic!("MirBodyItem: unwrap_clause called on non_clause"),
       }
    }
 
    pub fn clause(&self) -> Option<&MirBodyClause> {
       match self {
-         MirBodyItem::Clause(mir_body_clause) => Some(mir_body_clause),
+         Self::Clause(mir_body_clause) => Some(mir_body_clause),
          _ => None,
       }
    }
 
    pub fn bound_vars(&self) -> Vec<Ident> {
       match self {
-         MirBodyItem::Clause(cl) => {
+         Self::Clause(cl) => {
             let cl_vars = cl.args.iter().filter_map(expr_to_ident);
             let cond_cl_vars = cl.cond_clauses.iter().flat_map(|cc| cc.bound_vars());
             cl_vars.chain(cond_cl_vars).collect()
          },
-         MirBodyItem::Generator(gen) => pattern_get_vars(&gen.pattern),
-         MirBodyItem::Cond(cond) => cond.bound_vars(),
-         MirBodyItem::Agg(agg) => pattern_get_vars(&agg.pat),
+         Self::Generator(gen) => pattern_get_vars(&gen.pattern),
+         Self::Cond(cond) => cond.bound_vars(),
+         Self::Agg(agg) => pattern_get_vars(&agg.pat),
       }
    }
 }
@@ -135,8 +135,8 @@ impl MirBodyClause {
    }
 
    #[allow(dead_code)]
-   pub fn from(ir_body_clause: IrBodyClause, rel: MirRelation) -> MirBodyClause {
-      MirBodyClause {
+   pub fn from(ir_body_clause: IrBodyClause, rel: MirRelation) -> Self {
+      Self {
          rel,
          args: ir_body_clause.args,
          rel_args_span: ir_body_clause.rel_args_span,
@@ -171,8 +171,8 @@ impl MirRelation {
       tuple_type(&index_types)
    }
 
-   pub fn from(ir_relation: IrRelation, version: MirRelationVersion) -> MirRelation {
-      MirRelation {
+   pub fn from(ir_relation: IrRelation, version: MirRelationVersion) -> Self {
+      Self {
          ir_name: ir_relation.ir_name(),
          is_full_index: ir_relation.is_full_index(),
          is_no_index: ir_relation.is_no_index(),

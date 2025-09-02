@@ -134,8 +134,8 @@ where
    type Value = U;
 
    type IteratorType = std::iter::Map<
-      std::iter::Zip<T::IteratorType, std::iter::Repeat<&'a RelIndexValTransformer<T, F>>>,
-      for<'aa> fn((V, &'aa RelIndexValTransformer<T, F>)) -> U,
+      std::iter::Zip<T::IteratorType, std::iter::Repeat<&'a Self>>,
+      for<'aa> fn((V, &'aa Self)) -> U,
    >;
 
    fn index_get(&'a self, key: &Self::Key) -> Option<Self::IteratorType> {
@@ -157,8 +157,8 @@ where
    type Value = U;
 
    type ValueIteratorType = std::iter::Map<
-      std::iter::Zip<T::ValueIteratorType, std::iter::Repeat<&'a RelIndexValTransformer<T, F>>>,
-      for<'aa> fn((V, &'aa RelIndexValTransformer<T, F>)) -> U,
+      std::iter::Zip<T::ValueIteratorType, std::iter::Repeat<&'a Self>>,
+      for<'aa> fn((V, &'aa Self)) -> U,
    >;
 
    type AllIteratorType = Box<dyn Iterator<Item = (Self::Key, Self::ValueIteratorType)> + 'a>;

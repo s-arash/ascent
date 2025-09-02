@@ -112,10 +112,10 @@ impl<T: Clone + Hash + Eq> Default for TrRelIndCommon<T> {
 impl<T: Clone + Hash + Eq> TrRelIndCommon<T> {
    pub fn unwrap_new_mut(&mut self) -> &mut NewSet<T> {
       match self {
-         TrRelIndCommon::New { rel, .. } => rel,
+         Self::New { rel, .. } => rel,
          _ => {
             assert!(self.is_empty(), "unwrap_new_mut called on non-empty non-New");
-            *self = TrRelIndCommon::New { rel: Default::default() };
+            *self = Self::New { rel: Default::default() };
             self.unwrap_new_mut()
          },
       }
@@ -123,16 +123,16 @@ impl<T: Clone + Hash + Eq> TrRelIndCommon<T> {
 
    pub fn unwrap_total(&self) -> &TrRelUnionFind<T> {
       match self {
-         TrRelIndCommon::Total { rel, .. } => rel,
+         Self::Total { rel, .. } => rel,
          _ => panic!("TrRelIndCommon: unwrap_total called on non-Total"),
       }
    }
 
    pub fn is_empty(&self) -> bool {
       match self {
-         TrRelIndCommon::New { rel, .. } => rel.is_empty(),
-         TrRelIndCommon::Delta { rel, .. } => rel.set_connections.is_empty(),
-         TrRelIndCommon::Total { rel, .. } => rel.elem_ids.is_empty(),
+         Self::New { rel, .. } => rel.is_empty(),
+         Self::Delta { rel, .. } => rel.set_connections.is_empty(),
+         Self::Total { rel, .. } => rel.elem_ids.is_empty(),
       }
    }
 
@@ -150,26 +150,26 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
    }
 
    fn init(new: &mut Self, _delta: &mut Self, _total: &mut Self) {
-      *new = TrRelIndCommon::New { rel: Default::default() };
+      *new = Self::New { rel: Default::default() };
    }
 
    fn merge_delta_to_total_new_to_delta(new: &mut Self, delta: &mut Self, total: &mut Self) {
       let before = Instant::now();
 
-      if let TrRelIndCommon::Total { .. } = delta {
+      if let Self::Total { .. } = delta {
          assert!(total.is_empty());
          *total = std::mem::take(delta);
-         *delta = TrRelIndCommon::Delta { rel: TrRelDelta::default() }
+         *delta = Self::Delta { rel: TrRelDelta::default() }
       }
 
       let mut delta_rel = match delta {
-         TrRelIndCommon::Delta { rel } => std::mem::take(rel),
+         Self::Delta { rel } => std::mem::take(rel),
          _ => panic!("expected Delta"),
       };
       delta_rel.total = Rc::new(Default::default());
 
       let mut total_rel_rc = match total {
-         TrRelIndCommon::Total { rel, .. } => std::mem::take(rel),
+         Self::Total { rel, .. } => std::mem::take(rel),
          _ => panic!("expected Total"),
       };
 
@@ -186,7 +186,7 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
          unsafe {
             MERGE_TOTAL_UPDATE_TIME += before_total_update.elapsed();
          }
-         *delta = TrRelIndCommon::Total { rel: Rc::new(new_delta) };
+         *delta = Self::Total { rel: Rc::new(new_delta) };
          return;
       }
       let total_rel = Rc::get_mut(&mut total_rel_rc).unwrap();
@@ -358,8 +358,8 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
          precursor: new_rel,
          total: total_rel_rc.clone(),
       };
-      *delta = TrRelIndCommon::Delta { rel: new_delta };
-      *total = TrRelIndCommon::Total { rel: total_rel_rc };
+      *delta = Self::Delta { rel: new_delta };
+      *total = Self::Total { rel: total_rel_rc };
 
       unsafe {
          MERGE_TIME += before.elapsed();
@@ -374,9 +374,9 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
 
    fn contains(&self, x0: &Self::T0, x1: &Self::T1) -> bool {
       match self {
-         TrRelIndCommon::Delta { rel, .. } => rel.contains(x0, x1),
-         TrRelIndCommon::Total { rel, .. } => rel.contains(x0, x1),
-         TrRelIndCommon::New { .. } => panic!("unexpected New"),
+         Self::Delta { rel, .. } => rel.contains(x0, x1),
+         Self::Total { rel, .. } => rel.contains(x0, x1),
+         Self::New { .. } => panic!("unexpected New"),
       }
    }
 
@@ -386,30 +386,30 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
 
    fn iter_all(&self) -> Self::AllIter<'_> {
       match self {
-         TrRelIndCommon::Delta { rel, .. } => Box::new(rel.iter_all()),
-         TrRelIndCommon::Total { rel, .. } => Box::new(rel.iter_all()),
-         TrRelIndCommon::New { .. } => panic!("unexpected New"),
+         Self::Delta { rel, .. } => Box::new(rel.iter_all()),
+         Self::Total { rel, .. } => Box::new(rel.iter_all()),
+         Self::New { .. } => panic!("unexpected New"),
       }
    }
 
    fn len_estimate(&self) -> usize {
       let sample_size = 3;
       match self {
-         TrRelIndCommon::Delta { rel, .. } => {
+         Self::Delta { rel, .. } => {
             let avg_set_connections = rel.set_connections.iter().take(3).map(|(_s, sets)| sets.len()).sum::<usize>()
                / sample_size.min(rel.set_connections.len()).max(1);
             let avg_set_size = rel.total.sets.iter().rev().take(sample_size).map(|s| s.len()).sum::<usize>()
                / sample_size.min(rel.total.sets.len()).max(1);
             avg_set_connections * avg_set_size
          },
-         TrRelIndCommon::Total { rel, .. } => {
+         Self::Total { rel, .. } => {
             let avg_set_connections = rel.set_connections.iter().take(3).map(|(_s, sets)| sets.len()).sum::<usize>()
                / sample_size.min(rel.set_connections.len()).max(1);
             let avg_set_size = rel.sets.iter().rev().take(sample_size).map(|s| s.len()).sum::<usize>()
                / sample_size.min(rel.sets.len()).max(1);
             avg_set_connections * avg_set_size
          },
-         TrRelIndCommon::New { .. } => panic!("unexpected New"),
+         Self::New { .. } => panic!("unexpected New"),
       }
    }
 
@@ -422,8 +422,8 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
 
    fn ind0_iter_all(&self) -> Self::Ind0AllIter<'_> {
       match self {
-         TrRelIndCommon::Delta { rel, .. } => rel.ind_0_iter_all(),
-         TrRelIndCommon::Total { rel, .. } => {
+         Self::Delta { rel, .. } => rel.ind_0_iter_all(),
+         Self::Total { rel, .. } => {
             let res = || {
                rel.elem_ids.iter().map(|(x, set_id)| {
                   let set = || rel.set_of_by_set_id(x, *set_id);
@@ -432,23 +432,23 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
             };
             IteratorFromDyn::new(res)
          },
-         TrRelIndCommon::New { .. } => panic!("unexpected New"),
+         Self::New { .. } => panic!("unexpected New"),
       }
    }
 
    fn ind0_len_estimate(&self) -> usize {
       let res = match self {
-         TrRelIndCommon::Delta { rel, .. } => {
+         Self::Delta { rel, .. } => {
             let sample_size = 5;
             let sum_set_size = rel.total.sets.iter().rev().take(sample_size).map(|s| s.len()).sum::<usize>();
             sum_set_size * rel.set_connections.len() / sample_size.min(rel.total.sets.len()).max(1)
          },
-         TrRelIndCommon::Total { rel, .. } => {
+         Self::Total { rel, .. } => {
             let sample_size = 3;
             let sum_set_size = rel.sets.iter().rev().take(sample_size).map(|s| s.len()).sum::<usize>();
             sum_set_size * rel.set_connections.len() / sample_size.min(rel.sets.len()).max(1)
          },
-         TrRelIndCommon::New { .. } => panic!("unexpected New"),
+         Self::New { .. } => panic!("unexpected New"),
       };
       res
    }
@@ -459,14 +459,14 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
 
    fn ind0_index_get<'a>(&'a self, key: &Self::T0) -> Option<Self::Ind0ValsIter<'a>> {
       match self {
-         TrRelIndCommon::Delta { rel, .. } => rel.ind_0_get(key),
-         TrRelIndCommon::Total { rel, .. } => {
+         Self::Delta { rel, .. } => rel.ind_0_get(key),
+         Self::Total { rel, .. } => {
             let (key, id) = rel.elem_ids.get_key_value(key)?;
             let id = rel.get_dominant_id(*id);
             let res = move || rel.set_of_by_set_id(key, id);
             Some(IteratorFromDyn::new(res))
          },
-         TrRelIndCommon::New { .. } => panic!("unexpected New"),
+         Self::New { .. } => panic!("unexpected New"),
       }
    }
 
@@ -479,8 +479,8 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
 
    fn ind1_iter_all(&self) -> Self::Ind1AllIter<'_> {
       match self {
-         TrRelIndCommon::Delta { rel, .. } => rel.ind_1_iter_all(),
-         TrRelIndCommon::Total { rel, .. } => {
+         Self::Delta { rel, .. } => rel.ind_1_iter_all(),
+         Self::Total { rel, .. } => {
             let res = || {
                rel.elem_ids.iter().map(|(x, set_id)| {
                   let set = || rel.rev_set_of_by_set_id(x, *set_id);
@@ -489,23 +489,23 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
             };
             IteratorFromDyn::new(res)
          },
-         TrRelIndCommon::New { .. } => panic!("unexpected New"),
+         Self::New { .. } => panic!("unexpected New"),
       }
    }
 
    fn ind1_len_estimate(&self) -> usize {
       let res = match self {
-         TrRelIndCommon::Delta { rel, .. } => {
+         Self::Delta { rel, .. } => {
             let sample_size = 5;
             let sum_set_size = rel.total.sets.iter().rev().take(sample_size).map(|s| s.len()).sum::<usize>();
             sum_set_size * rel.rev_set_connections.len() / sample_size.min(rel.total.sets.len()).max(1)
          },
-         TrRelIndCommon::Total { rel, .. } => {
+         Self::Total { rel, .. } => {
             let sample_size = 3;
             let sum_set_size = rel.sets.iter().rev().take(sample_size).map(|s| s.len()).sum::<usize>();
             sum_set_size * rel.reverse_set_connections.len() / sample_size.min(rel.sets.len()).max(1)
          },
-         TrRelIndCommon::New { .. } => panic!("unexpected New"),
+         Self::New { .. } => panic!("unexpected New"),
       };
       res
    }
@@ -515,14 +515,14 @@ impl<T: Clone + Hash + Eq> ByodsBinRel for TrRelIndCommon<T> {
    where Self: 'a;
    fn ind1_index_get<'a>(&'a self, key: &Self::T1) -> Option<Self::Ind1ValsIter<'a>> {
       match self {
-         TrRelIndCommon::Delta { rel, .. } => rel.ind_1_get(key),
-         TrRelIndCommon::Total { rel, .. } => {
+         Self::Delta { rel, .. } => rel.ind_1_get(key),
+         Self::Total { rel, .. } => {
             let (key, id) = rel.elem_ids.get_key_value(key)?;
             let id = rel.get_dominant_id(*id);
             let res = move || rel.rev_set_of_by_set_id(key, id);
             Some(IteratorFromDyn::new(res))
          },
-         TrRelIndCommon::New { .. } => panic!("unexpected New"),
+         Self::New { .. } => panic!("unexpected New"),
       }
    }
 

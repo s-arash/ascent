@@ -30,7 +30,7 @@ impl AscentConfig {
    const GENERATE_RUN_TIMEOUT_ATTR: &'static str = "generate_run_timeout";
    const INTER_RULE_PARALLELISM_ATTR: &'static str = "inter_rule_parallelism";
 
-   pub fn new(attrs: Vec<Attribute>, is_parallel: bool) -> syn::Result<AscentConfig> {
+   pub fn new(attrs: Vec<Attribute>, is_parallel: bool) -> syn::Result<Self> {
       let include_rule_times = attrs
          .iter()
          .find(|attr| attr.meta.path().is_ident(Self::MEASURE_RULE_TIMES_ATTR))
@@ -69,7 +69,7 @@ impl AscentConfig {
       }
       let default_ds = get_ds_attr(&attrs)?
          .unwrap_or_else(|| DsAttributeContents { path: parse_quote! {::ascent::rel}, args: TokenStream::default() });
-      Ok(AscentConfig {
+      Ok(Self {
          inter_rule_parallelism: inter_rule_parallelism.is_some(),
          attrs,
          include_rule_times,
@@ -141,9 +141,9 @@ pub(crate) enum IrBodyItem {
 impl IrBodyItem {
    pub(crate) fn rel(&self) -> Option<&IrRelation> {
       match self {
-         IrBodyItem::Clause(bcl) => Some(&bcl.rel),
-         IrBodyItem::Agg(agg) => Some(&agg.rel),
-         IrBodyItem::Generator(_) | IrBodyItem::Cond(_) => None,
+         Self::Clause(bcl) => Some(&bcl.rel),
+         Self::Agg(agg) => Some(&agg.rel),
+         Self::Generator(_) | Self::Cond(_) => None,
       }
    }
 }
@@ -195,7 +195,7 @@ impl IrRelation {
       } else {
          IndexValType::Direct((0..relation.field_types.len()).filter(|i| !indices.contains(i)).collect_vec())
       };
-      IrRelation { relation, indices, val_type }
+      Self { relation, indices, val_type }
    }
 
    pub fn key_type(&self) -> Type {
@@ -268,7 +268,7 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
             rel.attrs
                .iter()
                .filter(|attr| {
-                  attr.meta.path().get_ident().map_or(true, |ident| !RECOGNIIZED_REL_ATTRS.iter().any(|ra| ident == ra))
+                  attr.meta.path().get_ident().is_none_or(|ident| !RECOGNIIZED_REL_ATTRS.iter().any(|ra| ident == ra))
                })
                .cloned()
                .collect_vec(),
