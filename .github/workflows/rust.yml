@@ -26,7 +26,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
           override: true
-          toolchain: 1.73
+          toolchain: "1.80"
     
     - run: cargo --version
 
@@ -73,7 +73,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
           override: true
-          toolchain: 1.73
+          toolchain: "1.80"
     
     - name: Run Benchmarks
       working-directory: ./ascent_tests

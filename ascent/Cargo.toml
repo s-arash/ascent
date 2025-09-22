@@ -2,7 +2,7 @@
 name = "ascent"
 version.workspace = true
 edition = "2021"
-rust-version = "1.73" # the CI (../.github/workflows/rust.yml) toolchain version must match this
+rust-version = "1.80" # the CI (../.github/workflows/rust.yml) toolchain version must match this
 authors = ["Arash Sahebolamri"]
 description = "Logic programming in Rust"
 keywords = ["logic-programming", "program-analysis", "Datalog", "procedural-macro"]
