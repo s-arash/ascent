@@ -720,7 +720,7 @@ where
 
 use crate::rel_boilerplate::NoopRelIndexWrite;
 macro_rules! to_trrel2 {
-   ($name: ident, $key: ty, $val: ty) => {paste::paste!{
+   ($name: ident, $key: ty, $val: ty) => {pastey::paste!{
       pub struct [<To $name>]<T0, T1, T2>(PhantomData<(T0, T1, T2)>)
       where T0: Clone + Hash + Eq, T1: Clone + Hash + Eq, T2: Clone + Hash + Eq//, TBinRel: ByodsBinRel<T0 = T1, T1 = T2>
       ;

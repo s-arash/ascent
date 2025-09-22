@@ -484,7 +484,7 @@ impl<'a, T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> RelIndexRead<'a> for EqRe
 }
 
 macro_rules! to_eq_rel2 {
-   ($name: ident, $key: ty, $val: ty) => {paste::paste!{
+   ($name: ident, $key: ty, $val: ty) => {pastey::paste!{
       pub struct [<To $name>]<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq>(PhantomData<(T0, T1)>);
 
       impl<T0: Clone + Hash + Eq, T1: Clone + Hash + Eq> Default for [<To $name>]<T0, T1> {

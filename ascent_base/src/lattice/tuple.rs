@@ -1,4 +1,4 @@
-use paste::paste;
+use pastey::paste;
 
 use super::{BoundedLattice, Lattice};
 

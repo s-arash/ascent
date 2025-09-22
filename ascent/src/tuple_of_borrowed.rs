@@ -1,4 +1,4 @@
-use paste::paste;
+use pastey::paste;
 
 pub trait TupleOfBorrowed {
    type Tuple;

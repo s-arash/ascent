@@ -1,6 +1,6 @@
 use dashmap::RwLock;
-use instant::Instant;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use web_time::Instant;
 
 use crate::internal::{
    CRelIndexRead, CRelIndexReadAll, CRelIndexWrite, Freezable, RelIndexMerge, RelIndexRead, RelIndexReadAll,
