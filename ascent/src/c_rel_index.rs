@@ -2,11 +2,11 @@ use std::hash::{BuildHasher, BuildHasherDefault, Hash};
 
 use ascent_base::util::update;
 use dashmap::{DashMap, ReadOnlyView, RwLock, SharedValue};
-use instant::Instant;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::plumbing::UnindexedConsumer;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::FxHasher;
+use web_time::Instant;
 
 use crate::internal::{
    CRelIndexRead, CRelIndexReadAll, CRelIndexWrite, Freezable, RelIndexMerge, RelIndexRead, RelIndexReadAll,

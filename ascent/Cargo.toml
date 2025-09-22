@@ -20,16 +20,16 @@ ascent_base = { workspace = true }
 cfg-if = "1.0"
 hashbrown = {version = "0.14", features = ["raw"]}
 rustc-hash = "2.0"
-instant = "0.1"
 dashmap = { version = "5.5", features = ["raw-api", "rayon"], optional = true }
 rayon = { version = "1.5", optional = true }
 boxcar = "0.1.0"
 once_cell = { version = "1.13.1", optional = true }
-paste = "1.0"
+web-time = "1.1.0"
+pastey = "0.1.1"
 
 [dev-dependencies]
 
 [features]
 default = ["par"]
-wasm-bindgen = ["instant/wasm-bindgen"]
+wasm-bindgen = []
 par = ["dashmap", "hashbrown/rayon", "once_cell", "rayon"]
