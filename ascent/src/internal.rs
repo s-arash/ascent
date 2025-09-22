@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use ascent_base::Lattice;
 use cfg_if::cfg_if;
-pub use instant::Instant;
 use rustc_hash::FxHasher;
+pub use web_time::Instant;
 
 pub use crate::convert::*;
 pub use crate::rel_index_read::{RelIndexCombined, RelIndexRead, RelIndexReadAll};

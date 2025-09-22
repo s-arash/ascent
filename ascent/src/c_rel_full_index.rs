@@ -2,8 +2,8 @@ use std::hash::{BuildHasherDefault, Hash};
 
 use ascent_base::util::update;
 use dashmap::{DashMap, SharedValue};
-use instant::Instant;
 use rustc_hash::FxHasher;
+use web_time::Instant;
 
 use crate::c_rel_index::{DashMapViewParIter, shards_count};
 use crate::internal::{

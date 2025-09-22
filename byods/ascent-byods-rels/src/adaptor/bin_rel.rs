@@ -223,7 +223,7 @@ use ascent::internal::ToRelIndex;
 
 use crate::rel_boilerplate::NoopRelIndexWrite;
 macro_rules! to_rel_ind {
-   ($name: ident, $key: ty, $val: ty) => {paste::paste!{
+   ($name: ident, $key: ty, $val: ty) => {pastey::paste!{
       pub struct [<To $name>]<T0, T1>(PhantomData<(T0, T1)>);
 
       impl<T0, T1> Default for [<To $name>]<T0, T1> {

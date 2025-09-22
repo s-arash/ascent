@@ -456,7 +456,7 @@ impl<'a, T: Clone + Hash + Eq> RelIndexRead<'a> for TrRelIndFull<'a, T> {
 }
 
 macro_rules! to_rel_ind {
-   ($name: ident, $key: ty, $val: ty) => {paste::paste!{
+   ($name: ident, $key: ty, $val: ty) => {pastey::paste!{
       pub struct [<To $name>]<T: Clone + Hash + Eq>(PhantomData<T>);
 
       impl<T: Clone + Hash + Eq> Default for [<To $name>]<T> {
