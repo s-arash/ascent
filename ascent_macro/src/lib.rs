@@ -14,6 +14,7 @@ mod syn_utils;
 extern crate quote;
 
 extern crate proc_macro;
+
 use ascent_syntax::{AscentProgram, desugar_ascent_program, parse_ascent_program};
 use derive_syn_parse::Parse;
 use itertools::Either;
@@ -21,7 +22,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::parse::{ParseStream, Parser};
 use syn::spanned::Spanned;
-use syn::{Attribute, Ident, Result, Token, parse_quote, parse_quote_spanned};
+use syn::{Attribute, Ident, Result, Token, parse_quote_spanned};
 use syn_utils::ResTokenStream2Ext;
 
 use crate::ascent_codegen::compile_mir;
@@ -97,18 +98,24 @@ pub fn ascent_run_par(input: TokenStream) -> TokenStream {
 /// syntax. It will look like the following:
 /// ```
 /// # #[macro_use] extern crate ascent;
+/// let capatures = ...; // ...
 /// mod my_ascent_sources {
-///   ascent_source! { secret_sauce:
+///   ascent_source! { secret_sauce (capatures, ...):
 ///     // secret Ascent code ...
 ///   }
 /// }
-///
 /// // somewhere else, we define an actual Ascent program:
 /// ascent! {
-///   include_source!(my_ascent_sources::secret_sauce);
+///   include_source!(my_ascent_sources::secret_sauce, capatures, ...);
 ///   // More Ascent code ...
 /// }
 /// ```
+/// ascent_source will compile the included source code to a deferred macro definition, where code after `:`
+/// will become the body of compiled macro.
+/// To avoid hygiene issues, we provide additional arguments to the `ascent_source` macro before `:`.
+/// These arguments are bound to the macro variables in the code after `:`. You can use `$` to refer to them.
+/// By providing these arguments as additional arguments to the `include_source!` macro, these macro variables
+/// are bounded to the actual variable outside of the `ascent_source` macro.
 ///
 /// # Be warned!
 /// This feature comes with all the caveats of C's `#include`, or Rust's `include!()` macro:
@@ -122,7 +129,7 @@ pub fn ascent_run_par(input: TokenStream) -> TokenStream {
 /// mod base {
 ///    ascent::ascent_source! {
 ///       /// Defines `edge` and `path`, the transitive closure of `edge`
-///       tc:
+///       tc ():
 ///       relation edge(usize, usize);
 ///       relation path(usize, usize);
 ///       path(x, y) <-- edge(x, y);
@@ -146,6 +153,18 @@ pub fn ascent_run_par(input: TokenStream) -> TokenStream {
 ///    include_source!(base::tc);
 /// }
 /// ```
+/// # Example for binding macro variables
+/// ```
+/// mod foo_mod {
+/// ascent_source! { foo_gen (z):
+///    foo(x, y) <-- foo(y, x), let _ = $z;
+/// }
+/// }
+/// ascent_run! {
+///    relation foo(i32, i32);
+///    include_source!(foo_mod::foo_gen, z);
+/// }
+/// ```
 #[proc_macro]
 pub fn ascent_source(input: TokenStream) -> TokenStream { ascent_source_impl(input.into()).into_token_stream() }
 
@@ -155,32 +174,40 @@ fn ascent_source_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::To
       #[call(Attribute::parse_outer)]
       attrs: Vec<Attribute>,
       name: Ident,
-      colon: Token![:],
+      #[paren]
+      _arg_paren: syn::token::Paren,
+      #[inside(_arg_paren)]
+      #[call(syn::punctuated::Punctuated::parse_terminated)]
+      caps: syn::punctuated::Punctuated<Ident, Token![,]>,
+      _colon: Token![:],
       ascent_code: proc_macro2::TokenStream,
    }
 
-   let AscentSourceInput { attrs, name, colon, ascent_code } = syn::parse2(input.into())?;
+   let AscentSourceInput { attrs, name, _arg_paren, caps, _colon, ascent_code } = syn::parse2(input.into())?;
 
-   match Parser::parse2(
-      |input: ParseStream| parse_ascent_program(input, parse_quote!(::ascent::ascent_source)),
-      ascent_code.clone(),
-   )? {
-      itertools::Either::Left(_prog) => (),
-      itertools::Either::Right(mut include_source_call) => {
-         let before_tokens = include_source_call.before_tokens;
-         include_source_call.before_tokens = quote! {
-            #(#attrs)*
-            #name #colon
-            #before_tokens
-         };
-         // This allows transitive `include_source`s. Disabled for now ...
-         // return Ok(include_source_call.macro_call_output())
-         return Err(syn::Error::new(
-            include_source_call.include_node.include_source_kw.span,
-            "`ascent_source`s cannot contain `include_source!`",
-         ))
-      },
-   };
+   let caps : Vec<Ident> = caps.into_iter().collect();
+   // WARNING: comment out for now because I allow `$` in the ascent_source for binding macro variables
+   // match Parser::parse2(
+   //    |input: ParseStream| parse_ascent_program(input, parse_quote!(::ascent::ascent_source)),
+   //    ascent_code.clone(),
+   // )? {
+   //    itertools::Either::Left(_prog) => (),
+   //    itertools::Either::Right(mut include_source_call) => {
+   //       let before_tokens = include_source_call.before_tokens;
+         
+   //       include_source_call.before_tokens = quote! {
+   //          #(#attrs)*
+   //          #name (#(#caps),*) #_colon
+   //          #before_tokens
+   //       };
+   //       // This allows transitive `include_source`s. Disabled for now ...
+   //       // return Ok(include_source_call.macro_call_output())
+   //       return Err(syn::Error::new(
+   //          include_source_call.include_node.include_source_kw.span,
+   //          "`ascent_source`s cannot contain `include_source!`",
+   //       ))
+   //    },
+   // };
 
    if let Some(bad_attr) = attrs.iter().find(|attr| attr.path().get_ident().map_or(true, |ident| ident != "doc")) {
       return Err(syn::Error::new(bad_attr.span(), "unexpected attribute. Only `doc` attribute is allowed"))
@@ -192,7 +219,7 @@ fn ascent_source_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::To
       #(#attrs)*
       #[macro_export]
       macro_rules! #macro_name {
-         ({$($cb: tt)*}, {$($before: tt)*}, {$($after: tt)*}) => {
+         ( (#($#caps:ident),*), {$($cb: tt)*}, {$($before: tt)*}, {$($after: tt)*}) => {
             $($cb)*! {
                $($before)*
                #ascent_code
