@@ -163,10 +163,10 @@ impl<const N: usize, T: BoundedLattice> BoundedLattice for Product<[T; N]> {
    fn bottom() -> Self {
       // unstable:
       // Product(std::array::from_fn(|_| T::bottom()))
-      Product([(); N].map(|_| T::bottom()))
+      Self([(); N].map(|_| T::bottom()))
    }
 
-   fn top() -> Self { Product([(); N].map(|_| T::top())) }
+   fn top() -> Self { Self([(); N].map(|_| T::top())) }
 }
 
 #[test]

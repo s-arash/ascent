@@ -21,15 +21,15 @@ pub enum CLatIndex<K, V> {
 impl<K: Clone + Hash + Eq, V: Clone + Hash + Eq> Freezable for CLatIndex<K, V> {
    fn freeze(&mut self) {
       update(self, |_self| match _self {
-         CLatIndex::Unfrozen(dm) => Self::Frozen(dm.into_read_only()),
-         CLatIndex::Frozen(_) => _self,
+         Self::Unfrozen(dm) => Self::Frozen(dm.into_read_only()),
+         Self::Frozen(_) => _self,
       })
    }
 
    fn unfreeze(&mut self) {
       update(self, |_self| match _self {
-         CLatIndex::Frozen(v) => Self::Unfrozen(v.into_inner()),
-         CLatIndex::Unfrozen(_) => _self,
+         Self::Frozen(v) => Self::Unfrozen(v.into_inner()),
+         Self::Unfrozen(_) => _self,
       })
    }
 }
@@ -38,31 +38,31 @@ impl<K: Clone + Hash + Eq, V: Clone + Hash + Eq> CLatIndex<K, V> {
    #[inline]
    pub fn unwrap_frozen(&self) -> &dashmap::ReadOnlyView<K, SetType<V>, BuildHasherDefault<FxHasher>> {
       match self {
-         CLatIndex::Frozen(v) => v,
-         CLatIndex::Unfrozen(_) => panic!("CRelIndex::unwrap_frozen(): object is Unfrozen"),
+         Self::Frozen(v) => v,
+         Self::Unfrozen(_) => panic!("CRelIndex::unwrap_frozen(): object is Unfrozen"),
       }
    }
 
    #[inline]
    pub fn unwrap_unfrozen(&self) -> &DashMap<K, SetType<V>, BuildHasherDefault<FxHasher>> {
       match self {
-         CLatIndex::Unfrozen(dm) => dm,
-         CLatIndex::Frozen(_) => panic!("CRelIndex::unwrap_unfrozen(): object is Frozen"),
+         Self::Unfrozen(dm) => dm,
+         Self::Frozen(_) => panic!("CRelIndex::unwrap_unfrozen(): object is Frozen"),
       }
    }
 
    #[inline]
    pub fn unwrap_mut_unfrozen(&mut self) -> &mut DashMap<K, SetType<V>, BuildHasherDefault<FxHasher>> {
       match self {
-         CLatIndex::Unfrozen(dm) => dm,
-         CLatIndex::Frozen(_) => panic!("CRelIndex::unwrap_unfrozen(): object is Frozen"),
+         Self::Unfrozen(dm) => dm,
+         Self::Frozen(_) => panic!("CRelIndex::unwrap_unfrozen(): object is Frozen"),
       }
    }
 
    pub fn into_read_only(self) -> dashmap::ReadOnlyView<K, SetType<V>, BuildHasherDefault<FxHasher>> {
       match self {
-         CLatIndex::Unfrozen(dm) => dm.into_read_only(),
-         CLatIndex::Frozen(f) => f,
+         Self::Unfrozen(dm) => dm.into_read_only(),
+         Self::Frozen(f) => f,
       }
    }
 

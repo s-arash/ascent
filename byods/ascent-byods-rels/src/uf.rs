@@ -28,12 +28,12 @@ pub mod elems {
    struct UfPtr(UfPtrType);
 
    impl UfPtr {
-      const MAX: UfPtr = UfPtr(UfPtrType::MAX);
+      const MAX: Self = Self(UfPtrType::MAX);
 
       #[inline]
       fn from_usize(s: usize) -> Self {
          debug_assert!(s < Self::MAX.to_usize());
-         UfPtr(s as UfPtrType)
+         Self(s as UfPtrType)
       }
 
       #[inline]
@@ -50,9 +50,9 @@ pub mod elems {
    }
 
    impl Add<UfPtrType> for UfPtr {
-      type Output = UfPtr;
+      type Output = Self;
 
-      fn add(self, rhs: UfPtrType) -> Self::Output { UfPtr(self.0 + rhs) }
+      fn add(self, rhs: UfPtrType) -> Self::Output { Self(self.0 + rhs) }
    }
 
    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -62,9 +62,9 @@ pub mod elems {
    pub(super) struct Rank(UfPtr);
 
    impl Add<UfPtrType> for Rank {
-      type Output = Rank;
+      type Output = Self;
 
-      fn add(self, rhs: UfPtrType) -> Self::Output { Rank(self.0 + rhs) }
+      fn add(self, rhs: UfPtrType) -> Self::Output { Self(self.0 + rhs) }
    }
 
    /// Each field is wrapped in a [`Cell`] so that the union-find can expose
@@ -91,7 +91,7 @@ pub mod elems {
 
    impl<T: PartialEq> Elem<T> {
       /// In-place union
-      pub fn union(&self, other: &Elem<T>) {
+      pub fn union(&self, other: &Self) {
          // NB: At this point, both nodes should be roots, so their parent IDs
          // are their own IDs
          debug_assert_ne!(self.parent.get(), other.parent.get());
@@ -104,7 +104,7 @@ pub mod elems {
       }
 
       /// In-place union by rank
-      pub(super) fn union_by_rank(&self, other: &Elem<T>) -> Id {
+      pub(super) fn union_by_rank(&self, other: &Self) -> Id {
          // NB: At this point, both nodes should be roots, so their parent IDs
          // are their own IDs
          debug_assert_ne!(self.parent.get(), other.parent.get());
