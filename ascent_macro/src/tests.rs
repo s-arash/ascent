@@ -1,64 +1,61 @@
 #![cfg(test)]
+use std::sync::Mutex;
+
 use petgraph::dot::{Config, Dot};
 use proc_macro2::TokenStream;
 
-use crate::{AscentMacroKind, ascent_impl};
+use crate::{AscentMacroKind, ascent_impl, ascent_source_impl};
 
-#[test]
-fn test_macro0() {
-   let inp = quote! {
-      struct Polonius<T: FactTypes>;
-      relation subset(T::Origin, T::Origin, T::Point);// = ctx.subset_base.clone();
-      relation cfg_edge(T::Point, T::Point);
-      relation origin_live_on_entry(T::Origin, T::Point);
-      relation origin_contains_loan_on_entry(T::Origin, T::Loan, T::Point);
-      relation loan_live_at(T::Loan, T::Point);
-      relation loan_invalidated_at(T::Loan, T::Point);
-      relation errors(T::Loan, T::Point);
-      relation placeholder_origin(T::Origin);
-      relation subset_error(T::Origin, T::Origin, T::Point);
-      relation loan_killed_at(T::Loan, T::Point);// = loan_killed_at.iter().cloned().collect();
-      relation known_placeholder_subset(T::Origin, T::Origin);// = known_placeholder_subset.iter().cloned().collect();
-
-      subset(origin1, origin3, point) <--
-         subset(origin1, origin2, point),
-         subset(origin2, origin3, point),
-         if origin1 != origin3;
-
-      subset(origin1, origin2, point2) <--
-         subset(origin1, origin2, point1),
-         cfg_edge(point1, point2),
-         origin_live_on_entry(origin1, point2),
-         origin_live_on_entry(origin2, point2);
-
-      origin_contains_loan_on_entry(origin2, loan, point) <--
-         origin_contains_loan_on_entry(origin1, loan, point),
-         subset(origin1, origin2, point);
-
-      origin_contains_loan_on_entry(origin, loan, point2) <--
-         origin_contains_loan_on_entry(origin, loan, point1),
-         cfg_edge(point1, point2),
-         !loan_killed_at(loan, point1),
-         origin_live_on_entry(origin, point2);
-
-      loan_live_at(loan, point) <--
-         origin_contains_loan_on_entry(origin, loan, point),
-         origin_live_on_entry(origin, point);
-
-      errors(loan, point) <--
-         loan_invalidated_at(loan, point),
-         loan_live_at(loan, point);
-
-      subset_error(origin1, origin2, point) <--
-         subset(origin1, origin2, point),
-         placeholder_origin(origin1),
-         placeholder_origin(origin2),
-         !known_placeholder_subset(origin1, origin2),
-         if origin1 != origin2;
-   };
-   // write_ascent_run_to_scratchpad(inp);
-   write_ascent_run_par_to_scratchpad(inp);
+enum TestAscentMacroKind {
+   Ascent(AscentMacroKind),
+   AscentSource,
 }
+impl From<AscentMacroKind> for TestAscentMacroKind {
+   fn from(value: AscentMacroKind) -> Self { Self::Ascent(value) }
+}
+
+fn write_to_scratchpad_base(tokens: TokenStream, prefix: TokenStream, kind: TestAscentMacroKind) -> TokenStream {
+   static LOCK: Mutex<()> = Mutex::new(());
+   let code = match kind {
+      TestAscentMacroKind::Ascent(ascent_macro_kind) => ascent_impl(tokens, ascent_macro_kind).unwrap(),
+      TestAscentMacroKind::AscentSource => ascent_source_impl(tokens).unwrap(),
+   };
+   let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
+   let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
+   let _lock = LOCK.lock().unwrap();
+   std::fs::write("examples/scratchpad.rs", prefix.to_string()).unwrap();
+   std::fs::write("examples/scratchpad.rs", code_in_template).unwrap();
+   std::process::Command::new("rustfmt").args(["examples/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
+   code
+}
+
+fn write_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, quote! {}, AscentMacroKind { is_ascent_run: false, is_parallel: false }.into())
+}
+
+fn write_ascent_source_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, quote! {}, TestAscentMacroKind::AscentSource)
+}
+
+fn write_with_prefix_to_scratchpad(tokens: TokenStream, prefix: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, prefix, AscentMacroKind { is_ascent_run: false, is_parallel: false }.into())
+}
+
+fn write_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, quote! {}, AscentMacroKind { is_ascent_run: false, is_parallel: true }.into())
+}
+
+#[allow(unused)]
+fn write_ascent_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, quote! {}, AscentMacroKind { is_ascent_run: true, is_parallel: false }.into())
+}
+
+#[allow(unused)]
+fn write_ascent_run_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
+   write_to_scratchpad_base(tokens, quote! {}, AscentMacroKind { is_ascent_run: true, is_parallel: true }.into())
+}
+
+
 #[test]
 fn test_macro_generic_tc() {
    let inp = quote! {
@@ -410,38 +407,6 @@ fn exp_items_in_fn() {
    println!("point is {:?}, with size {}", p, p.size());
 }
 
-fn write_to_scratchpad_base(
-   tokens: TokenStream, prefix: TokenStream, is_ascent_run: bool, is_parallel: bool,
-) -> TokenStream {
-   let code = ascent_impl(tokens, AscentMacroKind { is_ascent_run, is_parallel });
-   let code = code.unwrap();
-   let template = std::fs::read_to_string("src/scratchpad_template.rs").unwrap();
-   let code_in_template = template.replace("todo!(\"here\");", &code.to_string());
-   std::fs::write("src/scratchpad.rs", prefix.to_string()).unwrap();
-   std::fs::write("src/scratchpad.rs", code_in_template).unwrap();
-   std::process::Command::new("rustfmt").args(["src/scratchpad.rs"]).spawn().unwrap().wait().unwrap();
-   code
-}
-
-fn write_to_scratchpad(tokens: TokenStream) -> TokenStream { write_to_scratchpad_base(tokens, quote! {}, false, false) }
-
-fn write_with_prefix_to_scratchpad(tokens: TokenStream, prefix: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, prefix, false, false)
-}
-
-fn write_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, quote! {}, false, true)
-}
-
-#[allow(unused)]
-fn write_ascent_run_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, quote! {}, true, false)
-}
-
-fn write_ascent_run_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
-   write_to_scratchpad_base(tokens, quote! {}, true, true)
-}
-
 #[test]
 fn test_macro_lambda_calc() {
    let prefix = quote! {
@@ -542,4 +507,24 @@ fn test_macro_in_macro() {
    };
 
    write_to_scratchpad(inp);
+}
+
+#[test]
+fn test_include_source() {
+   let inp = quote! {
+      // relation before();
+      include_source!(my_ascent_source);
+      relation after();
+   };
+
+   write_to_scratchpad(inp);
+}
+
+#[test]
+fn test_ascent_source() {
+   let inp = quote! { test_ascent_source:
+      relation in_ascent_source(i32);
+      in_ascent_source(42);
+   };
+   write_ascent_source_to_scratchpad(inp);
 }

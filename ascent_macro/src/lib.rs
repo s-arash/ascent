@@ -4,7 +4,6 @@ mod tests;
 mod ascent_mir;
 mod utils;
 mod ascent_hir;
-mod scratchpad;
 mod ascent_codegen;
 mod ascent_syntax;
 mod test_errors;
@@ -149,7 +148,7 @@ pub fn ascent_run_par(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn ascent_source(input: TokenStream) -> TokenStream { ascent_source_impl(input.into()).into_token_stream() }
 
-fn ascent_source_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::TokenStream> {
+pub(crate) fn ascent_source_impl(input: proc_macro2::TokenStream) -> Result<proc_macro2::TokenStream> {
    #[derive(Parse)]
    struct AscentSourceInput {
       #[call(Attribute::parse_outer)]
