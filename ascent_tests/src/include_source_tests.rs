@@ -4,7 +4,7 @@ mod base {
    ascent::ascent_source! {
       /// Defines `edge` and `path`, the transitive closure of `edge`.
       /// The type of a node is `Node`
-      tc:
+      tc ():
 
       /// `edge` degined in `tc`
       relation edge(Node, Node);
@@ -14,7 +14,7 @@ mod base {
    }
 }
 
-ascent_source! { symmetric_edges:
+ascent_source! { symmetric_edges ():
    edge(x, y) <-- edge(y, x);
 }
 
@@ -31,4 +31,23 @@ fn include_ascent_source() {
    };
 
    assert!(res.path.contains(&(4, 1)));
+}
+
+#[test]
+fn test_macro_with_binding() {
+   let z = 1;
+   mod foom {
+      use super::*;
+      ascent_source! {
+         foo_gen (z):
+         foo(x, y) <-- foo(y, x), if y == &$z;
+      }
+   }
+   let prog = ascent_run! {
+      // struct MacroTest;
+      relation foo(usize, usize);
+      foo(1, 2);
+      include_source!(foom::foo_gen, z);
+   };
+   assert!(prog.foo.contains(&(2, 1)));
 }

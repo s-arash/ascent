@@ -4,7 +4,7 @@ mod base {
    ascent::ascent_source! {
       /// Defines `edge` and `path`, the transitive closure of `edge`.
       /// The type of a node is `Node`
-      tc:
+      tc ():
 
       relation edge(Node, Node);
       relation path(Node, Node);
@@ -13,8 +13,25 @@ mod base {
    }
 }
 
-ascent_source! { symm_edges:
+ascent_source! { symm_edges ():
    edge(x, y) <-- edge(y, x);
+}
+
+// #[test]
+fn _test_macro() {
+   let z = 1;
+   mod foom {
+      use super::*;
+      ascent_source! {
+         foo_gen (z):
+         foo(x, y) <-- foo(y, x), let _ = $z;
+      }
+   }
+   ascent_run! {
+      // struct MacroTest;
+      relation foo(usize, usize);
+      include_source!(foom::foo_gen, z);
+   };
 }
 
 fn main() {
