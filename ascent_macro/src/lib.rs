@@ -158,7 +158,7 @@ pub(crate) fn ascent_source_impl(input: proc_macro2::TokenStream) -> Result<proc
       ascent_code: proc_macro2::TokenStream,
    }
 
-   let AscentSourceInput { attrs, name, colon, ascent_code } = syn::parse2(input.into())?;
+   let AscentSourceInput { attrs, name, colon, ascent_code } = syn::parse2(input)?;
 
    match Parser::parse2(
       |input: ParseStream| parse_ascent_program(input, parse_quote!(::ascent::ascent_source)),
@@ -181,7 +181,7 @@ pub(crate) fn ascent_source_impl(input: proc_macro2::TokenStream) -> Result<proc
       },
    };
 
-   if let Some(bad_attr) = attrs.iter().find(|attr| attr.path().get_ident().map_or(true, |ident| ident != "doc")) {
+   if let Some(bad_attr) = attrs.iter().find(|attr| attr.path().get_ident().is_none_or(|ident| ident != "doc")) {
       return Err(syn::Error::new(bad_attr.span(), "unexpected attribute. Only `doc` attribute is allowed"))
    }
 

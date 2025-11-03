@@ -19,15 +19,15 @@ pub enum CRelFullIndex<K, V> {
 impl<K: Clone + Hash + Eq, V> Freezable for CRelFullIndex<K, V> {
    fn freeze(&mut self) {
       update(self, |_self| match _self {
-         CRelFullIndex::Unfrozen(dm) => Self::Frozen(dm.into_read_only()),
-         CRelFullIndex::Frozen(_) => _self,
+         Self::Unfrozen(dm) => Self::Frozen(dm.into_read_only()),
+         Self::Frozen(_) => _self,
       })
    }
 
    fn unfreeze(&mut self) {
       update(self, |_self| match _self {
-         CRelFullIndex::Frozen(v) => Self::Unfrozen(v.into_inner()),
-         CRelFullIndex::Unfrozen(dm) => CRelFullIndex::Unfrozen(dm),
+         Self::Frozen(v) => Self::Unfrozen(v.into_inner()),
+         Self::Unfrozen(dm) => Self::Unfrozen(dm),
       })
    }
 }
@@ -35,39 +35,39 @@ impl<K: Clone + Hash + Eq, V> Freezable for CRelFullIndex<K, V> {
 impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
    pub fn exact_len(&self) -> usize {
       match self {
-         CRelFullIndex::Unfrozen(uf) => uf.len(),
-         CRelFullIndex::Frozen(f) => f.len(),
+         Self::Unfrozen(uf) => uf.len(),
+         Self::Frozen(f) => f.len(),
       }
    }
 
    #[inline]
    pub fn unwrap_frozen(&self) -> &dashmap::ReadOnlyView<K, V, BuildHasherDefault<FxHasher>> {
       match self {
-         CRelFullIndex::Frozen(v) => v,
-         CRelFullIndex::Unfrozen(_) => panic!("CRelFullIndex::unwrap_frozen(): object is Unfrozen"),
+         Self::Frozen(v) => v,
+         Self::Unfrozen(_) => panic!("CRelFullIndex::unwrap_frozen(): object is Unfrozen"),
       }
    }
 
    #[inline]
    pub fn unwrap_unfrozen(&self) -> &DashMap<K, V, BuildHasherDefault<FxHasher>> {
       match self {
-         CRelFullIndex::Unfrozen(dm) => dm,
-         CRelFullIndex::Frozen(_) => panic!("CRelFullIndex::unwrap_unfrozen(): object is Frozen"),
+         Self::Unfrozen(dm) => dm,
+         Self::Frozen(_) => panic!("CRelFullIndex::unwrap_unfrozen(): object is Frozen"),
       }
    }
 
    #[inline]
    pub fn unwrap_mut_unfrozen(&mut self) -> &mut DashMap<K, V, BuildHasherDefault<FxHasher>> {
       match self {
-         CRelFullIndex::Frozen(_) => panic!("CRelFullIndex::unwrap_mut_unfrozen(): object is Frozen"),
-         CRelFullIndex::Unfrozen(dm) => dm,
+         Self::Frozen(_) => panic!("CRelFullIndex::unwrap_mut_unfrozen(): object is Frozen"),
+         Self::Unfrozen(dm) => dm,
       }
    }
 
    pub fn into_read_only(self) -> dashmap::ReadOnlyView<K, V, BuildHasherDefault<FxHasher>> {
       match self {
-         CRelFullIndex::Unfrozen(dm) => dm.into_read_only(),
-         CRelFullIndex::Frozen(f) => f,
+         Self::Unfrozen(dm) => dm.into_read_only(),
+         Self::Frozen(f) => f,
       }
    }
 
@@ -79,8 +79,8 @@ impl<K: Clone + Hash + Eq, V> CRelFullIndex<K, V> {
    pub fn get_cloned(&self, key: &K) -> Option<V>
    where V: Clone {
       match self {
-         CRelFullIndex::Unfrozen(uf) => uf.get(key).map(|x| x.value().clone()),
-         CRelFullIndex::Frozen(f) => f.get(key).cloned(),
+         Self::Unfrozen(uf) => uf.get(key).map(|x| x.value().clone()),
+         Self::Frozen(f) => f.get(key).cloned(),
       }
    }
 

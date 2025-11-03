@@ -15,7 +15,7 @@ impl<T: PartialEq + Eq + Hash + Ord> Set<T> {
    pub fn singleton(item: T) -> Self {
       let mut set = BTreeSet::new();
       set.insert(item);
-      Set(set)
+      Self(set)
    }
 }
 
