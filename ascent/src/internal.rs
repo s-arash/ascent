@@ -239,3 +239,14 @@ where T: Send + Sync
 
 #[inline(always)]
 pub fn comment(_: &str) {}
+
+/// Runs the closure compiled from a single rule, SCC, or other
+/// codegen segment. With the `segment-codegen` feature,
+/// `inline(never)` keeps each segment a separate function so rustc
+/// doesn't have to optimize one enormous function (which can be quite
+/// slow).
+#[cfg_attr(feature = "segment-codegen", inline(never))]
+#[cfg_attr(not(feature = "segment-codegen"), inline(always))]
+pub fn run_rule<R, F: FnOnce() -> R>(f: F) -> R {
+   f()
+}

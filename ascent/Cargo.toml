@@ -33,3 +33,7 @@ web-time = "1.1.0"
 default = ["par"]
 wasm-bindgen = []
 par = ["dashmap", "hashbrown/rayon", "once_cell", "rayon"]
+# Compile each rule/SCC of the generated program as a separate
+# `inline(never)` function instead of one giant `run`. Allows
+# faster compilation.
+segment-codegen = []

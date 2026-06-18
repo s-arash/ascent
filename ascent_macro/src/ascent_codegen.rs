@@ -561,7 +561,9 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
             ascent::internal::comment(#msg);
             __scope.spawn(|_| {
                #before_rule_var
-               #rule_compiled
+               ascent::internal::run_rule(|| {
+                  #rule_compiled
+               });
                #update_rule_time_field
             });
          }
@@ -569,9 +571,9 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
          quote! {
             #before_rule_var
             ascent::internal::comment(#msg);
-            {
+            ascent::internal::run_rule(|| {
                #rule_compiled
-            }
+            });
             #update_rule_time_field
          }
       });
