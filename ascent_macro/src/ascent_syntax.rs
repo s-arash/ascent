@@ -551,16 +551,32 @@ pub struct MacroDefNode {
    body: TokenStream,
 }
 
-#[derive(Parse)]
+// #[derive(Parse)]
 pub struct IncludeSourceNode {
    pub include_source_kw: kw::include_source,
    _bang: Token![!],
-   #[paren]
-   _arg_paren: syn::token::Paren,
-   #[inside(_arg_paren)]
-   #[call(syn::Path::parse_mod_style)]
-   path: syn::Path,
+   pub path: syn::Path,
+   pub caps: Punctuated<Ident, Token![,]>,
    _semi: Token![;],
+}
+
+impl Parse for IncludeSourceNode {
+   fn parse(input: ParseStream) -> Result<Self> {
+      let include_source_kw = input.parse()?;
+      let _bang = input.parse::<Token![!]>()?;
+      let content;
+      parenthesized!(content in input);
+      let path = syn::Path::parse_mod_style(&content)?;
+      let caps;
+      if content.peek(Token![,]) {
+         content.parse::<Token![,]>()?;
+         caps = content.parse_terminated(Ident::parse, Token![,])?;
+      } else {
+         caps = Punctuated::new();
+      }
+      let _semi = input.parse::<Token![;]>()?;
+      Ok(IncludeSourceNode { include_source_kw, _bang, path, caps, _semi })
+   }
 }
 
 // #[derive(Clone)]
@@ -586,8 +602,9 @@ impl IncludeSourceMacroCall {
    pub fn macro_call_output(&self) -> TokenStream {
       let Self { include_node, before_tokens, after_tokens, ascent_macro_name } = self;
       let include_macro_callback = &include_node.path;
+      let caps = include_node.caps.clone().into_iter().collect::<Vec<Ident>>();
       quote_spanned! {include_macro_callback.span()=>
-         #include_macro_callback! { {#ascent_macro_name}, {#before_tokens}, {#after_tokens} }
+         #include_macro_callback! { (#(#caps),*) , {#ascent_macro_name}, {#before_tokens}, {#after_tokens} }
       }
    }
 }
