@@ -45,10 +45,10 @@ where T: Ord
 
 impl<T: Lattice> Lattice for Dual<T> {
    #[inline]
-   fn meet(self, other: Self) -> Self { Dual(self.0.join(other.0)) }
+   fn meet(self, other: Self) -> Self { Self(self.0.join(other.0)) }
 
    #[inline]
-   fn join(self, other: Self) -> Self { Dual(self.0.meet(other.0)) }
+   fn join(self, other: Self) -> Self { Self(self.0.meet(other.0)) }
 
    #[inline]
    fn meet_mut(&mut self, other: Self) -> bool { self.0.join_mut(other.0) }
@@ -59,8 +59,8 @@ impl<T: Lattice> Lattice for Dual<T> {
 
 impl<T: BoundedLattice> BoundedLattice for Dual<T> {
    #[inline]
-   fn top() -> Self { Dual(T::bottom()) }
+   fn top() -> Self { Self(T::bottom()) }
 
    #[inline]
-   fn bottom() -> Self { Dual(T::top()) }
+   fn bottom() -> Self { Self(T::top()) }
 }

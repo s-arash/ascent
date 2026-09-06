@@ -114,7 +114,7 @@ impl<K: Eq + Hash, V> RelIndexWrite for RelIndexType1<K, V> {
 }
 
 impl<K: Eq + Hash, V> RelIndexMerge for RelIndexType1<K, V> {
-   fn move_index_contents(from: &mut RelIndexType1<K, V>, to: &mut RelIndexType1<K, V>) {
+   fn move_index_contents(from: &mut Self, to: &mut Self) {
       let before = Instant::now();
       if from.len() > to.len() {
          std::mem::swap(from, to);
@@ -161,7 +161,7 @@ impl<K: Eq + Hash, V: Hash + Eq> RelIndexWrite for LatticeIndexType<K, V> {
 
 impl<K: Eq + Hash, V: Hash + Eq> RelIndexMerge for LatticeIndexType<K, V> {
    #[inline(always)]
-   fn move_index_contents(hm1: &mut LatticeIndexType<K, V>, hm2: &mut LatticeIndexType<K, V>) {
+   fn move_index_contents(hm1: &mut Self, hm2: &mut Self) {
       for (k, v) in hm1.drain() {
          let set = hm2.entry(k).or_default();
          set.extend(v);

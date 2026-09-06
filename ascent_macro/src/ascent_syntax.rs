@@ -82,7 +82,7 @@ impl Parse for Signatures {
    fn parse(input: ParseStream) -> Result<Self> {
       let declaration = TypeSignature::parse(input)?;
       let implementation = if input.peek(Token![impl]) { Some(ImplSignature::parse(input)?) } else { None };
-      Ok(Signatures { declaration, implementation })
+      Ok(Self { declaration, implementation })
    }
 }
 
@@ -151,7 +151,7 @@ impl Parse for RelationNode {
       if is_lattice && field_types.empty_or_trailing() {
          return Err(input.error("empty lattice is not allowed"));
       }
-      Ok(RelationNode { attrs: vec![], name, field_types, _semi_colon, is_lattice, initialization })
+      Ok(Self { attrs: vec![], name, field_types, _semi_colon, is_lattice, initialization })
    }
 }
 
@@ -207,7 +207,7 @@ impl Parse for DisjunctionNode {
       if res.pairs().any(|pair| matches!(pair.punct(), Some(DisjunctionToken::OrOr(_)))) {
          eprintln!("WARNING: In Ascent rules, use `|` as the disjunction token instead of `||`")
       }
-      Ok(DisjunctionNode { paren, disjuncts: res })
+      Ok(Self { paren, disjuncts: res })
    }
 }
 
@@ -252,19 +252,19 @@ impl BodyClauseArg {
 
    pub fn get_vars(&self) -> Vec<Ident> {
       match self {
-         BodyClauseArg::Pat(p) => pattern_get_vars(&p.pattern),
-         BodyClauseArg::Expr(e) => expr_to_ident(e).into_iter().collect(),
+         Self::Pat(p) => pattern_get_vars(&p.pattern),
+         Self::Expr(e) => expr_to_ident(e).into_iter().collect(),
       }
    }
 }
 impl ToTokens for BodyClauseArg {
    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
       match self {
-         BodyClauseArg::Pat(pat) => {
+         Self::Pat(pat) => {
             pat.huh_token.to_tokens(tokens);
             pat.pattern.to_tokens(tokens);
          },
-         BodyClauseArg::Expr(exp) => exp.to_tokens(tokens),
+         Self::Expr(exp) => exp.to_tokens(tokens),
       }
    }
 }
@@ -311,9 +311,9 @@ pub enum CondClause {
 impl CondClause {
    pub fn bound_vars(&self) -> Vec<Ident> {
       match self {
-         CondClause::IfLet(cl) => pattern_get_vars(&cl.pattern),
-         CondClause::If(_) => vec![],
-         CondClause::Let(cl) => pattern_get_vars(&cl.pattern),
+         Self::IfLet(cl) => pattern_get_vars(&cl.pattern),
+         Self::If(_) => vec![],
+         Self::Let(cl) => pattern_get_vars(&cl.pattern),
       }
    }
 
@@ -321,9 +321,9 @@ impl CondClause {
    /// Useful for determining clause dependencies
    pub fn expr(&self) -> &Expr {
       match self {
-         CondClause::IfLet(cl) => &cl.exp,
-         CondClause::If(cl) => &cl.cond,
-         CondClause::Let(cl) => &cl.exp,
+         Self::IfLet(cl) => &cl.exp,
+         Self::If(cl) => &cl.cond,
+         Self::Let(cl) => &cl.exp,
       }
    }
 }
@@ -363,7 +363,7 @@ impl Parse for BodyClauseNode {
       while let Ok(cl) = input.parse() {
          cond_clauses.push(cl);
       }
-      Ok(BodyClauseNode { rel, args, cond_clauses })
+      Ok(Self { rel, args, cond_clauses })
    }
 }
 
@@ -389,8 +389,8 @@ pub enum HeadItemNode {
 impl HeadItemNode {
    pub fn clause(&self) -> &HeadClauseNode {
       match self {
-         HeadItemNode::HeadClause(cl) => cl,
-         HeadItemNode::MacroInvocation(_) => panic!("unexpected macro invocation"),
+         Self::HeadClause(cl) => cl,
+         Self::MacroInvocation(_) => panic!("unexpected macro invocation"),
       }
    }
 }
@@ -413,7 +413,7 @@ impl Parse for HeadClauseNode {
       let args_content;
       parenthesized!(args_content in input);
       let args = args_content.parse_terminated(Expr::parse, Token![,])?;
-      Ok(HeadClauseNode { rel, args })
+      Ok(Self { rel, args })
    }
 }
 
@@ -449,17 +449,17 @@ impl Parse for AggregatorNode {
       if input.peek(syn::token::Paren) {
          let inside_parens;
          parenthesized!(inside_parens in input);
-         Ok(AggregatorNode::Expr(inside_parens.parse()?))
+         Ok(Self::Expr(inside_parens.parse()?))
       } else {
-         Ok(AggregatorNode::Path(input.parse()?))
+         Ok(Self::Path(input.parse()?))
       }
    }
 }
 impl AggregatorNode {
    pub fn get_expr(&self) -> Expr {
       match self {
-         AggregatorNode::Path(path) => parse2(quote! {#path}).unwrap(),
-         AggregatorNode::Expr(expr) => expr.clone(),
+         Self::Path(path) => parse2(quote! {#path}).unwrap(),
+         Self::Expr(expr) => expr.clone(),
       }
    }
 }
@@ -481,12 +481,12 @@ impl Parse for RuleNode {
 
       if input.peek(Token![;]) {
          input.parse::<Token![;]>()?;
-         Ok(RuleNode { head_clauses, body_items: vec![] /*Punctuated::default()*/ })
+         Ok(Self { head_clauses, body_items: vec![] /*Punctuated::default()*/ })
       } else {
          input.parse::<kw::LongLeftArrow>()?;
          let body_items = Punctuated::<BodyItemNode, Token![,]>::parse_separated_nonempty(input)?;
          input.parse::<Token![;]>()?;
-         Ok(RuleNode { head_clauses, body_items: body_items.into_iter().collect() })
+         Ok(Self { head_clauses, body_items: body_items.into_iter().collect() })
       }
    }
 }
@@ -663,7 +663,7 @@ pub(crate) struct RelationIdentity {
 
 impl From<&RelationNode> for RelationIdentity {
    fn from(relation_node: &RelationNode) -> Self {
-      RelationIdentity {
+      Self {
          name: relation_node.name.clone(),
          field_types: relation_node.field_types.iter().cloned().collect(),
          is_lattice: relation_node.is_lattice,
