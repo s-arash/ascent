@@ -886,6 +886,35 @@ fn test_run_timeout() {
 }
 
 #[test]
+fn test_run_timeout_keeps_results() {
+   ascent_m_par! {
+      #![generate_run_timeout]
+      struct TimeoutTC;
+      relation edge(u32, u32);
+      relation path(u32, u32);
+      lattice shortest(u32, u32, Dual<u32>);
+      path(x, y), shortest(x, y, Dual(1)) <-- edge(x, y);
+      path(x, z) <-- edge(x, y), path(y, z);
+      shortest(x, z, Dual(d.0 + 1)) <-- edge(x, y), shortest(y, z, d);
+   }
+
+   let edges = (0..30).map(|x| (x, x + 1)).collect_vec();
+   let mut full = TimeoutTC::default();
+   full.edge = edges.iter().cloned().collect();
+   full.run();
+
+   let mut prog = TimeoutTC::default();
+   prog.edge = edges.into_iter().collect();
+   assert!(!prog.run_timeout(Duration::ZERO));
+   assert!(!prog.path.is_empty() && prog.path.len() < full.path.len());
+
+   // finishing the run after a timeout reaches the same fixed point
+   prog.run();
+   assert!(rels_equal(prog.path, full.path));
+   assert!(rels_equal(lat_to_vec(prog.shortest), lat_to_vec(full.shortest)));
+}
+
+#[test]
 fn test_ascent_bounded_set() {
    use ascent::lattice::bounded_set::BoundedSet;
    ascent_m_par! { struct AscentProgram<const N: usize>;

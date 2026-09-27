@@ -337,3 +337,31 @@ fn test_trrel2_in_ascent() {
       assert_eq!(res.tr_indexed_materialized.len(), res.tr_indexed_explicit.len());
    }
 }
+
+#[test]
+fn test_eq_rel_run_timeout_keeps_results() {
+   ascent! {
+      #![generate_run_timeout]
+      struct EqRelTimeoutProg;
+
+      #[ds(crate::eqrel)]
+      relation eq(u64, u64);
+
+      eq(0, 1);
+      eq(x + 1, x + 2) <-- eq(x, _), if *x < 20;
+   }
+
+   let mut full = EqRelTimeoutProg::default();
+   full.run();
+   let full_count = full.__eq_ind_common.count_exact();
+
+   let mut prog = EqRelTimeoutProg::default();
+   assert!(!prog.run_timeout(std::time::Duration::ZERO));
+   let partial_count = prog.__eq_ind_common.count_exact();
+   assert!(partial_count > 0, "results were lost on timeout");
+   assert!(partial_count < full_count);
+
+   // finishing the run after a timeout reaches the same fixed point
+   prog.run();
+   assert_eq!(prog.__eq_ind_common.count_exact(), full_count);
+}
