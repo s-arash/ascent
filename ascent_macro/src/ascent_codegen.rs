@@ -183,7 +183,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          #[doc = "Runs the Ascent program to a fixed point."]
          pub fn run(&mut self) {
             #![allow(clippy::all)]
-            macro_rules! __check_return_conditions {() => {};}
+            macro_rules! __check_return_conditions {($($cleanup:tt)*) => {};}
             #run_usings
             self.update_indices_priv();
             let _self = self;
@@ -199,8 +199,11 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
          #[doc = "Runs the Ascent program to a fixed point or until the timeout is reached. In case of a timeout returns false"]
          pub fn run_timeout(&mut self, timeout: ::std::time::Duration) -> bool {
             let __start_time = ::ascent::internal::Instant::now();
-            macro_rules! __check_return_conditions {() => {
-               if timeout < ::std::time::Duration::MAX && __start_time.elapsed() >= timeout {return false;}
+            macro_rules! __check_return_conditions {($($cleanup:tt)*) => {
+               if timeout < ::std::time::Duration::MAX && __start_time.elapsed() >= timeout {
+                  $($cleanup)*
+                  return false;
+               }
             };}
             #run_usings
             self.update_indices_priv();
@@ -214,7 +217,7 @@ pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::
       quote! {}
    } else {
       quote! {
-         macro_rules! __check_return_conditions {() => {};}
+         macro_rules! __check_return_conditions {($($cleanup:tt)*) => {};}
          #run_usings
          let _self = &mut __run_res;
          #(#relation_initializations)*
@@ -538,6 +541,12 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
       move_total_to_field.push(quote_spanned! {ir_name.span()=>
          #_self.#total_field = #total_var_name;
       });
+
+      if mir.is_parallel {
+         move_total_to_field.push(quote_spanned! {ir_name.span()=>
+            #_self.#total_field.unfreeze();
+         });
+      }
    }
 
    let rule_parallelism = mir.config.inter_rule_parallelism && mir.is_parallel;
@@ -614,7 +623,12 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
             #(#shift_delta_to_total_new_to_delta)*
             _self.scc_iters[#scc_ind] += 1;
             if !#check_changed_code {break;}
-            __check_return_conditions!();
+            // on timeout, fold the pending delta into total and store everything back into `_self`
+            __check_return_conditions!(
+               #(#shift_delta_to_total_new_to_delta)*
+               #(#move_total_to_field)*
+               _self.scc_times[#scc_ind] += _scc_start_time.elapsed();
+            );
          }
 
       }
@@ -632,7 +646,10 @@ fn compile_mir_scc(mir: &AscentMir, scc_ind: usize) -> proc_macro2::TokenStream 
             #(#shift_delta_to_total_new_to_delta)*
             #(#shift_delta_to_total_new_to_delta)*
             _self.scc_iters[#scc_ind] += 1;
-            __check_return_conditions!();
+            __check_return_conditions!(
+               #(#move_total_to_field)*
+               _self.scc_times[#scc_ind] += _scc_start_time.elapsed();
+            );
          }
       }
    };
