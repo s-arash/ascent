@@ -1,3 +1,7 @@
+## Unreleased
+
+- Aggregation clauses accept a parenthesized body after `in` (`agg s = sum(x) in (foo(y, x), bar(y), if *x > 0)`), and repeated variables in the aggregated atom (`agg s = sum(y) in foo(y, y)`) now act as equality constraints.
+
 ## 0.8.1
 
 - Updated dependencies (instant -> webtime, paste -> pasty) (#75)

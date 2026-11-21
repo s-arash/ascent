@@ -430,12 +430,21 @@ pub struct AggClauseNode {
    #[call(Punctuated::parse_terminated)]
    pub bound_args: Punctuated<Ident, Token![,]>,
    pub _in_kw: Token![in],
-   pub rel: Ident,
-   #[paren]
-   _rel_arg_paren: syn::token::Paren,
-   #[inside(_rel_arg_paren)]
-   #[call(Punctuated::parse_terminated)]
-   pub rel_args: Punctuated<Expr, Token![,]>,
+   /// The disjuncts of the aggregation body, each one a conjunction of body items
+   #[call(parse_agg_body)]
+   pub body: Vec<Vec<BodyItemNode>>,
+}
+
+/// Parses either a single relation atom or a parenthesized body, such as `(foo(x, y), bar(y))`
+fn parse_agg_body(input: ParseStream) -> Result<Vec<Vec<BodyItemNode>>> {
+   if !input.peek(syn::token::Paren) {
+      return Ok(vec![vec![BodyItemNode::Clause(input.parse()?)]]);
+   }
+   let body = DisjunctionNode::parse(input)?;
+   if body.disjuncts.is_empty() {
+      return Err(Error::new(body.paren.span.join(), "empty aggregation body"));
+   }
+   Ok(body.disjuncts.into_iter().map(|conj| conj.into_iter().collect()).collect())
 }
 
 #[derive(Clone)]
@@ -501,7 +510,7 @@ pub(crate) fn rule_node_summary(rule: &RuleNode) -> String {
          BodyItemNode::Clause(bcl) => format!("{}", bcl.rel),
          BodyItemNode::Disjunction(_) => todo!(),
          BodyItemNode::Cond(_cl) => format!("if_"),
-         BodyItemNode::Agg(agg) => format!("agg {}", agg.rel),
+         BodyItemNode::Agg(agg) => format!("agg {}", agg.body.iter().flatten().map(bitem_to_str).join(", ")),
          BodyItemNode::Negation(neg) => format!("! {}", neg.rel),
          BodyItemNode::MacroInvocation(m) => format!("{:?}!(..)", m.mac.path),
       }
@@ -697,7 +706,10 @@ fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
          BodyItemNode::Generator(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Clause(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Cond(_) => vec![vec![bitem.clone()]],
-         BodyItemNode::Agg(_) => vec![vec![bitem.clone()]],
+         BodyItemNode::Agg(agg) => {
+            let body = agg.body.iter().flat_map(|conj| bitems_desugar(conj)).collect();
+            vec![vec![BodyItemNode::Agg(AggClauseNode { body, ..agg.clone() })]]
+         },
          BodyItemNode::Negation(_) => vec![vec![bitem.clone()]],
          BodyItemNode::Disjunction(d) => {
             let mut res = vec![];
@@ -740,7 +752,10 @@ fn rule_desugar_disjunction_nodes(rule: RuleNode) -> Vec<RuleNode> {
 fn body_item_get_bound_vars(bi: &BodyItemNode) -> Vec<Ident> {
    match bi {
       BodyItemNode::Generator(gen) => pattern_get_vars(&gen.pattern),
-      BodyItemNode::Agg(agg) => pattern_get_vars(&agg.pat),
+      BodyItemNode::Agg(agg) => {
+         let body_vars = agg.body.iter().flatten().flat_map(body_item_get_bound_vars);
+         pattern_get_vars(&agg.pat).into_iter().chain(body_vars).collect()
+      },
       BodyItemNode::Clause(cl) => cl.args.iter().flat_map(|arg| arg.get_vars()).collect(),
       BodyItemNode::Negation(_cl) => vec![],
       BodyItemNode::Disjunction(disj) =>
@@ -753,7 +768,12 @@ fn body_item_get_bound_vars(bi: &BodyItemNode) -> Vec<Ident> {
 fn body_item_visit_bound_vars_mut(bi: &mut BodyItemNode, visitor: &mut dyn FnMut(&mut Ident)) {
    match bi {
       BodyItemNode::Generator(gen) => pattern_visit_vars_mut(&mut gen.pattern, visitor),
-      BodyItemNode::Agg(agg) => pattern_visit_vars_mut(&mut agg.pat, visitor),
+      BodyItemNode::Agg(agg) => {
+         pattern_visit_vars_mut(&mut agg.pat, visitor);
+         for bi in agg.body.iter_mut().flatten() {
+            body_item_visit_bound_vars_mut(bi, visitor)
+         }
+      },
       BodyItemNode::Clause(cl) =>
          for arg in cl.args.iter_mut() {
             match arg {
@@ -792,11 +812,14 @@ fn body_item_visit_exprs_free_vars_mut(
    match bi {
       BodyItemNode::Generator(gen) => visit(&mut gen.expr),
       BodyItemNode::Agg(agg) => {
-         for arg in agg.rel_args.iter_mut() {
-            visit(arg)
-         }
          if let AggregatorNode::Expr(e) = &mut agg.aggregator {
             visit(e)
+         }
+         for arg in agg.bound_args.iter_mut() {
+            visitor(arg)
+         }
+         for bi in agg.body.iter_mut().flatten() {
+            body_item_visit_exprs_free_vars_mut(bi, visitor, visit_macro_idents);
          }
       },
       BodyItemNode::Clause(cl) =>
@@ -901,32 +924,38 @@ fn rule_desugar_pattern_args(rule: RuleNode) -> RuleNode {
       new_cond_clauses.extend(body_clause.cond_clauses);
       BodyClauseNode { args: new_args, cond_clauses: new_cond_clauses, rel: body_clause.rel }
    }
-   let mut gensym = GenSym::default();
-   RuleNode {
-      body_items: rule
-         .body_items
+   fn body_items_desugar_pattern_args(bitems: Vec<BodyItemNode>, gensym: &mut GenSym) -> Vec<BodyItemNode> {
+      bitems
          .into_iter()
          .map(|bi| match bi {
-            BodyItemNode::Clause(cl) => BodyItemNode::Clause(clause_desugar_pattern_args(cl, &mut gensym)),
+            BodyItemNode::Clause(cl) => BodyItemNode::Clause(clause_desugar_pattern_args(cl, gensym)),
+            BodyItemNode::Agg(agg) => {
+               let body = agg.body.into_iter().map(|conj| body_items_desugar_pattern_args(conj, gensym)).collect();
+               BodyItemNode::Agg(AggClauseNode { body, ..agg })
+            },
             _ => bi,
          })
-         .collect(),
-      head_clauses: rule.head_clauses,
+         .collect()
    }
+   let mut gensym = GenSym::default();
+   let body_items = body_items_desugar_pattern_args(rule.body_items, &mut gensym);
+   RuleNode { body_items, head_clauses: rule.head_clauses }
 }
 
 fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
-   let mut grounded_vars = HashMap::<Ident, usize>::new();
-   for i in 0..rule.body_items.len() {
-      let bitem = &mut rule.body_items[i];
+   body_items_desugar_repeated_vars(&mut rule.body_items, HashSet::new());
+   rule
+}
+
+fn body_items_desugar_repeated_vars(bitems: &mut [BodyItemNode], mut grounded_vars: HashSet<Ident>) {
+   for bitem in bitems.iter_mut() {
       match bitem {
          BodyItemNode::Clause(cl) => {
+            let mut clause_vars = HashSet::new();
             let mut new_cond_clauses = vec![];
-            for arg_ind in 0..cl.args.len() {
-               let expr = cl.args[arg_ind].unwrap_expr_ref();
-               let expr_has_vars_from_same_clause = expr_get_vars(expr)
-                  .iter()
-                  .any(|var| if let Some(cl_ind) = grounded_vars.get(var) { *cl_ind == i } else { false });
+            for arg in cl.args.iter_mut() {
+               let expr = arg.unwrap_expr_ref();
+               let expr_has_vars_from_same_clause = expr_get_vars(expr).iter().any(|var| clause_vars.contains(var));
                if expr_has_vars_from_same_clause {
                   let new_ident = fresh_ident(
                      &expr_to_ident(expr).map(|e| e.to_string()).unwrap_or_else(|| "expr_replaced".to_string()),
@@ -934,69 +963,86 @@ fn rule_desugar_repeated_vars(mut rule: RuleNode) -> RuleNode {
                   );
                   new_cond_clauses
                      .push(CondClause::If(parse2(quote_spanned! {expr.span()=> if #new_ident.eq(&(#expr))}).unwrap()));
-                  cl.args[arg_ind] = BodyClauseArg::Expr(parse2(new_ident.to_token_stream()).unwrap());
+                  *arg = BodyClauseArg::Expr(parse2(new_ident.to_token_stream()).unwrap());
                } else if let Some(ident) = expr_to_ident(expr) {
-                  grounded_vars.entry(ident).or_insert(i);
+                  if !grounded_vars.contains(&ident) {
+                     clause_vars.insert(ident);
+                  }
                }
             }
+            grounded_vars.extend(clause_vars);
             for new_cond_cl in new_cond_clauses.into_iter().rev() {
                cl.cond_clauses.insert(0, new_cond_cl);
             }
          },
-         BodyItemNode::Generator(gen) =>
-            for ident in pattern_get_vars(&gen.pattern) {
-               grounded_vars.entry(ident).or_insert(i);
-            },
-         BodyItemNode::Cond(ref cond_cl @ CondClause::IfLet(_))
-         | BodyItemNode::Cond(ref cond_cl @ CondClause::Let(_)) =>
-            for ident in cond_cl.bound_vars() {
-               grounded_vars.entry(ident).or_insert(i);
-            },
-         BodyItemNode::Cond(CondClause::If(_)) => (),
-         BodyItemNode::Agg(agg) =>
-            for ident in pattern_get_vars(&agg.pat) {
-               grounded_vars.entry(ident).or_insert(i);
-            },
+         BodyItemNode::Generator(gen) => grounded_vars.extend(pattern_get_vars(&gen.pattern)),
+         BodyItemNode::Cond(cond_cl) => grounded_vars.extend(cond_cl.bound_vars()),
+         BodyItemNode::Agg(agg) => {
+            let outer_vars =
+               grounded_vars.iter().filter(|v| !agg.bound_args.iter().contains(v)).cloned().collect::<HashSet<_>>();
+            for conj in agg.body.iter_mut() {
+               body_items_desugar_repeated_vars(conj, outer_vars.clone());
+            }
+            grounded_vars.extend(pattern_get_vars(&agg.pat));
+         },
          BodyItemNode::Negation(_) => (),
          BodyItemNode::Disjunction(_) => panic!("unrecognized BodyItemNode variant"),
          BodyItemNode::MacroInvocation(m) => panic!("unexpected macro invocation: {:?}", m.mac.path),
       }
    }
-   rule
 }
 
 fn rule_desugar_wildcards(mut rule: RuleNode) -> RuleNode {
-   let mut gensym = GenSym::default();
-   gensym.next("_"); // to move past "_"
-   for bi in &mut rule.body_items[..] {
-      if let BodyItemNode::Clause(bcl) = bi {
-         for arg in bcl.args.iter_mut() {
-            match arg {
-               BodyClauseArg::Expr(expr) =>
-                  if is_wild_card(expr) {
-                     let new_ident = gensym.next_ident("_", expr.span());
-                     *expr = parse2(quote! {#new_ident}).unwrap();
-                  },
-               BodyClauseArg::Pat(_) => (),
-            }
+   fn body_items_desugar_wildcards(bitems: &mut [BodyItemNode], gensym: &mut GenSym) {
+      for bi in bitems {
+         match bi {
+            BodyItemNode::Clause(bcl) =>
+               for arg in bcl.args.iter_mut() {
+                  match arg {
+                     BodyClauseArg::Expr(expr) =>
+                        if is_wild_card(expr) {
+                           let new_ident = gensym.next_ident("_", expr.span());
+                           *expr = parse2(quote! {#new_ident}).unwrap();
+                        },
+                     BodyClauseArg::Pat(_) => (),
+                  }
+               },
+            BodyItemNode::Agg(agg) =>
+               for conj in agg.body.iter_mut() {
+                  body_items_desugar_wildcards(conj, gensym)
+               },
+            _ => (),
          }
       }
    }
+   let mut gensym = GenSym::default();
+   gensym.next("_"); // to move past "_"
+   body_items_desugar_wildcards(&mut rule.body_items, &mut gensym);
    rule
 }
 
 fn rule_desugar_negation(mut rule: RuleNode) -> RuleNode {
-   for bi in &mut rule.body_items[..] {
-      if let BodyItemNode::Negation(neg) = bi {
-         let rel = &neg.rel;
-         let args = &neg.args;
-         let replacement = quote_spanned! {neg.neg_token.span=>
-            agg () = ::ascent::aggregators::not() in #rel(#args)
-         };
-         let replacement: AggClauseNode = parse2(replacement).unwrap();
-         *bi = BodyItemNode::Agg(replacement);
+   fn body_items_desugar_negation(bitems: &mut [BodyItemNode]) {
+      for bi in bitems {
+         match bi {
+            BodyItemNode::Negation(neg) => {
+               let rel = &neg.rel;
+               let args = &neg.args;
+               let replacement = quote_spanned! {neg.neg_token.span=>
+                  agg () = ::ascent::aggregators::not() in #rel(#args)
+               };
+               let replacement: AggClauseNode = parse2(replacement).unwrap();
+               *bi = BodyItemNode::Agg(replacement);
+            },
+            BodyItemNode::Agg(agg) =>
+               for conj in agg.body.iter_mut() {
+                  body_items_desugar_negation(conj)
+               },
+            _ => (),
+         }
       }
    }
+   body_items_desugar_negation(&mut rule.body_items);
    rule
 }
 
@@ -1073,6 +1119,21 @@ fn rule_expand_macro_invocations(rule: RuleNode, macros: &HashMap<Ident, &MacroD
                ..disj
             })))
          },
+         BodyItemNode::Agg(agg) => {
+            let span = agg.agg_kw.span;
+            let body = agg
+               .body
+               .into_iter()
+               .map(|conj| {
+                  conj
+                     .into_iter()
+                     .map(|bi| body_item_expand_macros(bi, macros, gensym, depth - 1, Some(span)))
+                     .flatten_ok()
+                     .collect()
+               })
+               .collect::<Result<_>>()?;
+            Ok(punctuated_singleton(BodyItemNode::Agg(AggClauseNode { body, ..agg })))
+         },
          _ => Ok(punctuated_singleton(bi)),
       }
    }
@@ -1124,9 +1185,9 @@ pub(crate) fn desugar_ascent_program(mut prog: AscentProgram) -> Result<AscentPr
    prog.rules = rules_macro_expanded
       .into_iter()
       .flat_map(rule_desugar_disjunction_nodes)
+      .map(rule_desugar_negation)
       .map(rule_desugar_pattern_args)
       .map(rule_desugar_wildcards)
-      .map(rule_desugar_negation)
       .map(rule_desugar_repeated_vars)
       .collect_vec();
 

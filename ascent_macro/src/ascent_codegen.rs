@@ -9,10 +9,11 @@ use syn::{Expr, Type, parse_quote, parse_quote_spanned, parse2};
 use crate::ascent_hir::{IndexValType, IrRelation};
 use crate::ascent_mir::MirRelationVersion::*;
 use crate::ascent_mir::{
-   AscentMir, MirBodyItem, MirRelation, MirRelationVersion, MirRule, MirScc, ir_relation_version_var_name,
-   mir_rule_summary, mir_summary,
+   AscentMir, MirAggClause, MirBodyClause, MirBodyItem, MirRelation, MirRelationVersion, MirRule, MirScc,
+   ir_relation_version_var_name, mir_rule_summary, mir_summary,
 };
 use crate::ascent_syntax::{CondClause, RelationIdentity};
+use crate::syn_utils::expr_get_vars;
 use crate::utils::{TokenStreamExtensions, exp_cloned, expr_to_ident, tuple, tuple_spanned, tuple_type};
 
 pub(crate) fn compile_mir(mir: &AscentMir, is_ascent_run: bool) -> proc_macro2::TokenStream {
@@ -919,19 +920,14 @@ fn compile_mir_rule_inner(
 
             let bclause_rel_name = &bclause.rel.relation.name;
             let selected_args = &bclause.selected_args();
-            let pre_clause_vars =
-               rule.body_items.iter().take(clause_ind).flat_map(MirBodyItem::bound_vars).collect::<Vec<_>>();
-
-            let clause_vars = bclause.vars();
-            let common_vars = clause_vars.iter().filter(|(_i, v)| pre_clause_vars.contains(v)).collect::<Vec<_>>();
-            let common_vars_no_indices = common_vars.iter().map(|(_i, v)| v.clone()).collect::<Vec<_>>();
 
             let cloning_needed = true;
 
             let matched_val_ident = Ident::new("__val", bclause.rel_args_span);
+            // variables in the index columns are bound before the clause
             let new_vars_assignments = clause_var_assignments(
                &bclause.rel,
-               clause_vars.iter().filter(|(_i, var)| !common_vars_no_indices.contains(var)).cloned(),
+               bclause.vars().into_iter().filter(|(i, _var)| !bclause.rel.indices.contains(i)),
                &matched_val_ident,
                &parse_quote! {_self.#bclause_rel_name},
                cloning_needed,
@@ -1038,45 +1034,40 @@ fn compile_mir_rule_inner(
          MirBodyItem::Cond(cond) => compile_cond_clause(cond, next_loop),
          MirBodyItem::Agg(agg) => {
             let pat = &agg.pat;
-            let rel_name = &agg.rel.relation.name;
-            let mir_relation = MirRelation::from(agg.rel.clone(), Total);
-            // let rel_version_var_name = mir_relation.var_name();
-            let rel_expr = expr_for_rel(&mir_relation, mir);
-            let selected_args = mir_relation.indices.iter().map(|&i| &agg.rel_args[i]);
-            let selected_args_cloned = selected_args.map(exp_cloned).collect_vec();
-            let selected_args_tuple = tuple_spanned(&selected_args_cloned, agg.span);
-            let agg_args_tuple_indices = agg.bound_args.iter().map(|arg| {
-               (
-                  agg.rel_args.iter().find_position(|rel_arg| expr_to_ident(rel_arg) == Some(arg.clone())).unwrap().0,
-                  arg.clone(),
-               )
-            });
-
-            let agg_args_tuple =
-               tuple_spanned(&agg.bound_args.iter().map(|v| parse_quote! {#v}).collect_vec(), agg.span);
-
-            let vars_assignments = clause_var_assignments(
-               &MirRelation::from(agg.rel.clone(), MirRelationVersion::Total),
-               agg_args_tuple_indices,
-               &parse_quote_spanned! {agg.span=> __val},
-               &parse_quote! {_self.#rel_name},
-               false,
-               mir,
-            );
-
             let agg_func = &agg.aggregator;
-            let _self = quote! { _self };
-            quote_spanned! {agg.span=>
-               let __aggregated_rel = #rel_expr;
-               let __matching = __aggregated_rel.index_get( &#selected_args_tuple);
-               let __agg_args = __matching.into_iter().flatten().map(|__val| {
-                  #vars_assignments
-                  #agg_args_tuple
+            let bound_args = &agg.bound_args;
+            let agg_args = Ident::new("__agg_args", Span::mixed_site());
+            let agg_args_def = if let Some(agg_args_def) = compile_agg_body_iter(agg, &agg_args, mir) {
+               agg_args_def
+            } else {
+               // the arguments are not all borrowed from relations, so we collect them first
+               let agg_buf = Ident::new("__agg_buf", Span::mixed_site());
+               let push_bound_args = quote_spanned! {agg.span=>
+                  #agg_buf.push((#(#bound_args.clone(),)*));
+               };
+               let bodies = agg.bodies.iter().map(|body| {
+                  let body_rule = MirRule {
+                     head_clause: vec![],
+                     body_items: body.clone(),
+                     simple_join_start_index: None,
+                     reorderable: false,
+                  };
+                  compile_mir_rule_inner(&body_rule, _scc, mir, 0, push_bound_args.clone(), 0)
                });
-               for #pat in #agg_func(__agg_args) {
+               quote_spanned! {agg.span=>
+                  let #agg_buf = {
+                     let mut #agg_buf = ::std::vec::Vec::new();
+                     #(#bodies)*
+                     #agg_buf
+                  };
+                  let #agg_args = #agg_buf.iter().map(|(#(#bound_args,)*)| (#(#bound_args,)*));
+               }
+            };
+            quote_spanned! {agg.span=>
+               #agg_args_def
+               for #pat in #agg_func(#agg_args) {
                   #next_loop
                }
-
             }
          },
       }
@@ -1088,6 +1079,109 @@ fn compile_mir_rule_inner(
          // _self.update_time_nanos.fetch_add(update_took.as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
       }
    }
+}
+
+/// Compiles the body of an aggregation into statements defining `agg_args`, a lazy iterator over references
+/// to the aggregated arguments. Returns `None` if the body is a disjunction, does not start with a clause,
+/// contains a nested aggregation, binds an aggregated argument other than by a relation column, or binds
+/// a variable before its last clause other than by a relation column.
+fn compile_agg_body_iter(agg: &MirAggClause, agg_args: &Ident, mir: &AscentMir) -> Option<proc_macro2::TokenStream> {
+   let [body] = &agg.bodies[..] else { return None };
+   // each segment is a clause followed by its conditions and the conditions up to the next clause
+   let mut segments: Vec<(&MirBodyClause, Vec<&CondClause>)> = vec![];
+   for bitem in body {
+      match bitem {
+         MirBodyItem::Clause(bcl) => segments.push((bcl, bcl.cond_clauses.iter().collect())),
+         MirBodyItem::Cond(cond) => segments.last_mut()?.1.push(cond),
+         // a nested aggregation can be satisfied in several ways, so it does not fit in a `filter_map`
+         MirBodyItem::Agg(_) | MirBodyItem::Generator(_) => return None,
+      }
+   }
+   // the variables bound by the relation columns of each segment's clause
+   let column_vars = segments
+      .iter()
+      .map(|(bcl, _)| bcl.vars().into_iter().filter(|(i, _var)| !bcl.rel.indices.contains(i)).collect_vec())
+      .collect_vec();
+   let all_column_vars = column_vars.iter().flatten().map(|(_i, var)| var).collect_vec();
+   let (_, init_segments) = segments.split_last()?;
+   if !agg.bound_args.iter().all(|arg| all_column_vars.contains(&arg))
+      || init_segments.iter().flat_map(|(_, conds)| conds).any(|cond| !cond.bound_vars().is_empty())
+      // rows of lattices are behind locks in parallel programs
+      || mir.is_parallel && segments.iter().any(|(bcl, _)| bcl.rel.relation.is_lattice)
+   {
+      return None;
+   }
+
+   let bound_args = &agg.bound_args;
+   let val_ident = Ident::new("__val", Span::mixed_site());
+   let mut rel_defs = vec![];
+   // the variables used by the part of the body compiled so far
+   let mut used_vars = bound_args.iter().cloned().collect::<HashSet<_>>();
+   let mut res = quote_spanned! {agg.span=> (#(#bound_args,)*)};
+   for (seg_ind, (bcl, conds)) in segments.iter().enumerate().rev() {
+      let rel_ident = format_ident!("__agg_rel_{}", seg_ind, span = Span::mixed_site());
+      let rel_expr = expr_for_rel(&bcl.rel, mir);
+      rel_defs.push(quote_spanned! {agg.span=> let #rel_ident = #rel_expr;});
+
+      used_vars.extend(conds.iter().flat_map(|cond| expr_get_vars(cond.expr())));
+      let rel_name = &bcl.rel.relation.name;
+      let vars_assignments = clause_var_assignments(
+         &bcl.rel,
+         column_vars[seg_ind].iter().filter(|(_i, var)| used_vars.contains(var)).cloned(),
+         &val_ident,
+         &parse_quote! {_self.#rel_name},
+         false,
+         mir,
+      );
+      used_vars.extend(bcl.args.iter().flat_map(expr_get_vars));
+      let selected_args_cloned = bcl.selected_args().iter().map(exp_cloned).collect_vec();
+      let selected_args_tuple = tuple_spanned(&selected_args_cloned, bcl.args_span);
+      let mut rows = quote_spanned! {agg.span=> #rel_ident.index_get(&#selected_args_tuple).into_iter().flatten()};
+      let mut closure_arg = quote! {#val_ident};
+      // the variables bound by previous clauses are local to their closures, so we pass the ones used from here on
+      // along with the rows
+      let prev_vars = column_vars[..seg_ind]
+         .iter()
+         .flatten()
+         .map(|(_i, var)| var)
+         .filter(|var| used_vars.contains(var))
+         .collect_vec();
+      if !prev_vars.is_empty() {
+         rows = quote_spanned! {agg.span=> #rows.zip(::std::iter::repeat((#(#prev_vars,)*)))};
+         closure_arg = quote! {(#val_ident, (#(#prev_vars,)*))};
+      }
+
+      let is_last = seg_ind == segments.len() - 1;
+      res = if conds.iter().all(|cond| matches!(cond, CondClause::Let(_))) {
+         let conds_then_res = conds.iter().rev().fold(res, |code, cond| compile_cond_clause(cond, code));
+         let map = if is_last {
+            quote_spanned! {agg.span=> map}
+         } else {
+            quote_spanned! {agg.span=> flat_map}
+         };
+         quote_spanned! {agg.span=>
+            #rows.#map(|#closure_arg| {
+               #vars_assignments
+               #conds_then_res
+            })
+         }
+      } else {
+         let return_res = quote_spanned! {agg.span=> return Some(#res);};
+         let conds_then_res = conds.iter().rev().fold(return_res, |code, cond| compile_cond_clause(cond, code));
+         let flatten = (!is_last).then(|| quote_spanned! {agg.span=> .flatten()});
+         quote_spanned! {agg.span=>
+            #rows.filter_map(|#closure_arg| {
+               #vars_assignments
+               #conds_then_res
+               None
+            }) #flatten
+         }
+      };
+   }
+   Some(quote_spanned! {agg.span=>
+      #(#rel_defs)*
+      let #agg_args = #res;
+   })
 }
 
 fn head_update_code(rule: &MirRule, scc: &MirScc, mir: &AscentMir) -> proc_macro2::TokenStream {

@@ -180,6 +180,23 @@ where N: Ord + Clone
 ```
 Aggregators can even be parameterized! For an example of a parameterized aggregator, lookup the definition of `percentile` in [`ascent::aggregators`](./ascent/src/aggregators.rs).
 
+The part after `in` can also be a parenthesized, comma-separated body, with the same meaning as in a rule body. It may contain several atoms and `if`, `let` and `if let` clauses, as well as negations and disjunctions (`for` clauses are not allowed). Variables that are bound before the aggregation clause group the result, and variables that are first bound inside the body are local to it:
+
+```Rust
+ascent! {
+   relation order(u32, u32);          // (order id, customer id)
+   relation item(u32, u32, u32);      // (order id, product id, price)
+   relation customer(u32);
+   relation spent(u32, u32);
+
+   spent(c, total) <--
+      customer(c),
+      agg total = sum(price) in (order(o, c), item(o, _, price), if *price > 0);
+}
+```
+
+The aggregator receives its arguments once for every way the body is satisfied. Repeated variables in the atom of an aggregation clause act as equality constraints, so `agg s = sum(y) in foo(y, y)` only aggregates the rows of `foo` whose two columns are equal.
+
 ### Macro definitions
 It may be useful to define macros that expand to either body items or head items. Ascent allows you to do this.
 
