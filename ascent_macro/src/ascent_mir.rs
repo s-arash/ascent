@@ -6,7 +6,7 @@ use itertools::Itertools;
 use petgraph::algo::condensation;
 use petgraph::graphmap::DiGraphMap;
 use proc_macro2::{Ident, Span};
-use syn::{Expr, Type};
+use syn::{Expr, Pat, Type};
 
 use crate::ascent_hir::{
    AscentConfig, AscentIr, IndexValType, IrAggClause, IrBodyClause, IrBodyItem, IrHeadClause, IrRelation, IrRule,
@@ -69,7 +69,7 @@ pub(crate) fn mir_rule_summary(rule: &MirRule) -> String {
          MirBodyItem::Cond(CondClause::If(..)) => format!("if ⋯"),
          MirBodyItem::Cond(CondClause::IfLet(..)) => format!("if let ⋯"),
          MirBodyItem::Cond(CondClause::Let(..)) => format!("let ⋯"),
-         MirBodyItem::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
+         MirBodyItem::Agg(agg) => format!("agg {}", agg.bodies.iter().flatten().map(bitem_to_str).join(", ")),
       }
    }
    format!(
@@ -86,7 +86,17 @@ pub(crate) enum MirBodyItem {
    Clause(MirBodyClause),
    Generator(GeneratorNode),
    Cond(CondClause),
-   Agg(IrAggClause),
+   Agg(MirAggClause),
+}
+
+#[derive(Clone)]
+pub(crate) struct MirAggClause {
+   pub span: Span,
+   pub pat: Pat,
+   pub aggregator: Expr,
+   pub bound_args: Vec<Ident>,
+   /// The disjuncts of the aggregation body
+   pub bodies: Vec<Vec<MirBodyItem>>,
 }
 
 impl MirBodyItem {
@@ -216,7 +226,7 @@ fn get_hir_dep_graph(hir: &AscentIr) -> Vec<(usize, usize)> {
    let mut edges = vec![];
    for (i, rule) in hir.rules.iter().enumerate() {
       for bitem in rule.body_items.iter() {
-         if let Some(body_rel) = bitem.rel() {
+         for body_rel in bitem.relations() {
             let body_rel_identity = &body_rel.relation;
             if let Some(set) = relations_to_rules_in_head.get(body_rel_identity) {
                for &rule_with_rel_in_head in set.iter().sorted() {
@@ -247,10 +257,8 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir> {
       let mut dynamic_relations_set = HashSet::new();
       for &rule_ind in scc.iter() {
          let rule = &hir.rules[rule_ind];
-         for bitem in rule.body_items.iter() {
-            if let Some(rel) = bitem.rel() {
-               body_only_relations.entry(rel.relation.clone()).or_default().insert(rel.clone());
-            }
+         for rel in rule.body_items.iter().flat_map(IrBodyItem::relations) {
+            body_only_relations.entry(rel.relation.clone()).or_default().insert(rel.clone());
          }
 
          for hcl in hir.rules[rule_ind].head_clauses.iter() {
@@ -279,15 +287,10 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir> {
          .flat_map(|&ind| compile_hir_rule_to_mir_rules(&hir.rules[ind], &dynamic_relations_set))
          .collect_vec();
 
-      for rule in rules.iter() {
-         for bi in rule.body_items.iter() {
-            if let MirBodyItem::Agg(agg) = bi {
-               if dynamic_relations.contains_key(&agg.rel.relation) {
-                  return Err(syn::Error::new(
-                     agg.span,
-                     format!("use of aggregated relation `{}` cannot be stratified", &agg.rel.relation.name),
-                  ));
-               }
+      for &rule_ind in scc.iter() {
+         for bi in hir.rules[rule_ind].body_items.iter() {
+            if let IrBodyItem::Agg(agg) = bi {
+               agg_check_stratification(agg, &dynamic_relations)?;
             }
          }
       }
@@ -317,6 +320,25 @@ pub(crate) fn compile_hir_to_mir(hir: &AscentIr) -> syn::Result<AscentMir> {
       config: hir.config.clone(),
       is_parallel: hir.is_parallel,
    })
+}
+
+/// Checks that no relation in the body of `agg` (or of the aggregations nested in it, like negations) is computed
+/// in the current stratum
+fn agg_check_stratification(
+   agg: &IrAggClause, dynamic_relations: &HashMap<RelationIdentity, HashSet<IrRelation>>,
+) -> syn::Result<()> {
+   for bitem in agg.bodies.iter().flatten() {
+      match bitem {
+         IrBodyItem::Clause(bcl) if dynamic_relations.contains_key(&bcl.rel.relation) =>
+            return Err(syn::Error::new(
+               bcl.rel_args_span,
+               format!("use of aggregated relation `{}` cannot be stratified", &bcl.rel.relation.name),
+            )),
+         IrBodyItem::Agg(agg) => agg_check_stratification(agg, dynamic_relations)?,
+         _ => (),
+      }
+   }
+   Ok(())
 }
 
 fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<RelationIdentity>) -> Vec<MirRule> {
@@ -383,7 +405,17 @@ fn compile_hir_rule_to_mir_rules(rule: &IrRule, dynamic_relations: &HashSet<Rela
          },
          IrBodyItem::Cond(cl) => MirBodyItem::Cond(cl.clone()),
          IrBodyItem::Generator(gen) => MirBodyItem::Generator(gen.clone()),
-         IrBodyItem::Agg(agg) => MirBodyItem::Agg(agg.clone()),
+         IrBodyItem::Agg(agg) => MirBodyItem::Agg(MirAggClause {
+            span: agg.span,
+            pat: agg.pat.clone(),
+            aggregator: agg.aggregator.clone(),
+            bound_args: agg.bound_args.clone(),
+            bodies: agg
+               .bodies
+               .iter()
+               .map(|body| body.iter().map(|bi| hir_body_item_to_mir_body_item(bi, None)).collect())
+               .collect(),
+         }),
       }
    }
 

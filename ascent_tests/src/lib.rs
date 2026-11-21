@@ -12,3 +12,4 @@ mod agg_tests;
 mod example_tests;
 mod macros_tests;
 mod include_source_tests;
+mod agg_body_tests;

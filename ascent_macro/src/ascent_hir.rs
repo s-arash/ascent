@@ -13,7 +13,7 @@ use crate::ascent_syntax::{
    RuleNode, Signatures,
 };
 use crate::syn_utils::{expr_get_vars, pattern_get_vars};
-use crate::utils::{dedup_all_keep_last_by, expr_to_ident, is_wild_card, tuple_type};
+use crate::utils::{dedup_all_keep_last_by, expr_to_ident, tuple_type};
 
 #[derive(Clone)]
 pub(crate) struct AscentConfig {
@@ -113,7 +113,7 @@ pub(crate) fn ir_rule_summary(rule: &IrRule) -> String {
          IrBodyItem::Cond(CondClause::If(..)) => format!("if ⋯"),
          IrBodyItem::Cond(CondClause::IfLet(..)) => format!("if let ⋯"),
          IrBodyItem::Cond(CondClause::Let(..)) => format!("let ⋯"),
-         IrBodyItem::Agg(agg) => format!("agg {}", agg.rel.ir_name()),
+         IrBodyItem::Agg(agg) => format!("agg {}", agg.bodies.iter().flatten().map(bitem_to_str).join(", ")),
       }
    }
    format!(
@@ -131,6 +131,7 @@ pub(crate) struct IrHeadClause {
    pub args_span: Span,
 }
 
+#[derive(Clone)]
 pub(crate) enum IrBodyItem {
    Clause(IrBodyClause),
    Generator(GeneratorNode),
@@ -139,11 +140,12 @@ pub(crate) enum IrBodyItem {
 }
 
 impl IrBodyItem {
-   pub(crate) fn rel(&self) -> Option<&IrRelation> {
+   /// The relations read by this body item, including the ones in aggregation bodies
+   pub(crate) fn relations(&self) -> Vec<&IrRelation> {
       match self {
-         IrBodyItem::Clause(bcl) => Some(&bcl.rel),
-         IrBodyItem::Agg(agg) => Some(&agg.rel),
-         IrBodyItem::Generator(_) | IrBodyItem::Cond(_) => None,
+         IrBodyItem::Clause(bcl) => vec![&bcl.rel],
+         IrBodyItem::Agg(agg) => agg.relations(),
+         IrBodyItem::Generator(_) | IrBodyItem::Cond(_) => vec![],
       }
    }
 }
@@ -168,8 +170,14 @@ pub(crate) struct IrAggClause {
    pub pat: Pat,
    pub aggregator: Expr,
    pub bound_args: Vec<Ident>,
-   pub rel: IrRelation,
-   pub rel_args: Vec<Expr>,
+   /// The disjuncts of the aggregation body
+   pub bodies: Vec<Vec<IrBodyItem>>,
+}
+
+impl IrAggClause {
+   pub(crate) fn relations(&self) -> Vec<&IrRelation> {
+      self.bodies.iter().flatten().flat_map(IrBodyItem::relations).collect()
+   }
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
@@ -277,16 +285,8 @@ pub(crate) fn compile_ascent_program_to_hir(prog: &AscentProgram, is_parallel: b
       });
    }
    for (ir_rule, extra_relations) in ir_rules.iter() {
-      for bitem in ir_rule.body_items.iter() {
-         let rel = match bitem {
-            IrBodyItem::Clause(bcl) => Some(&bcl.rel),
-            IrBodyItem::Agg(agg) => Some(&agg.rel),
-            _ => None,
-         };
-         if let Some(rel) = rel {
-            let relation = &rel.relation;
-            relations_ir_relations.entry(relation.clone()).or_default().insert(rel.clone());
-         }
+      for rel in ir_rule.body_items.iter().flat_map(IrBodyItem::relations) {
+         relations_ir_relations.entry(rel.relation.clone()).or_default().insert(rel.clone());
       }
       for extra_rel in extra_relations.iter() {
          relations_ir_relations.entry(extra_rel.relation.clone()).or_default().insert(extra_rel.clone());
@@ -318,131 +318,66 @@ fn get_ds_attr(attrs: &[Attribute]) -> syn::Result<Option<DsAttributeContents>> 
    }
 }
 
+fn extend_grounded_vars(grounded_vars: &mut Vec<Ident>, new_vars: impl IntoIterator<Item = Ident>) -> syn::Result<()> {
+   for v in new_vars.into_iter() {
+      if grounded_vars.contains(&v) {
+         // TODO may someday this will work
+         let other_var = grounded_vars.iter().find(|&x| x == &v).unwrap();
+         let other_err = Error::new(other_var.span(), "variable being shadowed");
+         let mut err = Error::new(v.span(), format!("`{v}` shadows another variable with the same name"));
+         err.combine(other_err);
+         return Err(err);
+      }
+      grounded_vars.push(v);
+   }
+   Ok(())
+}
+
 fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result<(IrRule, Vec<IrRelation>)> {
    let mut body_items = vec![];
    let mut grounded_vars = vec![];
-   fn extend_grounded_vars(
-      grounded_vars: &mut Vec<Ident>, new_vars: impl IntoIterator<Item = Ident>,
-   ) -> syn::Result<()> {
-      for v in new_vars.into_iter() {
-         if grounded_vars.contains(&v) {
-            // TODO may someday this will work
-            let other_var = grounded_vars.iter().find(|&x| x == &v).unwrap();
-            let other_err = Error::new(other_var.span(), "variable being shadowed");
-            let mut err = Error::new(v.span(), format!("`{v}` shadows another variable with the same name"));
-            err.combine(other_err);
-            return Err(err);
-         }
-         grounded_vars.push(v);
-      }
-      Ok(())
-   }
 
    let first_clause_ind =
       rule.body_items.iter().enumerate().find(|(_, bi)| matches!(bi, BodyItemNode::Clause(..))).map(|(i, _)| i);
    let mut first_two_clauses_simple = first_clause_ind.is_some()
       && matches!(rule.body_items.get(first_clause_ind.unwrap() + 1), Some(BodyItemNode::Clause(..)));
    for (bitem_ind, bitem) in rule.body_items.iter().enumerate() {
-      match bitem {
-         BodyItemNode::Clause(ref bcl) => {
-            if first_clause_ind == Some(bitem_ind)
-               && bcl.cond_clauses.iter().any(|c| matches!(c, &CondClause::IfLet(_)))
-            {
-               first_two_clauses_simple = false;
-            }
+      if let BodyItemNode::Clause(bcl) = bitem {
+         if first_clause_ind == Some(bitem_ind) && bcl.cond_clauses.iter().any(|c| matches!(c, &CondClause::IfLet(_))) {
+            first_two_clauses_simple = false;
+         }
 
-            if first_clause_ind.map(|x| x + 1) == Some(bitem_ind) && first_two_clauses_simple {
-               let mut self_vars = HashSet::new();
-               for var in bcl.args.iter().filter_map(|arg| expr_to_ident(arg.unwrap_expr_ref())) {
-                  if !self_vars.insert(var) {
-                     first_two_clauses_simple = false;
-                  }
-               }
-               for cond_cl in bcl.cond_clauses.iter() {
-                  let cond_expr = cond_cl.expr();
-                  let expr_idents = expr_get_vars(cond_expr);
-                  if !expr_idents.iter().all(|v| self_vars.contains(v)) {
-                     first_two_clauses_simple = false;
-                     break;
-                  }
-                  self_vars.extend(cond_cl.bound_vars());
+         if first_clause_ind.map(|x| x + 1) == Some(bitem_ind) && first_two_clauses_simple {
+            let mut self_vars = HashSet::new();
+            for var in bcl.args.iter().filter_map(|arg| expr_to_ident(arg.unwrap_expr_ref())) {
+               if !self_vars.insert(var) {
+                  first_two_clauses_simple = false;
                }
             }
-            let mut indices = vec![];
-            for (i, arg) in bcl.args.iter().enumerate() {
-               if let Some(var) = expr_to_ident(arg.unwrap_expr_ref()) {
-                  if grounded_vars.contains(&var) {
-                     indices.push(i);
-                     if first_clause_ind == Some(bitem_ind) {
-                        first_two_clauses_simple = false;
-                     }
-                  } else {
-                     grounded_vars.push(var);
-                  }
-               } else {
-                  indices.push(i);
+            for cond_cl in bcl.cond_clauses.iter() {
+               let cond_expr = cond_cl.expr();
+               let expr_idents = expr_get_vars(cond_expr);
+               if !expr_idents.iter().all(|v| self_vars.contains(v)) {
+                  first_two_clauses_simple = false;
+                  break;
+               }
+               self_vars.extend(cond_cl.bound_vars());
+            }
+         }
+         for arg in bcl.args.iter() {
+            match expr_to_ident(arg.unwrap_expr_ref()) {
+               Some(var) =>
+                  if first_clause_ind == Some(bitem_ind) && grounded_vars.contains(&var) {
+                     first_two_clauses_simple = false;
+                  },
+               None =>
                   if bitem_ind < 2 + first_clause_ind.unwrap_or(0) {
                      first_two_clauses_simple = false;
-                  }
-               }
+                  },
             }
-            let relation = prog_get_relation(prog, &bcl.rel, bcl.args.len())?;
-
-            for cond_clause in bcl.cond_clauses.iter() {
-               extend_grounded_vars(&mut grounded_vars, cond_clause.bound_vars())?;
-            }
-
-            let ir_rel = IrRelation::new(relation.into(), indices);
-            let ir_bcl = IrBodyClause {
-               rel: ir_rel,
-               args: bcl.args.iter().cloned().map(BodyClauseArg::unwrap_expr).collect(),
-               rel_args_span: bcl.rel.span().join(bcl.args.span()).unwrap_or_else(|| bcl.rel.span()),
-               args_span: bcl.args.span(),
-               cond_clauses: bcl.cond_clauses.clone(),
-            };
-            body_items.push(IrBodyItem::Clause(ir_bcl));
-         },
-         BodyItemNode::Generator(ref gen) => {
-            extend_grounded_vars(&mut grounded_vars, pattern_get_vars(&gen.pattern))?;
-            body_items.push(IrBodyItem::Generator(gen.clone()));
-         },
-         BodyItemNode::Cond(ref cl) => {
-            body_items.push(IrBodyItem::Cond(cl.clone()));
-            extend_grounded_vars(&mut grounded_vars, cl.bound_vars())?;
-         },
-         BodyItemNode::Agg(ref agg) => {
-            extend_grounded_vars(&mut grounded_vars, pattern_get_vars(&agg.pat))?;
-            let indices = agg
-               .rel_args
-               .iter()
-               .enumerate()
-               .filter(|(_i, expr)| {
-                  if is_wild_card(expr) {
-                     return false;
-                  } else if let Some(ident) = expr_to_ident(expr) {
-                     if agg.bound_args.iter().contains(&ident) {
-                        return false;
-                     }
-                  }
-                  true
-               })
-               .map(|(i, _expr)| i)
-               .collect_vec();
-            let relation = prog_get_relation(prog, &agg.rel, agg.rel_args.len())?;
-
-            let ir_rel = IrRelation::new(relation.into(), indices);
-            let ir_agg_clause = IrAggClause {
-               span: agg.agg_kw.span,
-               pat: agg.pat.clone(),
-               aggregator: agg.aggregator.get_expr(),
-               bound_args: agg.bound_args.iter().cloned().collect_vec(),
-               rel: ir_rel,
-               rel_args: agg.rel_args.iter().cloned().collect_vec(),
-            };
-            body_items.push(IrBodyItem::Agg(ir_agg_clause));
-         },
-         _ => panic!("unrecognized body item"),
+         }
       }
+      body_items.push(compile_body_item(bitem, prog, &mut grounded_vars)?);
    }
    let mut head_clauses = vec![];
    for hcl_node in rule.head_clauses.iter() {
@@ -482,6 +417,77 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
    }
 
    Ok((IrRule { simple_join_start_index, head_clauses, body_items }, vec![]))
+}
+
+fn compile_body_item(
+   bitem: &BodyItemNode, prog: &AscentProgram, grounded_vars: &mut Vec<Ident>,
+) -> syn::Result<IrBodyItem> {
+   match bitem {
+      BodyItemNode::Clause(bcl) => {
+         let mut indices = vec![];
+         for (i, arg) in bcl.args.iter().enumerate() {
+            match expr_to_ident(arg.unwrap_expr_ref()) {
+               Some(var) if !grounded_vars.contains(&var) => grounded_vars.push(var),
+               _ => indices.push(i),
+            }
+         }
+         let relation = prog_get_relation(prog, &bcl.rel, bcl.args.len())?;
+
+         for cond_clause in bcl.cond_clauses.iter() {
+            extend_grounded_vars(grounded_vars, cond_clause.bound_vars())?;
+         }
+
+         let ir_rel = IrRelation::new(relation.into(), indices);
+         let ir_bcl = IrBodyClause {
+            rel: ir_rel,
+            args: bcl.args.iter().cloned().map(BodyClauseArg::unwrap_expr).collect(),
+            rel_args_span: bcl.rel.span().join(bcl.args.span()).unwrap_or_else(|| bcl.rel.span()),
+            args_span: bcl.args.span(),
+            cond_clauses: bcl.cond_clauses.clone(),
+         };
+         Ok(IrBodyItem::Clause(ir_bcl))
+      },
+      BodyItemNode::Generator(gen) => {
+         extend_grounded_vars(grounded_vars, pattern_get_vars(&gen.pattern))?;
+         Ok(IrBodyItem::Generator(gen.clone()))
+      },
+      BodyItemNode::Cond(cl) => {
+         extend_grounded_vars(grounded_vars, cl.bound_vars())?;
+         Ok(IrBodyItem::Cond(cl.clone()))
+      },
+      BodyItemNode::Agg(agg) => {
+         // the aggregated variables belong to the aggregation body, even if they shadow outer variables
+         let outer_vars = grounded_vars.iter().filter(|v| !agg.bound_args.iter().contains(v)).cloned().collect_vec();
+         let bodies = agg
+            .body
+            .iter()
+            .map(|conj| {
+               let mut body_vars = outer_vars.clone();
+               let body: Vec<_> = conj
+                  .iter()
+                  .map(|bi| match bi {
+                     BodyItemNode::Generator(gen) =>
+                        Err(Error::new(gen.for_keyword.span, "`for` clauses are not allowed in aggregation bodies")),
+                     _ => compile_body_item(bi, prog, &mut body_vars),
+                  })
+                  .try_collect()?;
+               if let Some(arg) = agg.bound_args.iter().find(|arg| !body_vars.contains(arg)) {
+                  return Err(Error::new(arg.span(), format!("`{arg}` is not bound by the aggregation body")));
+               }
+               Ok(body)
+            })
+            .try_collect()?;
+         extend_grounded_vars(grounded_vars, pattern_get_vars(&agg.pat))?;
+         Ok(IrBodyItem::Agg(IrAggClause {
+            span: agg.agg_kw.span,
+            pat: agg.pat.clone(),
+            aggregator: agg.aggregator.get_expr(),
+            bound_args: agg.bound_args.iter().cloned().collect_vec(),
+            bodies,
+         }))
+      },
+      _ => panic!("unrecognized body item"),
+   }
 }
 
 pub fn ir_name_for_rel_indices(rel: &Ident, indices: &[usize]) -> Ident {
