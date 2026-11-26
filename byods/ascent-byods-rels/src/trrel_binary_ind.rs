@@ -24,8 +24,8 @@ pub enum TrRelIndCommon<T: Clone + Hash + Eq> {
 impl<T: Clone + Hash + Eq> TrRelIndCommon<T> {
    pub fn anti_reflexive(&self) -> bool {
       match self {
-         TrRelIndCommon::New { anti_reflexive, .. } => *anti_reflexive,
-         TrRelIndCommon::Old { anti_reflexive, .. } => *anti_reflexive,
+         Self::New { anti_reflexive, .. } => *anti_reflexive,
+         Self::Old { anti_reflexive, .. } => *anti_reflexive,
       }
    }
 
@@ -35,28 +35,28 @@ impl<T: Clone + Hash + Eq> TrRelIndCommon<T> {
    #[inline]
    pub fn rel(&self) -> &BinaryRel<T> {
       match self {
-         TrRelIndCommon::New { rel, .. } => rel,
-         TrRelIndCommon::Old { rel, .. } => rel,
+         Self::New { rel, .. } => rel,
+         Self::Old { rel, .. } => rel,
       }
    }
 
    pub fn unwrap_new_mut(&mut self) -> &mut BinaryRel<T> {
       match self {
-         TrRelIndCommon::New { rel, .. } => rel,
-         TrRelIndCommon::Old { .. } => panic!("TrRelIndCommon: unwrap_new_mut called on Old"),
+         Self::New { rel, .. } => rel,
+         Self::Old { .. } => panic!("TrRelIndCommon: unwrap_new_mut called on Old"),
       }
    }
    pub fn unwrap_new(&self) -> &BinaryRel<T> {
       match self {
-         TrRelIndCommon::New { rel, .. } => rel,
-         TrRelIndCommon::Old { .. } => panic!("TrRelIndCommon: unwrap_new called on Old"),
+         Self::New { rel, .. } => rel,
+         Self::Old { .. } => panic!("TrRelIndCommon: unwrap_new called on Old"),
       }
    }
 
    pub fn unwrap_old(&self) -> &BinaryRel<T> {
       match self {
-         TrRelIndCommon::Old { rel, .. } => rel,
-         TrRelIndCommon::New { .. } => panic!("TrRelIndCommon: unwrap_old called on New"),
+         Self::Old { rel, .. } => rel,
+         Self::New { .. } => panic!("TrRelIndCommon: unwrap_old called on New"),
       }
    }
 
@@ -74,8 +74,8 @@ impl<T: Clone + Hash + Eq> TrRelIndCommon<T> {
 
    pub fn is_empty(&self) -> bool {
       match self {
-         TrRelIndCommon::New { rel, .. } => rel.map.is_empty(),
-         TrRelIndCommon::Old { rel, .. } => rel.map.is_empty(),
+         Self::New { rel, .. } => rel.map.is_empty(),
+         Self::Old { rel, .. } => rel.map.is_empty(),
       }
    }
 }
@@ -89,8 +89,8 @@ pub trait ToTrRelIndCommon<T: Clone + Hash + Eq> {
 }
 
 impl<T: Clone + Hash + Eq> ToTrRelIndCommon<T> for TrRelIndCommon<T> {
-   fn to_tr_rel_ind(&self) -> &TrRelIndCommon<T> { self }
-   fn to_tr_rel_ind_mut(&mut self) -> &mut TrRelIndCommon<T> { self }
+   fn to_tr_rel_ind(&self) -> &Self { self }
+   fn to_tr_rel_ind_mut(&mut self) -> &mut Self { self }
 }
 
 impl<T: Clone + Hash + Eq> Default for TrRelIndCommon<T> {
@@ -114,12 +114,12 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
       let anti_reflexive = total.anti_reflexive();
 
       let mut total_rel = match total {
-         TrRelIndCommon::New { .. } => Default::default(),
-         TrRelIndCommon::Old { rel, .. } => std::mem::take(rel),
+         Self::New { .. } => Default::default(),
+         Self::Old { rel, .. } => std::mem::take(rel),
       };
       let mut delta_rel = match delta {
-         TrRelIndCommon::New { .. } => Default::default(),
-         TrRelIndCommon::Old { rel, .. } => std::mem::take(rel),
+         Self::New { .. } => Default::default(),
+         Self::Old { rel, .. } => std::mem::take(rel),
       };
 
       move_hash_map_of_hash_set_contents_disjoint(&mut delta_rel.map, &mut total_rel.map);
@@ -273,9 +273,9 @@ impl<T: Clone + Hash + Eq> RelIndexMerge for TrRelIndCommon<T> {
       new_delta.map = delta_total_map;
       new_delta.reverse_map = delta_total_rev_map;
 
-      *total = TrRelIndCommon::Old { rel: total_rel, anti_reflexive };
-      *delta = TrRelIndCommon::Old { rel: new_delta, anti_reflexive };
-      *new = TrRelIndCommon::New { rel: Default::default(), anti_reflexive };
+      *total = Self::Old { rel: total_rel, anti_reflexive };
+      *delta = Self::Old { rel: new_delta, anti_reflexive };
+      *new = Self::New { rel: Default::default(), anti_reflexive };
 
       unsafe {
          MERGE_TIME += before.elapsed();

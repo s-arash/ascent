@@ -203,8 +203,8 @@ where
    #[inline]
    fn next(&mut self) -> Option<Self::Item> {
       match self {
-         Either::Left(l) => l.next(),
-         Either::Right(r) => r.next(),
+         Self::Left(l) => l.next(),
+         Self::Right(r) => r.next(),
       }
    }
 }

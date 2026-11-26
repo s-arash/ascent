@@ -100,7 +100,7 @@ impl<T: PartialEq> Lattice for ConstPropagation<T> {
 }
 
 impl<T: Lattice> BoundedLattice for ConstPropagation<T>
-where ConstPropagation<T>: Lattice
+where Self: Lattice
 {
    fn top() -> Self { Self::Top }
    fn bottom() -> Self { Self::Bottom }

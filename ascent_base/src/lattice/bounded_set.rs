@@ -16,16 +16,16 @@ impl<const BOUND: usize, T: PartialEq + Eq + Hash + Ord> Default for BoundedSet<
 
 impl<const BOUND: usize, T: PartialEq + Eq + Hash + Ord> BoundedSet<BOUND, T> {
    /// A set containing everything
-   pub const TOP: Self = BoundedSet(None);
+   pub const TOP: Self = Self(None);
 
    /// Creates an empty `BoundedSet`
-   pub fn new() -> Self { BoundedSet(Some(Set::default())) }
+   pub fn new() -> Self { Self(Some(Set::default())) }
 
    /// Creates a `BoundedSet` containing only `item`
    pub fn singleton(item: T) -> Self { Self::from_set(Set::singleton(item)) }
 
    /// Creates a `BoundedSet` from a `Set`, ensuring the `BOUND` is not exceeded
-   pub fn from_set(set: Set<T>) -> Self { if set.len() <= BOUND { BoundedSet(Some(set)) } else { BoundedSet(None) } }
+   pub fn from_set(set: Set<T>) -> Self { if set.len() <= BOUND { Self(Some(set)) } else { Self(None) } }
 
    /// Returns the size of the set. In case of the set being `TOP`, returns `None`
    pub fn count(&self) -> Option<usize> { self.0.as_ref().map(|s| s.len()) }
@@ -86,23 +86,23 @@ impl<const BOUND: usize, T: PartialEq + Eq + Hash + Ord> Lattice for BoundedSet<
    }
    fn meet(self, other: Self) -> Self {
       match (self.0, other.0) {
-         (None, None) => BoundedSet(None),
-         (None, set2 @ Some(_)) => BoundedSet(set2),
-         (set1 @ Some(_), None) => BoundedSet(set1),
+         (None, None) => Self(None),
+         (None, set2 @ Some(_)) => Self(set2),
+         (set1 @ Some(_), None) => Self(set1),
          (Some(set1), Some(set2)) => {
             let res = set1.meet(set2);
-            BoundedSet(Some(res))
+            Self(Some(res))
          },
       }
    }
 
    fn join(self, other: Self) -> Self {
       match (self.0, other.0) {
-         (None, _) => BoundedSet(None),
-         (_, None) => BoundedSet(None),
+         (None, _) => Self(None),
+         (_, None) => Self(None),
          (Some(set1), Some(set2)) => {
             let res = set1.join(set2);
-            if res.len() > BOUND { BoundedSet(None) } else { BoundedSet(Some(res)) }
+            if res.len() > BOUND { Self(None) } else { Self(Some(res)) }
          },
       }
    }
@@ -112,7 +112,7 @@ impl<const BOUND: usize, T: PartialEq + Eq + Hash + Ord> BoundedLattice for Boun
    fn bottom() -> Self { Self::new() }
 
    /// top is meant to represent a set containing everything
-   fn top() -> Self { BoundedSet(None) }
+   fn top() -> Self { Self(None) }
 }
 
 #[test]

@@ -143,7 +143,7 @@ impl<T: Lattice + Clone> Lattice for Rc<T> {
          },
          // Stable in 1.76:
          // None => Rc::make_mut(self).meet_mut(Rc::unwrap_or_clone(other))
-         None => Rc::make_mut(self).meet_mut(Rc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
+         None => Self::make_mut(self).meet_mut(Self::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
       }
    }
 
@@ -156,7 +156,7 @@ impl<T: Lattice + Clone> Lattice for Rc<T> {
          },
          // Stable in 1.76:
          // None => Rc::make_mut(self).join_mut(Rc::unwrap_or_clone(other))
-         None => Rc::make_mut(self).join_mut(Rc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
+         None => Self::make_mut(self).join_mut(Self::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
       }
    }
 }
@@ -171,7 +171,7 @@ impl<T: Lattice + Clone> Lattice for Arc<T> {
          },
          // Stable in 1.76:
          // None => Arc::make_mut(self).meet_mut(Arc::unwrap_or_clone(other))
-         None => Arc::make_mut(self).meet_mut(Arc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
+         None => Self::make_mut(self).meet_mut(Self::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
       }
    }
 
@@ -184,7 +184,7 @@ impl<T: Lattice + Clone> Lattice for Arc<T> {
          },
          // Stable in 1.76:
          // None => Arc::make_mut(self).join_mut(Arc::unwrap_or_clone(other))
-         None => Arc::make_mut(self).join_mut(Arc::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
+         None => Self::make_mut(self).join_mut(Self::try_unwrap(other).unwrap_or_else(|rc| (*rc).clone())),
       }
    }
 }
@@ -197,10 +197,10 @@ impl<T: Lattice + Sized> Lattice for Box<T> {
 
 impl<T: Lattice> Lattice for Reverse<T> {
    #[inline]
-   fn meet(self, other: Self) -> Self { Reverse(self.0.join(other.0)) }
+   fn meet(self, other: Self) -> Self { Self(self.0.join(other.0)) }
 
    #[inline]
-   fn join(self, other: Self) -> Self { Reverse(self.0.meet(other.0)) }
+   fn join(self, other: Self) -> Self { Self(self.0.meet(other.0)) }
 
    #[inline]
    fn meet_mut(&mut self, other: Self) -> bool { self.0.join_mut(other.0) }
@@ -211,10 +211,10 @@ impl<T: Lattice> Lattice for Reverse<T> {
 
 impl<T: BoundedLattice> BoundedLattice for Reverse<T> {
    #[inline]
-   fn bottom() -> Self { Reverse(T::top()) }
+   fn bottom() -> Self { Self(T::top()) }
 
    #[inline]
-   fn top() -> Self { Reverse(T::bottom()) }
+   fn top() -> Self { Self(T::bottom()) }
 }
 
 #[cfg(test)]
