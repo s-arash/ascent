@@ -1045,19 +1045,12 @@ fn compile_mir_rule_inner(
             let selected_args = mir_relation.indices.iter().map(|&i| &agg.rel_args[i]);
             let selected_args_cloned = selected_args.map(exp_cloned).collect_vec();
             let selected_args_tuple = tuple_spanned(&selected_args_cloned, agg.span);
-            let agg_args_tuple_indices = agg.bound_args.iter().map(|arg| {
-               (
-                  agg.rel_args.iter().find_position(|rel_arg| expr_to_ident(rel_arg) == Some(arg.clone())).unwrap().0,
-                  arg.clone(),
-               )
-            });
-
             let agg_args_tuple =
                tuple_spanned(&agg.bound_args.iter().map(|v| parse_quote! {#v}).collect_vec(), agg.span);
 
             let vars_assignments = clause_var_assignments(
                &MirRelation::from(agg.rel.clone(), MirRelationVersion::Total),
-               agg_args_tuple_indices,
+               agg.agg_args_tuple_indices.iter().cloned(),
                &parse_quote_spanned! {agg.span=> __val},
                &parse_quote! {_self.#rel_name},
                false,
