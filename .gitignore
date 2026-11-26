@@ -1,5 +1,5 @@
 target
-cargo.lock
+Cargo.lock
 .vscode
 **/scratchpad.rs
 
