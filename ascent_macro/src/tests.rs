@@ -55,7 +55,6 @@ fn write_ascent_run_par_to_scratchpad(tokens: TokenStream) -> TokenStream {
    write_to_scratchpad_base(tokens, quote! {}, AscentMacroKind { is_ascent_run: true, is_parallel: true }.into())
 }
 
-
 #[test]
 fn test_macro_generic_tc() {
    let inp = quote! {

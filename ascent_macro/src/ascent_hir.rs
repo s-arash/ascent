@@ -170,6 +170,7 @@ pub(crate) struct IrAggClause {
    pub bound_args: Vec<Ident>,
    pub rel: IrRelation,
    pub rel_args: Vec<Expr>,
+   pub agg_args_tuple_indices: Vec<(usize, Ident)>,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
@@ -431,6 +432,20 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
             let relation = prog_get_relation(prog, &agg.rel, agg.rel_args.len())?;
 
             let ir_rel = IrRelation::new(relation.into(), indices);
+            let agg_args_tuple_indices = agg
+               .bound_args
+               .iter()
+               .map::<syn::Result<_>, _>(|arg| {
+                  Ok((
+                     agg.rel_args
+                        .iter()
+                        .find_position(|rel_arg| expr_to_ident(rel_arg) == Some(arg.clone()))
+                        .ok_or_else(|| syn::Error::new_spanned(arg, "aggregation variable not bound"))?
+                        .0,
+                     arg.clone(),
+                  ))
+               })
+               .try_collect()?;
             let ir_agg_clause = IrAggClause {
                span: agg.agg_kw.span,
                pat: agg.pat.clone(),
@@ -438,6 +453,7 @@ fn compile_rule_to_ir_rule(rule: &RuleNode, prog: &AscentProgram) -> syn::Result
                bound_args: agg.bound_args.iter().cloned().collect_vec(),
                rel: ir_rel,
                rel_args: agg.rel_args.iter().cloned().collect_vec(),
+               agg_args_tuple_indices,
             };
             body_items.push(IrBodyItem::Agg(ir_agg_clause));
          },
